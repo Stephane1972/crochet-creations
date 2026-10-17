@@ -24,10 +24,9 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
 - Utilitaires `formatEuros` (montants en centimes) et dates en français.
 - Documentation : README, ARCHITECTURE, ROADMAP, CHANGELOG.
 - Tests unitaires (montants, dates, thèmes, contrastes) et tests de widgets (splash, navigation, thème).
-- Construction automatique de l'APK avec GitHub Actions, scripts `tool/setup_android.sh` et `tool/generate_icons.py`.
+- Construction automatique de l'APK avec GitHub Actions (analyse, tests, APK publié dans une pré-version), scripts `tool/setup_android.sh` et `tool/generate_icons.py`.
 
 ### Limites connues
 - Aucun chiffre n'est calculé : pas encore de base de données (étape 2).
 - Le choix jour/nuit n'est pas mémorisé entre deux lancements (étape 2).
-- Le code n'a pas pu être compilé ni testé dans l'environnement de rédaction (SDK Flutter inaccessible) :
-  la première exécution de GitHub Actions fait foi.
+- Le code est analysé, testé et compilé en APK par GitHub Actions, mais n'a pas encore été essayé sur un téléphone.

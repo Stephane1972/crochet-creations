@@ -44,14 +44,17 @@ Pour l'instant **aucun chiffre n'est calculé** (pas encore de base de données)
 
 ### Option A — Télécharger l'APK construit par GitHub (aucune installation)
 
-1. Sur GitHub, ouvrir le dépôt → onglet **Actions** → workflow **Android (analyse, tests, APK)**.
-2. Ouvrir la dernière exécution (pastille verte ou rouge) → section **Artifacts** en bas de page.
-3. Télécharger **crochet-creations-apk** (un fichier .zip contenant `app-release.apk`).
-4. Copier `app-release.apk` sur le téléphone Android et l'ouvrir. Android demandera d'autoriser
-   l'installation d'applications de sources inconnues pour l'application utilisée (Fichiers, Chrome…).
+1. Sur le téléphone, ouvrir le dépôt sur GitHub (navigateur ou application) → section **Releases**
+   (https://github.com/Stephane1972/crochet-creations/releases).
+2. Ouvrir la pré-version **« APK de test — … »** de la branche voulue et télécharger le fichier
+   `crochet-creations-XXXXXXX.apk` (XXXXXXX = numéro du commit).
+3. Ouvrir le fichier téléchargé. Android demandera d'autoriser l'installation d'applications de
+   sources inconnues pour l'application utilisée (Chrome, Fichiers…).
 
-Une exécution se lance automatiquement à chaque envoi sur `main` et à chaque pull request.
-On peut aussi la lancer à la main : **Actions → Android → Run workflow**.
+Une construction se lance automatiquement à chaque envoi sur `main` et sur chaque pull request ;
+on peut aussi la lancer à la main (**Actions → Android → Run workflow**). La pré-version d'une branche
+est remplacée à chaque nouvel envoi. L'APK est aussi proposé en « artefact » dans l'onglet Actions
+lorsque le quota de stockage du compte GitHub le permet.
 
 ### Option B — Lancer en local (nécessite Flutter)
 

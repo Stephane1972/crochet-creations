@@ -374,8 +374,8 @@ class _Seuil extends StatelessWidget {
           borderRadius: BorderRadius.circular(8),
           color: scheme.primary,
           backgroundColor: scheme.surfaceContainerHighest,
+          // Pas de semanticsValue : Flutter annonce déjà le pourcentage (et exige un nombre).
           semanticsLabel: libelle,
-          semanticsValue: '${(part * 100).round()} pour cent du seuil',
         ),
       ],
     );

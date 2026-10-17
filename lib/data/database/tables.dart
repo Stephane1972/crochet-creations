@@ -8,8 +8,9 @@
 ///   Les ventes, factures et devis ne s'archivent pas : ils changent de statut.
 /// - **Clés étrangères** : activées à l'ouverture (`PRAGMA foreign_keys = ON`), par défaut
 ///   en `RESTRICT` : on ne peut pas supprimer ce qui est encore utilisé par une vente, une facture...
-/// - **Contraintes** : quantités et montants positifs, totaux cohérents, numéros uniques...
-///   La base refuse un enregistrement incohérent même si le code se trompe.
+/// - **Contraintes** : noms non vides, quantités et montants positifs, totaux cohérents,
+///   numéros uniques... La base refuse un enregistrement incohérent même si le code se trompe.
+///   (`withLength` de Drift ne contrôle que côté Dart : la base reçoit donc aussi un `CHECK`.)
 /// - Les valeurs des listes de choix (`enums.dart`) sont enregistrées sous leur nom Dart ;
 ///   certaines sont citées dans les contraintes SQL ci-dessous.
 ///
@@ -141,6 +142,12 @@ class Produits extends Table with Tracabilite, Archivable {
 
   /// Chemin de la photo principale (les autres photos sont dans `photos_produit`).
   TextColumn get photoPrincipaleChemin => text().nullable()();
+
+  @override
+  List<String> get customConstraints => [
+    'CHECK (length(trim(nom)) > 0)',
+    'CHECK (length(trim(reference)) > 0)',
+  ];
 }
 
 /// Variante d'un produit (couleur, taille...) avec son propre stock.
@@ -168,6 +175,9 @@ class VariantesProduit extends Table with Tracabilite, Archivable {
   List<Set<Column>> get uniqueKeys => [
     {produitId, libelle},
   ];
+
+  @override
+  List<String> get customConstraints => ['CHECK (length(trim(libelle)) > 0)'];
 }
 
 /// Photos secondaires d'un produit (la principale est dans `produits`).
@@ -179,6 +189,9 @@ class PhotosProduit extends Table {
       integer().references(Produits, #id, onDelete: KeyAction.cascade)();
   TextColumn get chemin => text().withLength(min: 1)();
   IntColumn get position => integer().withDefault(const Constant(0))();
+
+  @override
+  List<String> get customConstraints => ['CHECK (length(trim(chemin)) > 0)'];
 }
 
 // -----------------------------------------------------------------------------
@@ -297,6 +310,7 @@ class LignesVente extends Table {
 
   @override
   List<String> get customConstraints => [
+    'CHECK (length(trim(designation)) > 0)',
     'CHECK (total_ligne_centimes = quantite * prix_unitaire_centimes)',
     'CHECK (variante_id IS NULL OR produit_id IS NOT NULL)',
     "CHECK (produit_id IS NULL OR nature = 'bien')",
@@ -451,6 +465,7 @@ class LignesDevis extends Table {
 
   @override
   List<String> get customConstraints => [
+    'CHECK (length(trim(designation)) > 0)',
     'CHECK (total_ligne_centimes = quantite * prix_unitaire_centimes)',
     'CHECK (variante_id IS NULL OR produit_id IS NOT NULL)',
     "CHECK (produit_id IS NULL OR nature = 'bien')",
@@ -483,6 +498,9 @@ class Cours extends Table with Tracabilite, Archivable {
   BoolColumn get materielInclus => boolean().withDefault(const Constant(false))();
   TextColumn get photoChemin => text().nullable()();
   TextColumn get statut => textEnum<StatutCours>().withDefault(const Constant('planifie'))();
+
+  @override
+  List<String> get customConstraints => ['CHECK (length(trim(titre)) > 0)'];
 }
 
 /// Inscription d'un client à un cours. Une seule ligne par couple (cours, client) :

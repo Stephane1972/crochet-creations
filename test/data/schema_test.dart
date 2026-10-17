@@ -177,6 +177,29 @@ void main() {
       );
     });
 
+    test('les noms obligatoires ne peuvent pas être vides (variante, cours, ligne de vente)', () async {
+      final int produit = await db.insererProduit();
+      final int vente = await db.insererVente();
+      await expectLater(
+        sql("INSERT INTO variantes_produit (produit_id, libelle) VALUES (?, '  ')", <Object?>[produit]),
+        throwsException,
+      );
+      await expectLater(
+        sql(
+          "INSERT INTO cours (titre, debut_le, duree_minutes, prix_centimes, places) VALUES ('', 1760000000, 60, 0, 1)",
+        ),
+        throwsException,
+      );
+      await expectLater(
+        sql(
+          'INSERT INTO lignes_vente (vente_id, designation, quantite, prix_unitaire_centimes, '
+          "total_ligne_centimes) VALUES (?, ' ', 1, 100, 100)",
+          <Object?>[vente],
+        ),
+        throwsException,
+      );
+    });
+
     test('une référence produit est unique', () async {
       await db.insererProduit(reference: 'PRD-0001');
       await expectLater(db.insererProduit(reference: 'PRD-0001'), throwsException);

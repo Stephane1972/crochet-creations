@@ -109,7 +109,7 @@ jobs:
       # L'APK s'y télécharge directement depuis le téléphone, sans dossier .zip,
       # et sans utiliser le quota de stockage d'artefacts de GitHub Actions.
       - name: Publier l'APK dans une pré-version
-        if: ${{ steps.apk.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.apk.outcome == 'success' }}
         env:
           GH_TOKEN: ${{ github.token }}
           BRANCHE: ${{ github.head_ref || github.ref_name }}
@@ -126,7 +126,7 @@ jobs:
 
       # Publication n°2 : artefact Actions (peut échouer si le quota du compte est plein : sans gravité).
       - name: Publier l'APK en artefact
-        if: ${{ steps.apk.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.apk.outcome == 'success' }}
         continue-on-error: true
         uses: actions/upload-artifact@v4
         with:

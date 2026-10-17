@@ -41,9 +41,23 @@ jobs:
       - name: Analyser le code
         run: flutter analyze --no-fatal-infos
 
+      # En cas d'échec, le détail des tests en erreur est aussi publié en « annotation »
+      # (visible en haut de la page de l'exécution), sans avoir à ouvrir le journal.
       - name: Lancer les tests
         if: ${{ !cancelled() }}
-        run: flutter test
+        run: |
+          set +e
+          flutter test --reporter expanded 2>&1 | tee test-output.log
+          code=${PIPESTATUS[0]}
+          if [ "$code" -ne 0 ]; then
+            RESUME=$(grep -E -A22 "\[E\]|EXCEPTION CAUGHT" test-output.log | head -c 7000)
+            if [ -z "$RESUME" ]; then RESUME=$(tail -n 60 test-output.log | head -c 7000); fi
+            RESUME="${RESUME//'%'/'%25'}"
+            RESUME="${RESUME//$'\r'/'%0D'}"
+            RESUME="${RESUME//$'\n'/'%0A'}"
+            echo "::error title=Tests en échec::$RESUME"
+          fi
+          exit $code
 
       # L'APK est construit même si un test échoue, pour pouvoir toujours essayer l'application.
       - name: Construire l'APK

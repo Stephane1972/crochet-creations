@@ -1,0 +1,60 @@
+name: Android (analyse, tests, APK)
+
+# Se lance à chaque envoi sur main, sur chaque pull request, et à la demande
+# (onglet « Actions » → « Android » → « Run workflow »).
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Installer Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Installer Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Version de Flutter
+        run: flutter --version
+
+      - name: Installer les dépendances
+        run: flutter pub get
+
+      - name: Préparer Android (dossier android/, nom, icônes)
+        run: bash tool/setup_android.sh
+
+      - name: Analyser le code
+        run: flutter analyze --no-fatal-infos
+
+      - name: Lancer les tests
+        if: ${{ !cancelled() }}
+        run: flutter test
+
+      # L'APK est construit même si un test échoue, pour pouvoir toujours essayer l'application.
+      - name: Construire l'APK
+        if: ${{ !cancelled() }}
+        run: flutter build apk --release
+
+      - name: Publier l'APK
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: crochet-creations-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: warn
+          retention-days: 30

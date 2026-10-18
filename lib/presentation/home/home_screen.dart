@@ -6,6 +6,8 @@ import '../../core/router/app_routes.dart';
 import '../../core/utils/date_fr.dart';
 import '../../core/utils/money.dart';
 import '../../core/widgets/app_logo.dart';
+import '../produits/filtres_produits.dart';
+import '../produits/produits_providers.dart';
 import '../shell/nav_provider.dart';
 
 /// Accueil / tableau de bord.
@@ -197,15 +199,16 @@ class _ActionTuile extends StatelessWidget {
 }
 
 // -----------------------------------------------------------------------------
-// Chiffres clés (valeurs branchées à l'étape 10)
+// Chiffres clés (« Stock faible » branché à l'étape 3, les autres à l'étape 10)
 // -----------------------------------------------------------------------------
 
-class _Chiffres extends StatelessWidget {
+class _Chiffres extends ConsumerWidget {
   const _Chiffres();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final ThemeData theme = Theme.of(context);
+    final int? aReapprovisionner = ref.watch(nombreAReapprovisionnerProvider);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -223,13 +226,18 @@ class _Chiffres extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        const _RangeeDeuxCartes(
+        _RangeeDeuxCartes(
           gauche: _ChiffreTuile(
             icone: Icons.inventory_2_outlined,
             libelle: 'Stock faible',
-            valeur: '—',
+            valeur: aReapprovisionner?.toString() ?? '—',
+            // Un appui ouvre la liste des produits à réapprovisionner.
+            onTap: () {
+              ref.read(filtresProduitsProvider.notifier).afficherAReapprovisionner();
+              ref.read(navIndexProvider.notifier).aller(OngletsNav.produits);
+            },
           ),
-          droite: _ChiffreTuile(
+          droite: const _ChiffreTuile(
             icone: Icons.hourglass_empty,
             libelle: 'Factures impayées',
             valeur: '—',
@@ -239,7 +247,7 @@ class _Chiffres extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.only(left: 4),
           child: Text(
-            'Les chiffres apparaîtront dès les premières ventes.',
+            'Les chiffres des ventes apparaîtront dès les premières ventes.',
             style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
           ),
         ),
@@ -249,11 +257,17 @@ class _Chiffres extends StatelessWidget {
 }
 
 class _ChiffreTuile extends StatelessWidget {
-  const _ChiffreTuile({required this.icone, required this.libelle, required this.valeur});
+  const _ChiffreTuile({
+    required this.icone,
+    required this.libelle,
+    required this.valeur,
+    this.onTap,
+  });
 
   final IconData icone;
   final String libelle;
   final String valeur;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -261,26 +275,30 @@ class _ChiffreTuile extends StatelessWidget {
     final ColorScheme scheme = theme.colorScheme;
 
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Row(
-              children: <Widget>[
-                Icon(icone, size: 20, color: scheme.primary),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    libelle,
-                    style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Row(
+                children: <Widget>[
+                  Icon(icone, size: 20, color: scheme.primary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      libelle,
+                      style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+                    ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Text(valeur, style: theme.textTheme.headlineSmall),
-          ],
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(valeur, style: theme.textTheme.headlineSmall),
+            ],
+          ),
         ),
       ),
     );

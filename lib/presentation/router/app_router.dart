@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../core/router/app_routes.dart';
 import '../common/placeholder_screen.dart';
+import '../produits/produit_fiche_screen.dart';
+import '../produits/produit_form_screen.dart';
 import '../settings/settings_screen.dart';
 import '../shell/main_shell.dart';
 import '../splash/splash_screen.dart';
@@ -20,6 +22,20 @@ abstract final class AppRouter {
         return _fondu(settings, const MainShell());
       case AppRoutes.reglages:
         return _page(settings, const SettingsScreen());
+      case AppRoutes.produitNouveau:
+        return _page(settings, const ProduitFormScreen());
+      case AppRoutes.produitFiche:
+        final int? idFiche = _identifiant(settings);
+        return _page(
+          settings,
+          idFiche == null ? const _PageIntrouvable() : ProduitFicheScreen(produitId: idFiche),
+        );
+      case AppRoutes.produitModifier:
+        final int? idModif = _identifiant(settings);
+        return _page(
+          settings,
+          idModif == null ? const _PageIntrouvable() : ProduitFormScreen(produitId: idModif),
+        );
     }
 
     final PlaceholderInfo? info = EcransAVenir.parRoute[settings.name];
@@ -27,6 +43,12 @@ abstract final class AppRouter {
       return _page(settings, PlaceholderScreen(info: info));
     }
     return _page(settings, const _PageIntrouvable());
+  }
+
+  /// Identifiant passé en `arguments` à la route (un entier), `null` s'il manque.
+  static int? _identifiant(RouteSettings settings) {
+    final Object? arguments = settings.arguments;
+    return arguments is int ? arguments : null;
   }
 
   static Route<dynamic> _page(RouteSettings settings, Widget ecran) {

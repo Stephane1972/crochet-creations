@@ -284,6 +284,7 @@ class ProduitRepository {
     if (await obtenir(produitId) == null) {
       throw const ElementIntrouvable('Ce produit n’existe plus.');
     }
+    await _verifierLibelleLibre(produitId, donnees.libelle);
     final int id = await _db
         .into(_db.variantesProduit)
         .insert(
@@ -302,6 +303,7 @@ class ProduitRepository {
 
   Future<VarianteProduit> modifierVariante(int id, DonneesVariante donnees) async {
     donnees.valider();
+    await _verifierLibelleLibre((await _variante(id)).produitId, donnees.libelle, sauf: id);
     final int lignes = await (_db.update(_db.variantesProduit)..where((t) => t.id.equals(id))).write(
       VariantesProduitCompanion(
         libelle: Value(donnees.libelle.trim()),
@@ -400,7 +402,7 @@ class ProduitRepository {
 
   /// Ventes validées contenant ce produit (toutes variantes), de la plus récente à la plus ancienne.
   Future<List<LigneHistoriqueVente>> historiqueVentes(int produitId) async {
-    final JoinedSelectStatement<$LignesVenteTable, LigneVente> requete =
+    final JoinedSelectStatement<HasResultSet, dynamic> requete =
         _db.select(_db.lignesVente).join(<Join>[
             innerJoin(_db.ventes, _db.ventes.id.equalsExp(_db.lignesVente.venteId)),
             leftOuterJoin(_db.clients, _db.clients.id.equalsExp(_db.ventes.clientId)),
@@ -492,6 +494,22 @@ class ProduitRepository {
       variantes: await variantes(id, inclureArchivees: true),
       photosSecondaires: await photosSecondaires(id),
     );
+  }
+
+  /// Refuse un nom de variante déjà pris pour ce produit (majuscules ignorées, variantes
+  /// archivées comprises), avec un message clair plutôt qu'une erreur technique de la base.
+  Future<void> _verifierLibelleLibre(int produitId, String libelle, {int? sauf}) async {
+    final String voulu = libelle.trim().toLowerCase();
+    final List<VarianteProduit> existantes = await variantes(produitId, inclureArchivees: true);
+    final bool pris = existantes.any(
+      (VarianteProduit v) => v.id != sauf && v.libelle.trim().toLowerCase() == voulu,
+    );
+    if (pris) {
+      throw DonneeInvalide(
+        'Une variante nommée « ${libelle.trim()} » existe déjà pour ce produit '
+        '(peut-être archivée).',
+      );
+    }
   }
 
   Future<PhotoProduit> _insererPhoto(int produitId, String chemin) async {

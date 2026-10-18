@@ -42,6 +42,13 @@ class ProduitResume {
 
   /// Produit à réapprovisionner : en alerte, hors produits sur commande.
   bool get aReapprovisionner => alerte != null;
+
+  /// Peut-on le vendre maintenant ? Non s'il est archivé, marqué « épuisé »,
+  /// ou s'il n'en reste plus en stock (sauf produit sur commande, fabriqué à la demande).
+  bool get vendable {
+    if (produit.archiveLe != null || produit.statut == StatutProduit.epuise) return false;
+    return !suitLeStock(produit.statut) || stockTotal > 0;
+  }
 }
 
 /// Tout ce qu'affiche la fiche d'un produit.

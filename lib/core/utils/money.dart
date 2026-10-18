@@ -12,14 +12,14 @@ String formatEuros(int centimes, {bool avecCentimes = true}) {
   final String decimales = (absolu % 100).toString().padLeft(2, '0');
   final String nombre = avecCentimes ? '$entier,$decimales' : entier;
   final String signe = negatif ? '−' : '';
-  return '$signe$nombre €';
+  return '$signe$nombre\u00A0€';
 }
 
 String _grouperParTrois(String chiffres) {
   final StringBuffer tampon = StringBuffer();
   for (int i = 0; i < chiffres.length; i++) {
     if (i > 0 && (chiffres.length - i) % 3 == 0) {
-      tampon.write(' ');
+      tampon.write('\u00A0');
     }
     tampon.write(chiffres[i]);
   }

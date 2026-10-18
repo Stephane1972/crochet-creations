@@ -7,7 +7,7 @@ import 'package:crochet_creations/data/repositories/produit_vues.dart';
 import 'package:crochet_creations/domain/calculs/stock.dart';
 import 'package:crochet_creations/domain/enums.dart';
 import 'package:crochet_creations/domain/erreurs.dart';
-import 'package:drift/drift.dart';
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter_test/flutter_test.dart';
 
 import 'aide_base.dart';
@@ -122,6 +122,18 @@ void main() {
       await repo.creer(doudou.copyWithStock(0, statut: StatutProduit.surCommande));
       final ProduitResume resume = (await repo.observerResumes().first).single;
       expect(resume.alerte, isNull);
+    });
+
+    test('vendable : ni archivé, ni épuisé, ni sans stock (sauf sur commande)', () async {
+      await repo.creer(doudou); // en stock
+      await repo.creer(doudou.copyWithStock(0)); // plus de stock
+      await repo.creer(doudou.copyWithStock(4, statut: StatutProduit.epuise)); // marqué épuisé
+      await repo.creer(doudou.copyWithStock(0, statut: StatutProduit.surCommande)); // à la demande
+      final Produit archive = await repo.creer(doudou);
+      await repo.archiver(archive.id);
+
+      final List<ProduitResume> resumes = await repo.observerResumes(inclureArchives: true).first;
+      expect(resumes.map((ProduitResume r) => r.vendable), <bool>[true, false, false, true, false]);
     });
 
     test('les produits archivés sont exclus sauf demande contraire', () async {
@@ -250,6 +262,58 @@ void main() {
         throwsA(isA<ElementIntrouvable>()),
       );
       expect(await db.select(db.photosProduit).get(), isEmpty);
+    });
+  });
+
+  group('noms de variantes', () {
+    test('un nom déjà pris est refusé avec un message clair, majuscules ignorées', () async {
+      final Produit p = await repo.creer(doudou);
+      await repo.ajouterVariante(p.id, const DonneesVariante(libelle: 'Rose'));
+
+      await expectLater(
+        repo.ajouterVariante(p.id, const DonneesVariante(libelle: ' rose ')),
+        throwsA(
+          isA<DonneeInvalide>().having(
+            (DonneeInvalide e) => e.message,
+            'message',
+            contains('existe déjà'),
+          ),
+        ),
+      );
+    });
+
+    test('le même nom est possible pour un autre produit', () async {
+      final Produit a = await repo.creer(doudou);
+      final Produit b = await repo.creer(doudou);
+      await repo.ajouterVariante(a.id, const DonneesVariante(libelle: 'Rose'));
+      await repo.ajouterVariante(b.id, const DonneesVariante(libelle: 'Rose'));
+    });
+
+    test('modifier une variante en gardant son nom est possible, en prenant celui d’une autre non', () async {
+      final Produit p = await repo.creer(doudou);
+      final VarianteProduit rose = await repo.ajouterVariante(p.id, const DonneesVariante(libelle: 'Rose'));
+      await repo.ajouterVariante(p.id, const DonneesVariante(libelle: 'Bleu'));
+
+      final VarianteProduit modifiee = await repo.modifierVariante(
+        rose.id,
+        const DonneesVariante(libelle: 'Rose', quantiteStock: 6),
+      );
+      expect(modifiee.quantiteStock, 6);
+
+      await expectLater(
+        repo.modifierVariante(rose.id, const DonneesVariante(libelle: 'BLEU')),
+        throwsA(isA<DonneeInvalide>()),
+      );
+    });
+
+    test('le nom d’une variante archivée reste réservé', () async {
+      final Produit p = await repo.creer(doudou);
+      final VarianteProduit rose = await repo.ajouterVariante(p.id, const DonneesVariante(libelle: 'Rose'));
+      await repo.archiverVariante(rose.id);
+      await expectLater(
+        repo.ajouterVariante(p.id, const DonneesVariante(libelle: 'Rose')),
+        throwsA(isA<DonneeInvalide>()),
+      );
     });
   });
 

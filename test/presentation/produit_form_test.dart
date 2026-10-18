@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:crochet_creations/core/utils/money.dart';
 import 'package:crochet_creations/data/database/app_database.dart';
+import 'package:crochet_creations/data/repositories/produit_repository.dart';
 import 'package:crochet_creations/domain/enums.dart';
 import 'package:crochet_creations/presentation/produits/produits_screen.dart';
 import 'package:flutter/material.dart';

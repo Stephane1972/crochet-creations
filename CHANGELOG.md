@@ -6,7 +6,38 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
 
 ## [Non publié]
 
-## [0.2.0] — Étape 2 : base de données (en attente de validation)
+## [0.3.0] — Étape 3 : produits et stock (en attente de validation)
+
+### Ajouté
+- Onglet **Produits** (écran 3) : liste avec recherche sans accents ni majuscules (nom, référence, catégorie, matières,
+  couleur, description, variantes), filtres par catégorie, « à réapprovisionner » et archivés, étiquettes
+  Épuisé / Stock faible / Sur commande / Masqué / Archivé, état vide.
+- **Fiche produit** (écran 4) : photos, informations, stock avec ajustement (inventaire), variantes (ajout, modification,
+  archivage et restauration), historique des ventes, modifier, dupliquer, archiver / restaurer avec confirmation,
+  boutons Vendre et Ajouter au panier.
+- **Formulaire produit** (écran 5) : validation champ par champ, photo principale et photos secondaires
+  (appareil photo ou galerie), temps de fabrication en heures et minutes, montants saisis en euros (virgule ou point),
+  confirmation avant d'abandonner une saisie.
+- Photos copiées dans le dossier privé de l'application (réduites à 1 600 px) ; la base ne garde que le nom du fichier.
+  Les fichiers devenus inutiles sont supprimés (jamais avant l'enregistrement pour une photo déjà enregistrée).
+- Accueil : la tuile « Stock faible » compte les produits à réapprovisionner et ouvre la liste filtrée.
+- Accès aux données : résumés du catalogue et fiche mis à jour automatiquement, duplication, inventaire,
+  historique des ventes, photos enregistrées avec le produit.
+- Règles testées : alerte de stock d'un produit à variantes, produit vendable ou non, noms de variantes uniques.
+
+### Modifié
+- Un nom de variante déjà pris est refusé avec un message clair (au lieu d'une erreur technique de la base).
+- `ProduitRepository.creer` et `modifier` acceptent des photos (paramètres facultatifs : appels existants inchangés).
+- Le texte des réglages indique « étape 3 sur 12 ».
+
+### Limites connues
+- « Vendre » et « Ajouter au panier » ouvrent l'onglet Vente, encore provisoire, jusqu'à l'étape 5.
+- L'historique des ventes reste vide tant qu'aucune vente ne peut être enregistrée (étape 5).
+- Dupliquer ne copie pas les photos et remet le stock à zéro (la copie est ouverte pour être complétée).
+- Si Android ferme l'application pendant la prise d'une photo, celle-ci n'est pas récupérée (à traiter à l'étape 12).
+- Le schéma de la base n'a pas changé : pas de migration.
+
+## [0.2.0] — Étape 2 : base de données
 
 ### Ajouté
 - Base de données SQLite hors ligne avec Drift : 15 tables (produits, variantes, photos secondaires, clients, ventes,

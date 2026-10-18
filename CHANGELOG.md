@@ -6,7 +6,36 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
 
 ## [Non publié]
 
-## [0.1.0] — Étape 1 : fondations (en attente de validation)
+## [0.2.0] — Étape 2 : base de données (en attente de validation)
+
+### Ajouté
+- Base de données SQLite hors ligne avec Drift : 15 tables (produits, variantes, photos secondaires, clients, ventes,
+  lignes de vente, paiements, factures, devis, lignes de devis, cours, inscriptions, dépenses, réglages, numérotation).
+- Clés étrangères activées, index sur les champs recherchés, contraintes de cohérence (noms non vides, montants et
+  stocks positifs, totaux exacts, numéros uniques, une seule facture émise par vente…), suppression douce.
+- Migration versionnée (version 1), avec vérification des liaisons après une mise à jour.
+- Règles de calcul testées : total d'une vente (remise en % ou en montant, frais de port, arrondi au centime),
+  statut de paiement (payée, partielle, impayée, remboursée), alertes de stock, format des numéros.
+- Numérotation continue `FACT-AAAA-NNNN`, `DEVIS-AAAA-NNNN` (une suite par année) et références produit `PRD-NNNN`,
+  sans trou si l'enregistrement échoue.
+- Accès aux données (repositories) : produits (variantes, photos, stock « tout ou rien »), clients, réglages, numérotation.
+- Le mode jour / nuit / automatique est mémorisé entre deux lancements.
+- Écran d'erreur en français si la base ne peut pas s'ouvrir.
+- Tests sur une base SQLite en mémoire (structure, contraintes, numérotation, stock, archivage).
+- CI : génération du code Drift, annotations lisibles des échecs de chaque étape, APK publié même si un test échoue.
+
+### Modifié
+- Dart 3.10 / Flutter 3.38 minimum (exigé par Drift).
+- Les fichiers `*.g.dart` générés ne sont pas versionnés.
+
+### Limites connues
+- Aucun écran ne lit encore la base (sauf le mode jour/nuit) : l'accueil affiche toujours « — ».
+- Ventes, factures, devis, cours, dépenses : tables et contraintes prêtes, mais leurs repositories (avec la logique
+  propre à chaque écran) arrivent avec leur étape.
+- Hypothèses de schéma à confirmer : voir ARCHITECTURE.md, « Hypothèses du schéma ».
+- La migration n'a jamais eu à convertir de vraies données (version 1 seulement).
+
+## [0.1.0] — Étape 1 : fondations
 
 ### Ajouté
 - Projet Flutter (Dart, Material 3, Riverpod) organisé en couches `presentation` / `domain` / `data`.
@@ -28,5 +57,5 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
 
 ### Limites connues
 - Aucun chiffre n'est calculé : pas encore de base de données (étape 2).
-- Le choix jour/nuit n'est pas mémorisé entre deux lancements (étape 2).
+- Le choix jour/nuit n'est pas mémorisé entre deux lancements (corrigé à l'étape 2).
 - Le code est analysé, testé et compilé en APK par GitHub Actions, mais n'a pas encore été essayé sur un téléphone.

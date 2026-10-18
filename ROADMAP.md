@@ -10,7 +10,7 @@ Objectif : gérer toute l'activité sans connexion ni serveur.
 | Étape | Contenu | Écrans concernés |
 |------:|---------|------------------|
 | 1 | Initialisation Flutter, thème rose/vert, mode jour/nuit, navigation, logo, splash, accueil | 1, 2 (maquette), 21 (thème) |
-| 2 | Base de données SQLite, modèles, migrations versionnées, repositories ; enregistrement du mode jour/nuit | — |
+| 2 | Base de données SQLite (15 tables), modèles, migrations versionnées, repositories ; enregistrement du mode jour/nuit | — |
 | 3 | Produits et stock : catalogue, fiche, ajout/modification, duplication, archivage, alertes de stock, photos | 3, 4, 5 |
 | 4 | Clients : liste, fiche, historique, « client de passage » | 6, 7 |
 | 5 | Ventes et panier : choix du client, quantités, remise, frais de port, paiement, décrémentation du stock | 8, 9, 10 |
@@ -27,8 +27,9 @@ Hypothèse à confirmer : le profil « Mon entreprise » (écran 22) est constru
 
 ### État
 
-- [x] Étape 1 : terminée, **en attente de validation**
-- [ ] Étapes 2 à 12
+- [x] Étape 1 : terminée (PR #1, en attente de fusion)
+- [x] Étape 2 : terminée, **en attente de validation** (PR #2)
+- [ ] Étapes 3 à 12
 
 ## Version 2 : confort et échanges (propositions, non engagées)
 

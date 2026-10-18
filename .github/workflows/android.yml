@@ -37,18 +37,45 @@ jobs:
         run: flutter --version
 
       - name: Installer les dépendances
-        run: flutter pub get
+        run: |
+          set +e
+          flutter pub get 2>&1 | tee pub-get.log
+          code=${PIPESTATUS[0]}
+          if [ "$code" -ne 0 ]; then bash tool/ci_annoter.sh "Échec de flutter pub get" pub-get.log; fi
+          exit $code
+
+      # Bibliothèque SQLite du système : filet de sécurité pour les tests de la base de données
+      # (le paquet sqlite3 embarque normalement sa propre copie).
+      - name: Installer SQLite (tests)
+        continue-on-error: true
+        run: sudo apt-get install -y libsqlite3-dev
+
+      # Drift (base de données) génère du code : fichiers *.g.dart, non versionnés.
+      - name: Générer le code de la base de données (Drift)
+        id: generer
+        run: |
+          set +e
+          dart run build_runner build --delete-conflicting-outputs 2>&1 | tee build-runner.log
+          code=${PIPESTATUS[0]}
+          if [ "$code" -ne 0 ]; then bash tool/ci_annoter.sh "Échec de la génération du code (build_runner)" build-runner.log "SEVERE|Error|error"; fi
+          exit $code
 
       - name: Préparer Android (dossier android/, nom, icônes)
         run: bash tool/setup_android.sh
 
       - name: Analyser le code
-        run: flutter analyze --no-fatal-infos
+        id: analyse
+        run: |
+          set +e
+          flutter analyze --no-fatal-infos 2>&1 | tee analyse.log
+          code=${PIPESTATUS[0]}
+          if [ "$code" -ne 0 ]; then bash tool/ci_annoter.sh "Problèmes détectés par flutter analyze" analyse.log "(error|warning) •"; fi
+          exit $code
 
       # En cas d'échec, le détail des tests en erreur est aussi publié en « annotation »
       # (visible en haut de la page de l'exécution), sans avoir à ouvrir le journal.
       - name: Lancer les tests
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.generer.outcome == 'success' }}
         run: |
           set +e
           flutter test --reporter expanded 2>&1 | tee test-output.log
@@ -70,14 +97,19 @@ jobs:
       # L'APK est construit même si un test échoue, pour pouvoir toujours essayer l'application.
       - name: Construire l'APK
         id: apk
-        if: ${{ !cancelled() }}
-        run: flutter build apk --release
+        if: ${{ !cancelled() && steps.generer.outcome == 'success' }}
+        run: |
+          set +e
+          flutter build apk --release 2>&1 | tee build-apk.log
+          code=${PIPESTATUS[0]}
+          if [ "$code" -ne 0 ]; then bash tool/ci_annoter.sh "Échec de la construction de l'APK" build-apk.log "(Error|error|FAILURE|What went wrong)"; fi
+          exit $code
 
       # Publication n°1 : pré-version GitHub (onglet « Releases » du dépôt).
       # L'APK s'y télécharge directement depuis le téléphone, sans dossier .zip,
       # et sans utiliser le quota de stockage d'artefacts de GitHub Actions.
       - name: Publier l'APK dans une pré-version
-        if: ${{ steps.apk.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.apk.outcome == 'success' }}
         env:
           GH_TOKEN: ${{ github.token }}
           BRANCHE: ${{ github.head_ref || github.ref_name }}
@@ -94,7 +126,7 @@ jobs:
 
       # Publication n°2 : artefact Actions (peut échouer si le quota du compte est plein : sans gravité).
       - name: Publier l'APK en artefact
-        if: ${{ steps.apk.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.apk.outcome == 'success' }}
         continue-on-error: true
         uses: actions/upload-artifact@v4
         with:

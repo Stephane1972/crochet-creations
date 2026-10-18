@@ -1,11 +1,12 @@
 name: crochet_creations
 description: "Crochet & Créations : stock, ventes, factures, devis et cours pour une créatrice auto-entrepreneuse."
 publish_to: "none"
-version: 0.1.0+1
+version: 0.2.0+2
 
 environment:
-  sdk: ^3.6.0
-  flutter: ">=3.27.0"
+  # Drift 2.35 demande Dart 3.10 (Flutter 3.38 ou plus récent, canal « stable »).
+  sdk: ^3.10.0
+  flutter: ">=3.38.0"
 
 dependencies:
   flutter:
@@ -19,15 +20,24 @@ dependencies:
   # Affichage du logo SVG dans l'application (le même fichier servira aux PDF)
   flutter_svg: ^2.0.10+1
 
-  # Les dépendances des étapes suivantes (base de données, pdf, printing, share_plus,
-  # image_picker, path_provider...) seront ajoutées au fur et à mesure,
-  # pour ne pas alourdir l'application avant d'en avoir besoin.
+  # Base de données SQLite (étape 2). Drift génère du code : voir ARCHITECTURE.md.
+  drift: ^2.35.0
+  drift_flutter: ^0.3.0
+  path_provider: ^2.1.5
+
+  # Les dépendances des étapes suivantes (pdf, printing, share_plus, image_picker...)
+  # seront ajoutées au fur et à mesure, pour ne pas alourdir l'application
+  # avant d'en avoir besoin.
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
   flutter_launcher_icons: ^0.14.3
+
+  # Génération du code de la base de données (`dart run build_runner build`).
+  drift_dev: ^2.35.0
+  build_runner: ^2.6.0
 
 flutter:
   uses-material-design: true

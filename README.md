@@ -16,8 +16,8 @@ Le développement se fait en 12 étapes validées une par une (détail dans [ROA
 
 | Étape | Contenu | État |
 |------:|---------|------|
-| 1 | Projet Flutter, thème rose/vert, mode jour/nuit, navigation, logo, splash, accueil | **à valider** |
-| 2 | Base de données, modèles, migrations, repositories | à venir |
+| 1 | Projet Flutter, thème rose/vert, mode jour/nuit, navigation, logo, splash, accueil | terminée (PR #1, en attente de fusion) |
+| 2 | Base de données, modèles, migrations, repositories | **à valider** |
 | 3 | Produits et stock | à venir |
 | 4 | Clients | à venir |
 | 5 | Ventes et panier | à venir |
@@ -29,16 +29,22 @@ Le développement se fait en 12 étapes validées une par une (détail dans [ROA
 | 11 | Sauvegarde / export | à venir |
 | 12 | Tests, corrections, optimisation de l'interface | à venir |
 
-### Ce que contient l'étape 1
+### Ce que contient l'étape 2
 
-- Thème Material 3 rose pastel / vert sauge, **mode jour, nuit ou automatique** (choix dans *Plus → Réglages*).
-- Logo (pelote de laine rose + crochet vert) en SVG, version monochrome pour les factures, icône Android.
-- Écran de démarrage (splash) avec le logo.
-- Navigation à 5 onglets : Accueil · Produits · Vente · Clients · Plus.
-- Écran d'accueil (tableau de bord) : raccourcis, emplacements des chiffres clés, suivi des seuils de franchise de TVA.
-- Les écrans des étapes suivantes affichent « Bientôt disponible », avec l'étape où ils seront construits.
+- **Base de données SQLite** sur le téléphone (15 tables : produits, variantes, photos, clients, ventes, lignes de
+  vente, paiements, factures, devis, lignes de devis, cours, inscriptions, dépenses, réglages, numérotation),
+  entièrement hors ligne.
+- **Garde-fous dans la base** : pas de stock ni de montant négatif, totaux toujours cohérents, numéros de facture
+  et de devis uniques, une seule facture émise par vente…
+- **Règles de calcul** testées : total d'une vente (remise, frais de port), statut de paiement, alertes de stock,
+  numérotation `FACT-2026-0001` / `DEVIS-2026-0001` (une suite par année, sans trou).
+- **Accès aux données** (repositories) pour les produits (variantes, photos, stock), les clients, les réglages
+  et la numérotation.
+- **Le mode jour / nuit choisi dans *Plus → Réglages* est maintenant mémorisé** entre deux lancements.
+- Si la base ne peut pas s'ouvrir, un écran en français explique quoi faire au lieu d'un écran blanc.
 
-Pour l'instant **aucun chiffre n'est calculé** (pas encore de base de données) : l'accueil affiche « — ».
+Visible sur le téléphone : surtout la mémorisation du mode jour/nuit. L'écran d'accueil affiche encore « — » :
+les écrans qui lisent et écrivent dans la base arrivent aux étapes 3 à 10.
 
 ## Essayer l'application
 
@@ -63,11 +69,16 @@ Prérequis : [Flutter](https://docs.flutter.dev/get-started/install) (canal *sta
 
 ```bash
 flutter pub get
+dart run build_runner build --delete-conflicting-outputs   # génère le code de la base de données
 bash tool/setup_android.sh   # crée le dossier android/, le nom de l'app et les icônes (une seule fois)
 flutter run                  # sur un téléphone branché ou un émulateur
 flutter test                 # lance les tests
 flutter analyze              # vérifie la qualité du code
 ```
+
+Flutter doit être récent (canal *stable*, Flutter 3.38 / Dart 3.10 au minimum). Les fichiers `*.g.dart` générés par
+`build_runner` ne sont pas versionnés : relancer la commande de génération après chaque `git pull` qui modifie
+`lib/data/database/tables.dart`.
 
 > Le dossier `android/` n'est volontairement **pas** versionné : il est généré par `tool/setup_android.sh`
 > (voir [ARCHITECTURE.md](ARCHITECTURE.md), section « Dossier android/ »).
@@ -75,10 +86,10 @@ flutter analyze              # vérifie la qualité du code
 ## Structure du dépôt
 
 ```
-lib/            code de l'application (voir ARCHITECTURE.md)
+lib/            code de l'application : presentation, domain, data (voir ARCHITECTURE.md)
 assets/         logo SVG, icônes, police Poppins
 test/           tests automatiques
-tool/           scripts : génération des icônes et du dossier android/
+tool/           scripts : génération des icônes et du dossier android/, annotations de la CI
 .github/        construction automatique de l'APK
 ```
 

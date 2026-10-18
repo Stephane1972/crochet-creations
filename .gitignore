@@ -14,6 +14,10 @@ build/
 .DS_Store
 coverage/
 
+# --- Code généré par build_runner (Drift) ---
+# Recréé par `dart run build_runner build` (fait automatiquement par la CI).
+*.g.dart
+
 # --- Dossiers de plateforme générés par `tool/setup_android.sh` ---
 # (Flutter les recrée à la demande ; on ne versionne que le code de l'application.
 #  Si vous préférez les versionner un jour, retirez simplement ces lignes.)

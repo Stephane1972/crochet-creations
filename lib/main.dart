@@ -1,12 +1,16 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
 
 import 'app.dart';
 import 'core/theme/theme_mode_provider.dart';
 import 'data/database/app_database.dart';
 import 'data/providers.dart';
 import 'data/repositories/parametres_repository.dart';
+import 'data/stockage/stockage_photos.dart';
 import 'presentation/startup/erreur_demarrage_app.dart';
 
 Future<void> main() async {
@@ -19,10 +23,17 @@ Future<void> main() async {
     final ParametresRepository parametres = ParametresRepository(base);
     final ThemeMode modeInitial = await parametres.lireModeTheme();
 
+    // Photos des produits : dossier privé de l'application (créé à la première photo).
+    final Directory documents = await getApplicationDocumentsDirectory();
+    final StockagePhotos photos = StockagePhotos(
+      Directory('${documents.path}${Platform.pathSeparator}photos_produits'),
+    );
+
     runApp(
       ProviderScope(
         overrides: [
           appDatabaseProvider.overrideWithValue(base),
+          stockagePhotosProvider.overrideWithValue(photos),
           modeThemeInitialProvider.overrideWithValue(modeInitial),
           modeThemeStoreProvider.overrideWithValue(parametres),
         ],

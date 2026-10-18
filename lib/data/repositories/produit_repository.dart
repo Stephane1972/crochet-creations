@@ -6,6 +6,7 @@ import '../../domain/enums.dart';
 import '../../domain/erreurs.dart';
 import '../database/app_database.dart';
 import 'numerotation_repository.dart';
+import 'produit_vues.dart';
 
 /// Données saisies pour créer ou modifier un produit.
 class DonneesProduit {
@@ -103,8 +104,6 @@ class DonneesVariante {
 }
 
 /// Catalogue : produits, variantes, photos secondaires et mouvements de stock.
-///
-/// Les recherches, filtres, alertes et la duplication arrivent à l'étape 3 (écrans produits).
 class ProduitRepository {
   ProduitRepository(this._db, this._numerotation);
 
@@ -114,7 +113,11 @@ class ProduitRepository {
   // --- Produits -------------------------------------------------------------
 
   /// Crée un produit avec sa référence automatique (`PRD-0001`...).
-  Future<Produit> creer(DonneesProduit donnees) async {
+  /// Les [photosSecondaires] (chemins) sont enregistrées dans la même opération.
+  Future<Produit> creer(
+    DonneesProduit donnees, {
+    List<String> photosSecondaires = const <String>[],
+  }) async {
     donnees.valider();
     return _db.transaction(() async {
       final String reference = await _numerotation.prochaineReferenceProduit();
@@ -139,34 +142,55 @@ class ProduitRepository {
               photoPrincipaleChemin: Value(nullSiVide(donnees.photoPrincipaleChemin)),
             ),
           );
+      for (final String chemin in photosSecondaires) {
+        await _insererPhoto(id, chemin);
+      }
       return _produit(id);
     });
   }
 
   /// Remplace les informations d'un produit (la référence ne change jamais).
-  Future<Produit> modifier(int id, DonneesProduit donnees) async {
+  ///
+  /// [photosAAjouter] (chemins) et [photosASupprimer] (identifiants de photos secondaires)
+  /// sont appliquées dans la même opération que la modification.
+  Future<Produit> modifier(
+    int id,
+    DonneesProduit donnees, {
+    List<String> photosAAjouter = const <String>[],
+    List<int> photosASupprimer = const <int>[],
+  }) async {
     donnees.valider();
-    final int lignes = await (_db.update(_db.produits)..where((t) => t.id.equals(id))).write(
-      ProduitsCompanion(
-        nom: Value(donnees.nom.trim()),
-        categorie: Value(donnees.categorie),
-        prixVenteCentimes: Value(donnees.prixVenteCentimes),
-        description: Value(nullSiVide(donnees.description)),
-        matieres: Value(nullSiVide(donnees.matieres)),
-        couleur: Value(nullSiVide(donnees.couleur)),
-        dimensions: Value(nullSiVide(donnees.dimensions)),
-        tempsFabricationMinutes: Value(donnees.tempsFabricationMinutes),
-        coutMatiereCentimes: Value(donnees.coutMatiereCentimes),
-        quantiteStock: Value(donnees.quantiteStock),
-        seuilAlerteStock: Value(donnees.seuilAlerteStock),
-        statut: Value(donnees.statut),
-        personnalisable: Value(donnees.personnalisable),
-        photoPrincipaleChemin: Value(nullSiVide(donnees.photoPrincipaleChemin)),
-        modifieLe: Value(DateTime.now()),
-      ),
-    );
-    if (lignes == 0) throw const ElementIntrouvable('Ce produit n’existe plus.');
-    return _produit(id);
+    return _db.transaction(() async {
+      final int lignes = await (_db.update(_db.produits)..where((t) => t.id.equals(id))).write(
+        ProduitsCompanion(
+          nom: Value(donnees.nom.trim()),
+          categorie: Value(donnees.categorie),
+          prixVenteCentimes: Value(donnees.prixVenteCentimes),
+          description: Value(nullSiVide(donnees.description)),
+          matieres: Value(nullSiVide(donnees.matieres)),
+          couleur: Value(nullSiVide(donnees.couleur)),
+          dimensions: Value(nullSiVide(donnees.dimensions)),
+          tempsFabricationMinutes: Value(donnees.tempsFabricationMinutes),
+          coutMatiereCentimes: Value(donnees.coutMatiereCentimes),
+          quantiteStock: Value(donnees.quantiteStock),
+          seuilAlerteStock: Value(donnees.seuilAlerteStock),
+          statut: Value(donnees.statut),
+          personnalisable: Value(donnees.personnalisable),
+          photoPrincipaleChemin: Value(nullSiVide(donnees.photoPrincipaleChemin)),
+          modifieLe: Value(DateTime.now()),
+        ),
+      );
+      if (lignes == 0) throw const ElementIntrouvable('Ce produit n’existe plus.');
+      for (final int photoId in photosASupprimer) {
+        await (_db.delete(_db.photosProduit)
+              ..where((t) => t.id.equals(photoId) & t.produitId.equals(id)))
+            .go();
+      }
+      for (final String chemin in photosAAjouter) {
+        await _insererPhoto(id, chemin);
+      }
+      return _produit(id);
+    });
   }
 
   Future<Produit?> obtenir(int id) =>
@@ -182,6 +206,65 @@ class ProduitRepository {
   Future<void> archiver(int id) => _marquerArchive(id, DateTime.now());
 
   Future<void> restaurer(int id) => _marquerArchive(id, null);
+
+  /// Catalogue avec les variantes de chaque produit, mis à jour automatiquement
+  /// à chaque modification des produits ou des variantes.
+  Stream<List<ProduitResume>> observerResumes({bool inclureArchives = false}) => _observer(
+    <ResultSetImplementation>{_db.produits, _db.variantesProduit},
+    () => _resumes(inclureArchives),
+  );
+
+  /// Fiche complète d'un produit (`null` s'il n'existe pas), mise à jour automatiquement.
+  Stream<ProduitDetail?> observerDetail(int id) => _observer(
+    <ResultSetImplementation>{_db.produits, _db.variantesProduit, _db.photosProduit},
+    () => _detail(id),
+  );
+
+  /// Copie un produit : nouvelle référence, nom suffixé « (copie) », variantes reprises.
+  /// Le stock repart à zéro et les photos ne sont pas copiées (elles restent à ajouter).
+  Future<Produit> dupliquer(int id) {
+    return _db.transaction(() async {
+      final Produit source = await _produit(id);
+      final String reference = await _numerotation.prochaineReferenceProduit();
+      final String nomBase = source.nom.length > 180 ? source.nom.substring(0, 180) : source.nom;
+      final int nouveauId = await _db
+          .into(_db.produits)
+          .insert(
+            ProduitsCompanion.insert(
+              reference: reference,
+              nom: '$nomBase (copie)',
+              categorie: source.categorie,
+              prixVenteCentimes: source.prixVenteCentimes,
+              description: Value(source.description),
+              matieres: Value(source.matieres),
+              couleur: Value(source.couleur),
+              dimensions: Value(source.dimensions),
+              tempsFabricationMinutes: Value(source.tempsFabricationMinutes),
+              coutMatiereCentimes: Value(source.coutMatiereCentimes),
+              quantiteStock: const Value(0),
+              seuilAlerteStock: Value(source.seuilAlerteStock),
+              statut: Value(source.statut),
+              personnalisable: Value(source.personnalisable),
+            ),
+          );
+      for (final VarianteProduit v in await variantes(id)) {
+        await _db
+            .into(_db.variantesProduit)
+            .insert(
+              VariantesProduitCompanion.insert(
+                produitId: nouveauId,
+                libelle: v.libelle,
+                couleur: Value(v.couleur),
+                taille: Value(v.taille),
+                prixCentimes: Value(v.prixCentimes),
+                quantiteStock: const Value(0),
+                seuilAlerteStock: Value(v.seuilAlerteStock),
+              ),
+            );
+      }
+      return _produit(nouveauId);
+    });
+  }
 
   // --- Variantes ------------------------------------------------------------
 
@@ -247,21 +330,7 @@ class ProduitRepository {
           .get();
 
   /// Ajoute une photo à la fin de la liste.
-  Future<PhotoProduit> ajouterPhoto(int produitId, String chemin) async {
-    if (chemin.trim().isEmpty) throw const DonneeInvalide('Le chemin de la photo est vide.');
-    final List<PhotoProduit> existantes = await photosSecondaires(produitId);
-    final int position = existantes.isEmpty ? 0 : existantes.last.position + 1;
-    final int id = await _db
-        .into(_db.photosProduit)
-        .insert(
-          PhotosProduitCompanion.insert(
-            produitId: produitId,
-            chemin: chemin.trim(),
-            position: Value(position),
-          ),
-        );
-    return (_db.select(_db.photosProduit)..where((t) => t.id.equals(id))).getSingle();
-  }
+  Future<PhotoProduit> ajouterPhoto(int produitId, String chemin) => _insererPhoto(produitId, chemin);
 
   Future<void> supprimerPhoto(int photoId) async {
     await (_db.delete(_db.photosProduit)..where((t) => t.id.equals(photoId))).go();
@@ -312,6 +381,55 @@ class ProduitRepository {
     });
   }
 
+  /// Fixe le stock à [quantite] (inventaire). Retourne le nouveau stock.
+  /// Si le produit a des variantes, indiquer [varianteId].
+  Future<int> definirStock({required int produitId, int? varianteId, required int quantite}) {
+    if (quantite < 0) throw const DonneeInvalide('Le stock ne peut pas être négatif.');
+    return _db.transaction(() async {
+      final int actuel;
+      if (varianteId == null) {
+        actuel = (await _produit(produitId)).quantiteStock;
+      } else {
+        actuel = (await _variante(varianteId)).quantiteStock;
+      }
+      return ajusterStock(produitId: produitId, varianteId: varianteId, delta: quantite - actuel);
+    });
+  }
+
+  // --- Historique -----------------------------------------------------------
+
+  /// Ventes validées contenant ce produit (toutes variantes), de la plus récente à la plus ancienne.
+  Future<List<LigneHistoriqueVente>> historiqueVentes(int produitId) async {
+    final JoinedSelectStatement<$LignesVenteTable, LigneVente> requete =
+        _db.select(_db.lignesVente).join(<Join>[
+            innerJoin(_db.ventes, _db.ventes.id.equalsExp(_db.lignesVente.venteId)),
+            leftOuterJoin(_db.clients, _db.clients.id.equalsExp(_db.ventes.clientId)),
+          ])
+          ..where(
+            _db.lignesVente.produitId.equals(produitId) &
+                _db.ventes.statut.equalsValue(StatutVente.validee),
+          )
+          ..orderBy(<OrderingTerm>[
+            OrderingTerm.desc(_db.ventes.dateVente),
+            OrderingTerm.desc(_db.lignesVente.id),
+          ]);
+
+    final List<TypedResult> lignes = await requete.get();
+    return <LigneHistoriqueVente>[
+      for (final TypedResult ligne in lignes)
+        _ligneHistorique(
+          ligne.readTable(_db.lignesVente),
+          ligne.readTable(_db.ventes),
+          ligne.readTableOrNull(_db.clients),
+        ),
+    ];
+  }
+
+  Stream<List<LigneHistoriqueVente>> observerHistorique(int produitId) => _observer(
+    <ResultSetImplementation>{_db.lignesVente, _db.ventes, _db.clients},
+    () => historiqueVentes(produitId),
+  );
+
   /// Décrémente le stock lors d'une vente. Un produit « sur commande » n'est pas suivi en stock :
   /// dans ce cas il ne se passe rien. Lance [StockInsuffisant] si le stock ne suffit pas.
   Future<void> consommerStock({
@@ -331,11 +449,80 @@ class ProduitRepository {
 
   SimpleSelectStatement<$ProduitsTable, Produit> _requeteListe(bool inclureArchives) {
     final SimpleSelectStatement<$ProduitsTable, Produit> requete = _db.select(_db.produits)
-      ..orderBy([(t) => OrderingTerm(expression: t.nom.collate(Collate.noCase))]);
+      ..orderBy([
+        (t) => OrderingTerm(expression: t.nom.collate(Collate.noCase)),
+        (t) => OrderingTerm(expression: t.id),
+      ]);
     if (!inclureArchives) {
       requete.where((t) => t.archiveLe.isNull());
     }
     return requete;
+  }
+
+  /// Relit les données à chaque modification des [tables] : Drift prévient dès qu'une
+  /// écriture les touche. `asyncMap` traite les relectures une par une, dans l'ordre.
+  Stream<T> _observer<T>(Set<ResultSetImplementation> tables, Future<T> Function() lire) {
+    return _db.customSelect('SELECT 1', readsFrom: tables).watch().asyncMap((_) => lire());
+  }
+
+  Future<List<ProduitResume>> _resumes(bool inclureArchives) async {
+    final List<Produit> produits = await lister(inclureArchives: inclureArchives);
+    final List<VarianteProduit> toutesVariantes =
+        await (_db.select(_db.variantesProduit)
+              ..where((t) => t.archiveLe.isNull())
+              ..orderBy(<OrderClauseGenerator<$VariantesProduitTable>>[
+                (t) => OrderingTerm(expression: t.libelle.collate(Collate.noCase)),
+              ]))
+            .get();
+    final Map<int, List<VarianteProduit>> parProduit = <int, List<VarianteProduit>>{};
+    for (final VarianteProduit v in toutesVariantes) {
+      parProduit.putIfAbsent(v.produitId, () => <VarianteProduit>[]).add(v);
+    }
+    return <ProduitResume>[
+      for (final Produit p in produits)
+        ProduitResume(produit: p, variantes: parProduit[p.id] ?? const <VarianteProduit>[]),
+    ];
+  }
+
+  Future<ProduitDetail?> _detail(int id) async {
+    final Produit? produit = await obtenir(id);
+    if (produit == null) return null;
+    return ProduitDetail(
+      produit: produit,
+      variantes: await variantes(id, inclureArchivees: true),
+      photosSecondaires: await photosSecondaires(id),
+    );
+  }
+
+  Future<PhotoProduit> _insererPhoto(int produitId, String chemin) async {
+    if (chemin.trim().isEmpty) throw const DonneeInvalide('Le chemin de la photo est vide.');
+    final List<PhotoProduit> existantes = await photosSecondaires(produitId);
+    final int position = existantes.isEmpty ? 0 : existantes.last.position + 1;
+    final int id = await _db
+        .into(_db.photosProduit)
+        .insert(
+          PhotosProduitCompanion.insert(
+            produitId: produitId,
+            chemin: chemin.trim(),
+            position: Value(position),
+          ),
+        );
+    return (_db.select(_db.photosProduit)..where((t) => t.id.equals(id))).getSingle();
+  }
+
+  LigneHistoriqueVente _ligneHistorique(LigneVente ligne, Vente vente, Client? client) {
+    final String nom = client == null
+        ? ''
+        : nomClientAffiche(prenom: client.prenom, nom: client.nom, raisonSociale: client.raisonSociale);
+    return LigneHistoriqueVente(
+      venteId: vente.id,
+      dateVente: vente.dateVente,
+      designation: ligne.designation,
+      quantite: ligne.quantite,
+      prixUnitaireCentimes: ligne.prixUnitaireCentimes,
+      totalLigneCentimes: ligne.totalLigneCentimes,
+      clientNom: nom.isEmpty ? null : nom,
+    );
   }
 
   Future<Produit> _produit(int id) async {

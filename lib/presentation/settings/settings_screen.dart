@@ -104,7 +104,7 @@ class SettingsScreen extends ConsumerWidget {
                       children: <Widget>[
                         Text(AppConstants.nomApplication, style: theme.textTheme.titleSmall),
                         Text(
-                          'Version ${AppConstants.version} · étape 1 sur 12 · '
+                          'Version ${AppConstants.version} · étape 3 sur 12 · '
                           'fonctionne sans connexion',
                           style: theme.textTheme.bodyMedium?.copyWith(
                             color: scheme.onSurfaceVariant,

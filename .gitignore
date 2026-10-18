@@ -1,2 +1,32 @@
-# Google App Engine generated folder
-appengine-generated/
+# --- Flutter / Dart ---
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+*.iml
+*.ipr
+*.iws
+.idea/
+.vscode/
+.DS_Store
+coverage/
+
+# --- Dossiers de plateforme générés par `tool/setup_android.sh` ---
+# (Flutter les recrée à la demande ; on ne versionne que le code de l'application.
+#  Si vous préférez les versionner un jour, retirez simplement ces lignes.)
+/android/
+/ios/
+/linux/
+/macos/
+/windows/
+/web/
+
+# --- Secrets (ne jamais versionner) ---
+*.jks
+*.keystore
+key.properties
+local.properties
+.env

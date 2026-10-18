@@ -1,0 +1,36 @@
+/// Noms des routes de l'application.
+///
+/// Les écrans qui ne sont pas encore développés pointent vers un écran
+/// « Bientôt disponible » (voir presentation/common/placeholder_screen.dart).
+abstract final class AppRoutes {
+  static const String splash = '/';
+  static const String accueil = '/accueil';
+
+  // Produits (étape 3)
+  static const String produitNouveau = '/produits/nouveau';
+
+  // Clients (étape 4)
+  static const String clientNouveau = '/clients/nouveau';
+
+  // Ventes (étape 5)
+  static const String venteNouvelle = '/ventes/nouvelle';
+
+  // Documents (étapes 6 et 7)
+  static const String factures = '/factures';
+  static const String devis = '/devis';
+  static const String devisNouveau = '/devis/nouveau';
+
+  // Cours (étape 8)
+  static const String cours = '/cours';
+
+  // Dépenses (étape 9)
+  static const String depenses = '/depenses';
+
+  // Statistiques (étape 10)
+  static const String statistiques = '/statistiques';
+
+  // Réglages
+  static const String reglages = '/reglages';
+  static const String monEntreprise = '/reglages/entreprise';
+  static const String sauvegarde = '/reglages/sauvegarde';
+}

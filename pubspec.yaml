@@ -1,0 +1,60 @@
+name: crochet_creations
+description: "Crochet & Créations : stock, ventes, factures, devis et cours pour une créatrice auto-entrepreneuse."
+publish_to: "none"
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.6.0
+  flutter: ">=3.27.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # Gestion d'état (imposée par le cahier des charges)
+  flutter_riverpod: ^2.6.1
+
+  # Affichage du logo SVG dans l'application (le même fichier servira aux PDF)
+  flutter_svg: ^2.0.10+1
+
+  # Les dépendances des étapes suivantes (base de données, pdf, printing, share_plus,
+  # image_picker, path_provider...) seront ajoutées au fur et à mesure,
+  # pour ne pas alourdir l'application avant d'en avoir besoin.
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.3
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+
+  fonts:
+    # Titres : Poppins (licence OFL, voir assets/fonts/OFL-Poppins.txt).
+    # Texte courant : police système Android (Roboto).
+    - family: Poppins
+      fonts:
+        - asset: assets/fonts/Poppins-Regular.ttf
+        - asset: assets/fonts/Poppins-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Poppins-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Poppins-Bold.ttf
+          weight: 700
+
+# Génération des icônes Android : dart run flutter_launcher_icons
+# (les PNG viennent de tool/generate_icons.py)
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/icon/app_icon.png"
+  min_sdk_android: 21
+  adaptive_icon_background: "#FBF7F4"
+  adaptive_icon_foreground: "assets/icon/app_icon_foreground.png"
+  adaptive_icon_monochrome: "assets/icon/app_icon_monochrome.png"

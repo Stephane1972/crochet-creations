@@ -1,0 +1,104 @@
+name: Android (analyse, tests, APK)
+
+# Se lance à chaque envoi sur main, sur chaque pull request, et à la demande
+# (onglet « Actions » → « Android » → « Run workflow »).
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Droit d'écriture : nécessaire pour publier l'APK dans une « pré-version » GitHub.
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Installer Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Installer Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Version de Flutter
+        run: flutter --version
+
+      - name: Installer les dépendances
+        run: flutter pub get
+
+      - name: Préparer Android (dossier android/, nom, icônes)
+        run: bash tool/setup_android.sh
+
+      - name: Analyser le code
+        run: flutter analyze --no-fatal-infos
+
+      # En cas d'échec, le détail des tests en erreur est aussi publié en « annotation »
+      # (visible en haut de la page de l'exécution), sans avoir à ouvrir le journal.
+      - name: Lancer les tests
+        if: ${{ !cancelled() }}
+        run: |
+          set +e
+          flutter test --reporter expanded 2>&1 | tee test-output.log
+          code=${PIPESTATUS[0]}
+          if [ "$code" -ne 0 ]; then
+            RESUME=$(grep -E -A22 "\[E\]|EXCEPTION CAUGHT" test-output.log | head -c 7000)
+            if [ -z "$RESUME" ]; then RESUME=$(tail -n 60 test-output.log | head -c 7000); fi
+            RESUME="${RESUME//'%'/'%25'}"
+            RESUME="${RESUME//$'\r'/'%0D'}"
+            RESUME="${RESUME//$'\n'/'%0A'}"
+            LISTE=$(grep -E "\[E\]" test-output.log | sort -u | head -c 2000)
+            LISTE="${LISTE//'%'/'%25'}"
+            LISTE="${LISTE//$'\n'/'%0A'}"
+            echo "::error title=Liste des tests en échec::$LISTE"
+            echo "::error title=Détail du premier échec::$RESUME"
+          fi
+          exit $code
+
+      # L'APK est construit même si un test échoue, pour pouvoir toujours essayer l'application.
+      - name: Construire l'APK
+        id: apk
+        if: ${{ !cancelled() }}
+        run: flutter build apk --release
+
+      # Publication n°1 : pré-version GitHub (onglet « Releases » du dépôt).
+      # L'APK s'y télécharge directement depuis le téléphone, sans dossier .zip,
+      # et sans utiliser le quota de stockage d'artefacts de GitHub Actions.
+      - name: Publier l'APK dans une pré-version
+        if: ${{ steps.apk.outcome == 'success' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCHE: ${{ github.head_ref || github.ref_name }}
+          COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          COURT="${COMMIT:0:7}"
+          TAG="apk-$(echo "$BRANCHE" | tr '/' '-')"
+          cp build/app/outputs/flutter-apk/app-release.apk "crochet-creations-$COURT.apk"
+          gh release delete "$TAG" --cleanup-tag --yes 2>/dev/null || true
+          gh release create "$TAG" "crochet-creations-$COURT.apk" \
+            --repo "$GITHUB_REPOSITORY" --target "$COMMIT" --prerelease \
+            --title "APK de test — $BRANCHE ($COURT)" \
+            --notes "Version de test construite automatiquement à partir du commit $COURT. Remplacée à chaque nouvel envoi sur la branche."
+
+      # Publication n°2 : artefact Actions (peut échouer si le quota du compte est plein : sans gravité).
+      - name: Publier l'APK en artefact
+        if: ${{ steps.apk.outcome == 'success' }}
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: crochet-creations-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: warn
+          retention-days: 7

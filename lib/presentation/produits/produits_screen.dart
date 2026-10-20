@@ -44,6 +44,8 @@ class _ProduitsScreenState extends ConsumerState<ProduitsScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Produits'), automaticallyImplyLeading: false),
       floatingActionButton: FloatingActionButton.extended(
+        // Un nom propre à cet onglet : plusieurs onglets pourront avoir leur bouton (étapes suivantes).
+        heroTag: 'bouton-ajouter-produit',
         onPressed: () => Navigator.of(context).pushNamed(AppRoutes.produitNouveau),
         icon: const Icon(Icons.add),
         label: const Text('Ajouter'),

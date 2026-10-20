@@ -29,6 +29,7 @@ class ImageProduit extends ConsumerWidget {
     this.hauteur,
     this.rayon = 12,
     this.fit = BoxFit.cover,
+    this.tailleIcone,
   });
 
   final String? chemin;
@@ -37,6 +38,19 @@ class ImageProduit extends ConsumerWidget {
   final double? hauteur;
   final double rayon;
   final BoxFit fit;
+
+  /// Taille de l'icône de substitution. Par défaut : 45 % du côté connu (largeur ou hauteur finie).
+  final double? tailleIcone;
+
+  /// Côté de référence pour l'icône : `double.infinity` (image qui remplit toute la place)
+  /// ne peut pas servir de taille d'icône.
+  double get _tailleIconeParDefaut {
+    final double? cote = <double?>[largeur, hauteur].firstWhere(
+      (double? c) => c != null && c.isFinite,
+      orElse: () => null,
+    );
+    return (cote ?? 64) * 0.45;
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -49,7 +63,7 @@ class ImageProduit extends ConsumerWidget {
       alignment: Alignment.center,
       child: Icon(
         iconeCategorie(categorie),
-        size: (largeur ?? hauteur ?? 64) * 0.45,
+        size: tailleIcone ?? _tailleIconeParDefaut,
         color: scheme.onSecondaryContainer,
       ),
     );

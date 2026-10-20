@@ -461,6 +461,7 @@ class _GalerieState extends State<_Galerie> {
               rayon: 0,
               largeur: double.infinity,
               hauteur: double.infinity,
+              tailleIcone: 72,
             ),
           ),
           if (nombre > 1)

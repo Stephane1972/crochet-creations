@@ -11,7 +11,8 @@ import 'aide_widget.dart';
 
 /// Ouvre la fiche du produit [nom] depuis l'onglet Produits.
 Future<void> ouvrirFiche(WidgetTester tester, EnvironnementTest env, String nom) async {
-  await ouvrirAccueil(tester, env);
+  // Écran très haut : toute la fiche (galerie, cartes, historique) est construite d'un coup.
+  await ouvrirAccueil(tester, env, taille: const Size(800, 2600));
   await tester.tap(ongletNav('Produits'));
   await tester.pumpAndSettle();
   await laisserFinir(tester);

@@ -26,6 +26,7 @@ Future<void> appuyerPuce(WidgetTester tester, Finder puce) async {
   await tester.drag(defilement, const Offset(5000, 0)); // retour au début de la rangée
   await tester.pumpAndSettle();
   await tester.scrollUntilVisible(puce, 150, scrollable: defilement);
+  await tester.pumpAndSettle(); // le défilement final doit être terminé avant d'appuyer
   await tester.tap(puce);
   await tester.pumpAndSettle();
   await laisserFinir(tester);

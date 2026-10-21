@@ -24,4 +24,9 @@ void main() {
       expect(salutation(DateTime(2026, 10, 17, 2)), 'Bonsoir');
     });
   });
+
+  test('formatDateCourte : jour et mois sur deux chiffres', () {
+    expect(formatDateCourte(DateTime(2026, 3, 5)), '05/03/2026');
+    expect(formatDateCourte(DateTime(2026, 12, 25, 18, 30)), '25/12/2026');
+  });
 }

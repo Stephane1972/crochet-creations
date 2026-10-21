@@ -25,7 +25,7 @@ Règles :
   modèles à toutes les couches. On n'a pas créé de seconde série de classes « métier » identiques : ce serait du
   code en double à maintenir. La couche `domain` contient les règles et les listes de choix, pas les entités.
 
-## Arborescence (étape 2)
+## Arborescence (étape 3)
 
 ```
 crochet-creations/
@@ -45,10 +45,13 @@ crochet-creations/
 │   │   │   ├── app_theme.dart                thèmes Material 3 jour et nuit
 │   │   │   └── theme_mode_provider.dart      choix auto / jour / nuit, mémorisé via la base
 │   │   ├── utils/
-│   │   │   ├── money.dart                    formatEuros (montants en centimes)
-│   │   │   ├── date_fr.dart                  dates et salutation en français
+│   │   │   ├── money.dart                    formatEuros, lecture d'un montant saisi (centimes)
+│   │   │   ├── date_fr.dart                  dates (longue et courte) et salutation en français
+│   │   │   ├── duree.dart                    « 45 min », « 2 h 30 »
+│   │   │   ├── recherche.dart                recherche sans majuscules ni accents
+│   │   │   ├── validateurs.dart              règles des champs de formulaire (obligatoire, montant, entier…)
 │   │   │   └── texte.dart                    nettoyage des saisies facultatives
-│   │   └── widgets/                          logo SVG, icônes de barre d'état
+│   │   └── widgets/                          logo SVG, icônes de barre d'état, dialogues de confirmation
 │   ├── domain/
 │   │   ├── enums.dart                        listes de choix (catégories, statuts, modes de paiement…)
 │   │   ├── erreurs.dart                      erreurs métier à message clair
@@ -62,12 +65,30 @@ crochet-creations/
 │   │   │   ├── tables.dart                   les 15 tables (contraintes, index)
 │   │   │   ├── app_database.dart             base, version du schéma, migrations
 │   │   │   └── app_database.g.dart           (généré par build_runner, non versionné)
-│   │   ├── repositories/                     numérotation, réglages, produits, clients
-│   │   └── providers.dart                    accès Riverpod à la base et aux repositories
+│   │   ├── repositories/
+│   │   │   ├── numerotation_repository.dart  FACT-…, DEVIS-…, PRD-…
+│   │   │   ├── parametres_repository.dart    profil entreprise, mode jour/nuit
+│   │   │   ├── produit_repository.dart       catalogue : créer, modifier, dupliquer, archiver, stock, historique
+│   │   │   ├── produit_vues.dart             ce que lisent les écrans : ProduitResume, ProduitDetail, historique
+│   │   │   └── client_repository.dart        clients (base posée à l'étape 2, écrans à l'étape 4)
+│   │   ├── stockage/
+│   │   │   ├── stockage_photos.dart          copie les photos dans le dossier privé de l'application
+│   │   │   └── selecteur_photo.dart          choix d'une photo (galerie / appareil), remplaçable en test
+│   │   └── providers.dart                    accès Riverpod à la base, aux repositories et aux photos
 │   └── presentation/
 │       ├── common/                   placeholder_screen.dart, menu_tile.dart
 │       ├── home/home_screen.dart             accueil / tableau de bord
 │       ├── more/more_screen.dart             onglet « Plus »
+│       ├── produits/                         onglet Produits et ses écrans (voir « Produits et stock »)
+│       │   ├── produits_screen.dart          liste, recherche, filtres (écran 3)
+│       │   ├── produit_fiche_screen.dart     fiche d'un produit (écran 4)
+│       │   ├── produit_form_screen.dart      ajout / modification (écran 5)
+│       │   ├── photos_formulaire.dart        photos en cours d'édition et fichiers à nettoyer
+│       │   ├── variante_form_sheet.dart      feuille d'ajout / modification d'une variante
+│       │   ├── stock_dialog.dart             « Ajuster le stock »
+│       │   ├── filtres_produits.dart         recherche + filtres, et fonction de filtrage
+│       │   ├── produits_providers.dart       flux Riverpod (résumés, détail, historique)
+│       │   └── produit_widgets.dart          image, étiquettes, textes de stock et de prix
 │       ├── router/app_router.dart            route → écran
 │       ├── settings/settings_screen.dart     réglages (thème)
 │       ├── shell/                            barre de navigation + onglet courant
@@ -108,7 +129,17 @@ les produits : `domain/produits/`, `data/produits/`, `presentation/produits/`.
   est enregistré en arrière-plan (`modeThemeInitialProvider`, `modeThemeStoreProvider`) ;
 - `navIndexProvider` : onglet affiché, ce qui permet à l'accueil de basculer vers l'onglet Vente ;
 - `appDatabaseProvider` et un provider par repository (`lib/data/providers.dart`). `appDatabaseProvider` est fourni
-  par `main()` ; les tests le remplacent par une base en mémoire.
+  par `main()` ; les tests le remplacent par une base en mémoire ;
+- `stockagePhotosProvider` (dossier des photos, fourni par `main()`) et `selecteurPhotoProvider` (galerie / appareil
+  photo). Le premier lève une erreur explicite s'il n'est pas fourni ; les tests remplacent les deux ;
+- produits (`presentation/produits/produits_providers.dart`) : `produitsResumesProvider` (catalogue, en direct),
+  `produitDetailProvider(id)` et `historiqueProduitProvider(id)` (fiche et historique, en direct),
+  `nombreAReapprovisionnerProvider` (pastille de l'accueil et du filtre) ;
+- `filtresProduitsProvider` : recherche, catégorie, « Archivés », « À réapprovisionner ». Il vit au-dessus des écrans :
+  le filtre choisi depuis l'accueil (« Stock faible ») s'applique à l'ouverture de l'onglet Produits.
+
+Les flux « en direct » sont des `StreamProvider.autoDispose` : l'écran se met à jour tout seul après chaque
+enregistrement, sans rechargement manuel.
 
 ## Navigation
 
@@ -118,6 +149,12 @@ Navigation Flutter standard (`Navigator` + routes nommées), sans bibliothèque 
 - `MainShell` porte la barre à 5 onglets (Accueil · Produits · Vente · Clients · Plus) avec `IndexedStack`,
   ce qui conserve l'état de chaque onglet (par exemple une vente en cours) quand on change d'onglet ;
 - les autres écrans (factures, devis, cours…) s'ouvrent par-dessus, depuis *Plus* ou l'accueil ;
+- les écrans qui concernent un élément précis reçoivent son identifiant en **argument de route**
+  (`Navigator.pushNamed(context, AppRoutes.produitFiche, arguments: produit.id)`) ; `AppRouter` le lit et
+  affiche un message d'erreur si l'identifiant manque. Aujourd'hui : `produitFiche` et `produitModifier` ;
+  `produitNouveau` n'en prend pas ;
+- « Vendre » et « Ajouter au panier » depuis une fiche produit ramènent à la racine et ouvrent l'onglet Vente
+  (`navIndexProvider`) ; cet onglet reste un écran « Bientôt disponible » jusqu'à l'étape 5 ;
 - le bouton « retour » d'Android ramène d'abord à l'accueil avant de quitter l'application ;
 - tant qu'un écran n'est pas développé, sa route affiche `PlaceholderScreen` (« Bientôt disponible »).
   Quand une étape livre un écran, on le retire de `EcransAVenir.parRoute` et on ajoute un `case` dans `AppRouter`.
@@ -218,13 +255,64 @@ Les valeurs des listes de choix sont enregistrées sous leur **nom Dart** : ne j
 `enums.dart` sans migration (un test, `enums_test.dart`, protège les noms cités dans les contraintes SQL).
 Après une migration, `PRAGMA foreign_key_check` vérifie qu'aucune liaison n'a été cassée.
 
+## Produits et stock (étape 3)
+
+### Où est le stock ?
+
+- Un produit **sans variante active** porte son stock (`produits.quantite_stock`) et son seuil d'alerte.
+- Un produit **avec variantes actives** : le stock affiché est la **somme des variantes** ; le stock propre du
+  produit est ignoré (le formulaire masque d'ailleurs ce champ). Une variante sans seuil hérite de celui du produit.
+- Un produit **« sur commande »** n'est jamais suivi : pas de stock affiché, pas d'alerte, vendable à tout moment.
+- Règles dans `domain/calculs/stock.dart` (`etatStockGlobal`, `alerteStock`, `suitLeStock`), testées sans base ;
+  `ProduitResume` (couche `data`) les applique à un produit et ses variantes : `stockTotal`, `alerte`,
+  `aReapprovisionner`, `vendable`.
+- Alerte : **épuisé** si tout est à zéro ou si le statut est « épuisé » ; **stock faible** si au moins un article
+  (produit ou variante) est au seuil ou en dessous.
+- `ajusterStock` (± quantité : réapprovisionnement, correction) refuse un stock négatif ; `definirStock`
+  (inventaire) fixe la quantité exacte ; `consommerStock` (vente, étape 5) retire les articles vendus et
+  ne fait rien pour un produit « sur commande ».
+
+### Lecture en direct des tables liées
+
+`ProduitRepository._observer` combine plusieurs tables sans bibliothèque supplémentaire :
+`customSelect('SELECT 1', readsFrom: tables).watch().asyncMap((_) => lire())`. Dès qu'une des tables change
+(produit, variante, photo, vente, client), la lecture complète est refaite et l'écran se met à jour.
+Un produit et ses variantes sont ainsi toujours lus ensemble, jamais l'un sans l'autre.
+
+### Photos
+
+- `StockagePhotos` copie la photo choisie dans `<documents>/photos_produits` : la galerie peut être vidée sans
+  perdre l'image. La base ne garde que le **nom du fichier** (un chemin absolu reste accepté tel quel).
+- `SelecteurPhoto` est une interface : `SelecteurPhotoSysteme` utilise `image_picker` (images réduites à
+  1 600 px, qualité 85 pour économiser l'espace) ; les tests utilisent un faux sélecteur.
+- `PhotosFormulaire` suit les fichiers pendant l'édition : une photo ajoutée puis remplacée ou abandonnée est
+  effacée aussitôt ; une photo déjà enregistrée n'est effacée **qu'après** l'enregistrement réussi.
+- `creer` et `modifier` enregistrent produit, variantes et photos dans **une seule transaction** : tout ou rien.
+
+### Règles de gestion retenues
+
+- **Référence** : attribuée automatiquement (`PRD-0001`) dans la transaction de création, jamais modifiable.
+- **Dupliquer** : nouvelle référence, nom suivi de « (copie) », variantes copiées avec un stock à 0, **sans photos** ;
+  la copie s'ouvre en modification.
+- **Archiver** : le produit disparaît du catalogue et ne peut plus être vendu, mais ses ventes passées restent
+  lisibles ; « Restaurer » le remet. Aucune suppression définitive (confirmation demandée avant d'archiver).
+- **Noms de variantes uniques** par produit, sans tenir compte des majuscules, **archivées comprises** (sinon la
+  restauration créerait un doublon).
+- **Historique** : lignes des ventes **validées** seulement (une vente annulée n'y figure pas), avec le client ou
+  « Client de passage ». Vide tant que les ventes (étape 5) n'existent pas.
+- **Vendable** : ni archivé, ni « épuisé », et stock > 0 sauf produit « sur commande ». Règle provisoire, à
+  confirmer à l'étape 5.
+
 ## Dossier `android/`
 
 Le dossier `android/` n'est pas versionné. `tool/setup_android.sh` le crée avec `flutter create`,
 règle le nom affiché (« Crochet & Créations ») et génère les icônes. La CI exécute ce script à chaque fois.
 
 Conséquence à garder en tête pour les étapes suivantes : toute modification de configuration Android
-(permissions caméra/photos pour `image_picker`, par exemple) devra être ajoutée à ce script.
+devra être ajoutée à ce script. `image_picker` (étape 3) n'en demande aucune : la galerie passe par le sélecteur
+de photos du système, sans permission. L'appareil photo, lui, ouvre l'application photo du téléphone ; si
+Android ferme Crochet & Créations pendant la prise de vue, la photo n'est pas retrouvée au retour (cas rare,
+traité à l'étape 12).
 Si cette contrainte gêne, on pourra versionner `android/` à la place (il suffit de retirer `/android/` du `.gitignore`).
 
 ## Choix techniques
@@ -236,7 +324,9 @@ Si cette contrainte gêne, on pourra versionner `android/` à la place (il suffi
 | Version minimale | Dart 3.10 / Flutter 3.38 (exigé par Drift 2.35) : utiliser le canal *stable* | étape 2 |
 | Modèles | Classes de lignes générées par Drift, pas de seconde série d'entités | étape 2 |
 | Mémorisation du mode jour/nuit | Dans la base (`parametres_entreprise`), sans bibliothèque supplémentaire | fait |
-| Dépendances des étapes suivantes | `pdf`, `printing`, `share_plus`, `image_picker`… arriveront avec les étapes qui s'en servent | à venir |
+| Photos des produits | `image_picker` (galerie et appareil photo, aucune permission à déclarer), copie dans le dossier privé de l'application ; chemin relatif en base | étape 3 |
+| Variantes dans l'étape 3 | L'interface des variantes (couleur / taille, stock propre) fait partie de l'étape 3 : c'est la réalisation du champ « couleur / variante » de la fiche produit | étape 3, à confirmer |
+| Dépendances des étapes suivantes | `pdf`, `printing`, `share_plus`… arriveront avec les étapes qui s'en servent | à venir |
 
 ### Hypothèses du schéma, à confirmer
 
@@ -257,13 +347,18 @@ Le cahier des charges ne tranchait pas ces points ; voici ce qui a été retenu 
 
 ## Tests
 
-- `test/core/` : montants, dates, thèmes (couleurs de la charte et contrastes), mode d'affichage et sa mémorisation.
+- `test/core/` : montants (affichage et saisie), dates, durées, recherche sans accents, validateurs de formulaire,
+  thèmes (couleurs de la charte et contrastes), mode d'affichage et sa mémorisation.
 - `test/domain/` : total d'une vente (remise, frais de port, arrondis), statut de paiement, règles de stock,
   format des numéros, noms des listes de choix. Aucun accès à la base ni à l'interface.
 - `test/data/` : sur une vraie base SQLite **en mémoire** (mêmes tables, index et contraintes que sur le téléphone) :
   structure et contraintes (`schema_test.dart`), numérotation continue et sans doublon, décrémentation du stock
-  « tout ou rien », archivage, variantes, réglages.
-- `test/widget_test.dart` et `test/presentation/` : parcours splash → accueil → réglages, écran d'erreur de démarrage.
+  « tout ou rien », archivage, variantes, réglages ; catalogue produits (résumés, fiche, duplication, inventaire,
+  historique, noms de variantes uniques, flux en direct).
+- `test/widget_test.dart` et `test/presentation/` : parcours splash → accueil → réglages, écran d'erreur de
+  démarrage ; liste de produits (recherche, filtres, alertes), fiche, formulaire (validations, abandon, photos),
+  gestion des photos du formulaire. `aide_widget.dart` fournit l'environnement commun : base en mémoire, dossier
+  temporaire, faux sélecteur de photo.
 
 Restent à écrire avec leur étape : conversion devis → facture (étape 7) et statistiques (étape 10).
 

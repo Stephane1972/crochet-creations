@@ -6,8 +6,11 @@ abstract final class AppRoutes {
   static const String splash = '/';
   static const String accueil = '/accueil';
 
-  // Produits (étape 3)
+  // Produits (étape 3). La fiche et la modification reçoivent l'identifiant du produit
+  // (un entier) dans `arguments`.
   static const String produitNouveau = '/produits/nouveau';
+  static const String produitFiche = '/produits/fiche';
+  static const String produitModifier = '/produits/modifier';
 
   // Clients (étape 4)
   static const String clientNouveau = '/clients/nouveau';

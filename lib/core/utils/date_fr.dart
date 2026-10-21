@@ -36,3 +36,9 @@ String formatDateLongue(DateTime date) {
 String salutation(DateTime date) {
   return (date.hour >= 18 || date.hour < 5) ? 'Bonsoir' : 'Bonjour';
 }
+
+/// « 05/03/2026 ».
+String formatDateCourte(DateTime date) {
+  String deux(int n) => n.toString().padLeft(2, '0');
+  return '${deux(date.day)}/${deux(date.month)}/${date.year}';
+}

@@ -16,9 +16,9 @@ Le développement se fait en 12 étapes validées une par une (détail dans [ROA
 
 | Étape | Contenu | État |
 |------:|---------|------|
-| 1 | Projet Flutter, thème rose/vert, mode jour/nuit, navigation, logo, splash, accueil | terminée (PR #1, en attente de fusion) |
-| 2 | Base de données, modèles, migrations, repositories | **à valider** |
-| 3 | Produits et stock | à venir |
+| 1 | Projet Flutter, thème rose/vert, mode jour/nuit, navigation, logo, splash, accueil | terminée et validée |
+| 2 | Base de données, modèles, migrations, repositories | terminée et validée |
+| 3 | Produits et stock | **à valider** (PR #3) |
 | 4 | Clients | à venir |
 | 5 | Ventes et panier | à venir |
 | 6 | Factures PDF | à venir |
@@ -29,22 +29,24 @@ Le développement se fait en 12 étapes validées une par une (détail dans [ROA
 | 11 | Sauvegarde / export | à venir |
 | 12 | Tests, corrections, optimisation de l'interface | à venir |
 
-### Ce que contient l'étape 2
+### Ce que contient l'étape 3 : produits et stock
 
-- **Base de données SQLite** sur le téléphone (15 tables : produits, variantes, photos, clients, ventes, lignes de
-  vente, paiements, factures, devis, lignes de devis, cours, inscriptions, dépenses, réglages, numérotation),
-  entièrement hors ligne.
-- **Garde-fous dans la base** : pas de stock ni de montant négatif, totaux toujours cohérents, numéros de facture
-  et de devis uniques, une seule facture émise par vente…
-- **Règles de calcul** testées : total d'une vente (remise, frais de port), statut de paiement, alertes de stock,
-  numérotation `FACT-2026-0001` / `DEVIS-2026-0001` (une suite par année, sans trou).
-- **Accès aux données** (repositories) pour les produits (variantes, photos, stock), les clients, les réglages
-  et la numérotation.
-- **Le mode jour / nuit choisi dans *Plus → Réglages* est maintenant mémorisé** entre deux lancements.
-- Si la base ne peut pas s'ouvrir, un écran en français explique quoi faire au lieu d'un écran blanc.
+- **Onglet Produits** : catalogue avec **recherche** (sans tenir compte des accents ni des majuscules : nom,
+  référence, catégorie, matières, couleur, description, variantes) et **filtres** (catégorie, « à réapprovisionner »,
+  archivés). Chaque produit montre sa photo, son prix, son stock et ses alertes **Épuisé** / **Stock faible**.
+- **Fiche produit** : photos à faire défiler, informations, stock (avec ajustement rapide), **variantes** (couleur,
+  taille, prix et stock propres), **historique des ventes**, et les actions Modifier, **Dupliquer**,
+  **Archiver / Restaurer** (avec confirmation), Vendre et Ajouter au panier.
+- **Ajout et modification** : formulaire vérifié champ par champ (nom, catégorie et prix obligatoires), photo
+  principale et autres photos (appareil photo ou galerie), temps de fabrication, coût des matières, stock, seuil
+  d'alerte, statut, « personnalisable ». La référence `PRD-0001`… est attribuée automatiquement.
+  Quitter un formulaire modifié demande confirmation.
+- **Accueil** : la tuile « Stock faible » compte les produits à réapprovisionner et ouvre la liste filtrée.
 
-Visible sur le téléphone : surtout la mémorisation du mode jour/nuit. L'écran d'accueil affiche encore « — » :
-les écrans qui lisent et écrivent dans la base arrivent aux étapes 3 à 10.
+À savoir : « Vendre » et « Ajouter au panier » ouvrent pour l'instant l'onglet Vente, encore provisoire
+(le panier arrive à l'étape 5). L'historique des ventes se remplira à partir de cette étape.
+
+(Les étapes 1 et 2 — fondations et base de données — sont décrites dans [CHANGELOG.md](CHANGELOG.md).)
 
 ## Essayer l'application
 

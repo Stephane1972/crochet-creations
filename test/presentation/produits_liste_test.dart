@@ -13,6 +13,24 @@ Finder dansProduits(Finder cible) =>
 
 Finder champRecherche() => dansProduits(find.byType(TextField));
 
+/// Appuie sur une puce de filtre. La rangée de puces défile : celles qui sortent de l'écran ne sont
+/// plus construites, on revient donc au début puis on avance jusqu'à la puce voulue.
+Future<void> appuyerPuce(WidgetTester tester, Finder puce) async {
+  // La zone de saisie contient aussi un défilement horizontal : on cible celui de la rangée de puces.
+  final Finder defilement = find.descendant(
+    of: dansProduits(
+      find.byWidgetPredicate((Widget w) => w is ListView && w.scrollDirection == Axis.horizontal),
+    ),
+    matching: find.byType(Scrollable),
+  );
+  await tester.drag(defilement, const Offset(5000, 0)); // retour au début de la rangée
+  await tester.pumpAndSettle();
+  await tester.scrollUntilVisible(puce, 150, scrollable: defilement);
+  await tester.tap(puce);
+  await tester.pumpAndSettle();
+  await laisserFinir(tester);
+}
+
 /// Quatre produits aux situations de stock différentes.
 Future<void> garnirCatalogue(WidgetTester tester, EnvironnementTest env) async {
   await env.creerProduit(tester, matieres: 'Coton bio'); // PRD-0001 : 5 en stock
@@ -122,11 +140,11 @@ void main() {
     await garnirCatalogue(tester, env);
     await ouvrirProduits(tester, env);
 
-    await appuyer(tester, dansProduits(find.widgetWithText(ChoiceChip, 'Doudou')));
+    await appuyerPuce(tester, dansProduits(find.widgetWithText(ChoiceChip, 'Doudou')));
     expect(dansProduits(find.text('Doudou lapin')), findsOneWidget);
     expect(dansProduits(find.text('Écharpe en laine')), findsNothing);
 
-    await appuyer(tester, dansProduits(find.widgetWithText(ChoiceChip, 'Tous')));
+    await appuyerPuce(tester, dansProduits(find.widgetWithText(ChoiceChip, 'Tous')));
     expect(dansProduits(find.text('Écharpe en laine')), findsOneWidget);
 
     await env.fermer(tester);
@@ -140,7 +158,7 @@ void main() {
     // Épuisé + stock faible = 2 produits à réapprovisionner.
     final Finder puce = dansProduits(find.widgetWithText(FilterChip, 'À réapprovisionner (2)'));
     expect(puce, findsOneWidget);
-    await appuyer(tester, puce);
+    await appuyerPuce(tester, puce);
 
     expect(dansProduits(find.text('Écharpe en laine')), findsOneWidget);
     expect(dansProduits(find.text('Boucles soleil')), findsOneWidget);
@@ -160,7 +178,7 @@ void main() {
     final String nomArchive = (await env.travailler(tester, () => env.produits.obtenir(id)))!.nom;
     expect(dansProduits(find.text(nomArchive)), findsNothing);
 
-    await appuyer(tester, dansProduits(find.widgetWithText(FilterChip, 'Archivés')));
+    await appuyerPuce(tester, dansProduits(find.widgetWithText(FilterChip, 'Archivés')));
     expect(dansProduits(find.text(nomArchive)), findsOneWidget);
     expect(dansProduits(find.text('Archivé')), findsOneWidget);
 

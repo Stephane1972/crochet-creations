@@ -193,3 +193,10 @@ Future<void> saisir(WidgetTester tester, String libelle, String texte) async {
   await tester.enterText(champ, texte);
   await tester.pump();
 }
+
+/// Appuie sur la flèche « retour » de la barre du haut. (`tester.pageBack()` cherche l'info-bulle
+/// anglaise « Back » : elle est « Retour » dans l'application, qui est en français.)
+Future<void> retourArriere(WidgetTester tester) async {
+  await tester.tap(find.byType(BackButton));
+  await tester.pumpAndSettle();
+}

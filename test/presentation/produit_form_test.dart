@@ -162,8 +162,7 @@ void main() {
     await ouvrirFormulaireNouveau(tester, env);
 
     await saisir(tester, 'Nom du produit *', 'Brouillon');
-    await tester.pageBack();
-    await tester.pumpAndSettle();
+    await retourArriere(tester);
     expect(find.text('Abandonner les modifications ?'), findsOneWidget);
 
     // On continue la saisie : le formulaire reste ouvert.
@@ -172,8 +171,7 @@ void main() {
     expect(find.text('Nouveau produit'), findsOneWidget);
 
     // On abandonne : retour à la liste, rien n'est enregistré.
-    await tester.pageBack();
-    await tester.pumpAndSettle();
+    await retourArriere(tester);
     await tester.tap(find.widgetWithText(FilledButton, 'Abandonner'));
     await tester.pumpAndSettle();
     expect(find.text('Nouveau produit'), findsNothing);
@@ -186,8 +184,7 @@ void main() {
     final EnvironnementTest env = await EnvironnementTest.creer(tester);
     await ouvrirFormulaireNouveau(tester, env);
 
-    await tester.pageBack();
-    await tester.pumpAndSettle();
+    await retourArriere(tester);
 
     expect(find.text('Abandonner les modifications ?'), findsNothing);
     expect(find.text('Nouveau produit'), findsNothing);
@@ -275,8 +272,7 @@ void main() {
     );
     expect(avant, 1);
 
-    await tester.pageBack();
-    await tester.pumpAndSettle();
+    await retourArriere(tester);
     await tester.tap(find.widgetWithText(FilledButton, 'Abandonner'));
     await tester.pumpAndSettle();
     await laisserFinir(tester);
@@ -299,8 +295,7 @@ void main() {
     expect(env.selecteur.appels, 1);
     expect(find.text('Ajouter la photo principale'), findsOneWidget);
     // Rien n'a changé : on peut quitter sans confirmation.
-    await tester.pageBack();
-    await tester.pumpAndSettle();
+    await retourArriere(tester);
     expect(find.text('Abandonner les modifications ?'), findsNothing);
 
     await env.fermer(tester);

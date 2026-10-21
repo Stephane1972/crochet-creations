@@ -385,7 +385,7 @@ class ProduitRepository {
 
   /// Fixe le stock à [quantite] (inventaire). Retourne le nouveau stock.
   /// Si le produit a des variantes, indiquer [varianteId].
-  Future<int> definirStock({required int produitId, int? varianteId, required int quantite}) {
+  Future<int> definirStock({required int produitId, int? varianteId, required int quantite}) async {
     if (quantite < 0) throw const DonneeInvalide('Le stock ne peut pas être négatif.');
     return _db.transaction(() async {
       final int actuel;

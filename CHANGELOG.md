@@ -31,6 +31,13 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
 - Le composant d'étiquette (`Etiquette`) est partagé entre produits et clients (`core/widgets/etiquette.dart`).
 - Le texte des réglages indique « étape 4 sur 12 ».
 
+### Corrigé
+- **Mises à jour en direct des fiches** (anomalie de l'étape 3, découverte par un test de l'étape 4) : Drift
+  partage un même flux entre toutes les requêtes de même texte SQL, sans regarder les tables surveillées. Les flux
+  du catalogue, de la fiche produit et de son historique, qui s'écrivaient tous `SELECT 1`, pouvaient donc se
+  confondre : un écran ouvert ne se rafraîchissait plus quand une vente était ajoutée. `observerTables`
+  (`data/database/flux_en_direct.dart`) distingue les flux par leurs tables ; test de non-régression ajouté.
+
 ### Limites connues
 - Le « client de passage » (vente rapide sans fiche) est géré avec les ventes, à l'étape 5.
 - L'historique d'un client reste vide tant que les ventes, factures, devis et cours ne peuvent pas être créés

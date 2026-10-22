@@ -238,6 +238,16 @@ Future<void> laisserFinir(WidgetTester tester) async {
   }
 }
 
+/// Fait avancer le temps simulé, en laissant la base travailler, jusqu'à ce que [condition] soit
+/// vraie (au plus [essais] tours). Utile quand un écran se met à jour après une chaîne de lectures
+/// de la base (l'historique d'un client en enchaîne sept) : huit tours de [laisserFinir] ne suffisent pas.
+Future<void> attendreJusqua(WidgetTester tester, bool Function() condition, {int essais = 200}) async {
+  for (int i = 0; i < essais && !condition(); i++) {
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 10)));
+    await tester.pump(const Duration(milliseconds: 50));
+  }
+}
+
 /// Démarre l'application, attend la fin du splash et arrive sur l'accueil.
 Future<void> ouvrirAccueil(
   WidgetTester tester,

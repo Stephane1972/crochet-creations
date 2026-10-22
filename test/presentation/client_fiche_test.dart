@@ -257,7 +257,7 @@ void main() {
       date: DateTime(2026, 10, 1),
       ecranOuvert: true,
     );
-    await laisserFinir(tester);
+    await attendreJusqua(tester, () => dansFiche(find.text('Aucune vente.')).evaluate().isEmpty);
 
     expect(dansFiche(find.text('Aucune vente.')), findsNothing);
     expect(dansFiche(find.text('1 vente validée · ${formatEuros(2500)}')), findsOneWidget);

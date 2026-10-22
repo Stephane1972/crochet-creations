@@ -5,6 +5,7 @@ import '../../domain/calculs/stock.dart';
 import '../../domain/enums.dart';
 import '../../domain/erreurs.dart';
 import '../database/app_database.dart';
+import '../database/flux_en_direct.dart';
 import 'numerotation_repository.dart';
 import 'produit_vues.dart';
 
@@ -461,11 +462,9 @@ class ProduitRepository {
     return requete;
   }
 
-  /// Relit les données à chaque modification des [tables] : Drift prévient dès qu'une
-  /// écriture les touche. `asyncMap` traite les relectures une par une, dans l'ordre.
-  Stream<T> _observer<T>(Set<ResultSetImplementation> tables, Future<T> Function() lire) {
-    return _db.customSelect('SELECT 1', readsFrom: tables).watch().asyncMap((_) => lire());
-  }
+  /// Relit les données à chaque modification des [tables] (voir `observerTables`).
+  Stream<T> _observer<T>(Set<ResultSetImplementation> tables, Future<T> Function() lire) =>
+      observerTables(_db, tables, lire);
 
   Future<List<ProduitResume>> _resumes(bool inclureArchives) async {
     final List<Produit> produits = await lister(inclureArchives: inclureArchives);

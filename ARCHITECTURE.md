@@ -65,6 +65,7 @@ crochet-creations/
 │   │   ├── database/
 │   │   │   ├── tables.dart                   les 15 tables (contraintes, index)
 │   │   │   ├── app_database.dart             base, version du schéma, migrations
+│   │   │   ├── flux_en_direct.dart           lecture « en direct » de plusieurs tables (observerTables)
 │   │   │   └── app_database.g.dart           (généré par build_runner, non versionné)
 │   │   ├── repositories/
 │   │   │   ├── numerotation_repository.dart  FACT-…, DEVIS-…, PRD-…
@@ -287,10 +288,17 @@ Après une migration, `PRAGMA foreign_key_check` vérifie qu'aucune liaison n'a 
 
 ### Lecture en direct des tables liées
 
-`ProduitRepository._observer` combine plusieurs tables sans bibliothèque supplémentaire :
-`customSelect('SELECT 1', readsFrom: tables).watch().asyncMap((_) => lire())`. Dès qu'une des tables change
-(produit, variante, photo, vente, client), la lecture complète est refaite et l'écran se met à jour.
+`observerTables` (`data/database/flux_en_direct.dart`), utilisé par `ProduitRepository` et `ClientRepository`,
+combine plusieurs tables sans bibliothèque supplémentaire :
+`customSelect('SELECT 1 /* tables */', readsFrom: tables).watch().asyncMap((_) => lire())`. Dès qu'une des tables
+change (produit, variante, photo, vente, client), la lecture complète est refaite et l'écran se met à jour.
 Un produit et ses variantes sont ainsi toujours lus ensemble, jamais l'un sans l'autre.
+
+⚠️ **Drift partage un même flux entre toutes les requêtes de même texte SQL, sans regarder les tables
+surveillées.** Avec un `SELECT 1` identique partout, le premier flux ouvert (la liste des produits, toujours
+affichée dans l'onglet Produits) « volait » les suivants, qui ne se rafraîchissaient plus quand une vente était
+ajoutée. Les noms des tables sont donc écrits en commentaire dans le texte SQL : deux flux sur des tables
+différentes ne se confondent plus (test `test/data/flux_en_direct_test.dart`).
 
 ### Photos
 
@@ -347,7 +355,7 @@ Un produit et ses variantes sont ainsi toujours lus ensemble, jamais l'un sans l
 - ses **inscriptions aux cours** (jointure avec `cours` pour le titre et la date), liste d'attente comprise.
 
 `observerHistorique` relit le tout dès qu'une de ces tables change (même technique que le catalogue :
-`customSelect('SELECT 1', readsFrom: tables).watch().asyncMap(...)`). La fiche s'ouvre donc déjà à jour quand
+`observerTables`, voir « Lecture en direct des tables liées »). La fiche s'ouvre donc déjà à jour quand
 les ventes, factures, devis et cours seront créés dans les étapes suivantes : aucun changement d'écran à prévoir.
 
 ## Dossier `android/`
@@ -401,7 +409,7 @@ Le cahier des charges ne tranchait pas ces points ; voici ce qui a été retenu 
 - `test/data/` : sur une vraie base SQLite **en mémoire** (mêmes tables, index et contraintes que sur le téléphone) :
   structure et contraintes (`schema_test.dart`), numérotation continue et sans doublon, décrémentation du stock
   « tout ou rien », archivage, variantes, réglages ; catalogue produits (résumés, fiche, duplication, inventaire,
-  historique, noms de variantes uniques, flux en direct) ; clients (règles de saisie refusées avec le bon message,
+  historique, noms de variantes uniques, flux en direct, flux simultanés qui ne se confondent pas) ; clients (règles de saisie refusées avec le bon message,
   historique complet et limité au bon client, flux en direct).
 - `test/widget_test.dart` et `test/presentation/` : parcours splash → accueil → réglages, écran d'erreur de
   démarrage ; liste de produits (recherche, filtres, alertes), fiche, formulaire (validations, abandon, photos),

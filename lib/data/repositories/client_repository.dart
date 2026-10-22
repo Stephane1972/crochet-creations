@@ -5,6 +5,7 @@ import '../../domain/enums.dart';
 import '../../domain/erreurs.dart';
 import '../../domain/regles_client.dart';
 import '../database/app_database.dart';
+import '../database/flux_en_direct.dart';
 import 'client_vues.dart';
 
 /// Données saisies pour créer ou modifier un client.
@@ -221,10 +222,7 @@ class ClientRepository {
       _db.inscriptionsCours,
       _db.cours,
     };
-    return _db
-        .customSelect('SELECT 1', readsFrom: tables)
-        .watch()
-        .asyncMap((_) => historique(clientId));
+    return observerTables(_db, tables, () => historique(clientId));
   }
 
   // --- Interne --------------------------------------------------------------

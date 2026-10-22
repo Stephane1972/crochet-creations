@@ -250,7 +250,13 @@ void main() {
     await ouvrirFiche(tester, env, 'Camille Martin');
     expect(dansFiche(find.text('Aucune vente.')), findsOneWidget);
 
-    await env.ajouterVenteClient(tester, clientId: c.id, total: 2500, date: DateTime(2026, 10, 1));
+    await env.ajouterVenteClient(
+      tester,
+      clientId: c.id,
+      total: 2500,
+      date: DateTime(2026, 10, 1),
+      ecranOuvert: true,
+    );
     await laisserFinir(tester);
 
     expect(dansFiche(find.text('Aucune vente.')), findsNothing);

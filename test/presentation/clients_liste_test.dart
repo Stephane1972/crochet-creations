@@ -179,7 +179,7 @@ void main() {
     await ouvrirClients(tester, env);
     expect(find.text('Aucun client pour le moment'), findsOneWidget);
 
-    await env.creerClient(tester, const DonneesClient(prenom: 'Léa', nom: 'Roux'));
+    await env.creerClient(tester, const DonneesClient(prenom: 'Léa', nom: 'Roux'), ecranOuvert: true);
     await laisserFinir(tester);
 
     expect(find.text('Aucun client pour le moment'), findsNothing);

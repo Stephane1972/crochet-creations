@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:crochet_creations/app.dart';
@@ -62,6 +63,39 @@ class EnvironnementTest {
   /// Exécute un travail « réel » (base, fichiers) hors du temps simulé du test.
   Future<T> travailler<T>(WidgetTester tester, Future<T> Function() action) async {
     final T? resultat = await tester.runAsync<T>(action);
+    return resultat as T;
+  }
+
+  /// Écrit dans la base **pendant qu'un écran qui la lit « en direct » est affiché**.
+  ///
+  /// Le travail s'exécute dans le temps simulé du test, comme un enregistrement fait depuis
+  /// l'application : les écrans ouverts se mettent alors à jour tout seuls. Le faire avec
+  /// [travailler] (hors temps simulé) bloquait le test (verrou de la base pris par une lecture en
+  /// direct qui attend le temps simulé) ou n'actualisait pas l'écran.
+  Future<T> ecrireEcranOuvert<T>(WidgetTester tester, Future<T> Function() action) async {
+    bool fini = false;
+    T? resultat;
+    Object? erreur;
+    StackTrace? pile;
+    unawaited(
+      action().then(
+        (T valeur) {
+          resultat = valeur;
+          fini = true;
+        },
+        onError: (Object e, StackTrace p) {
+          erreur = e;
+          pile = p;
+          fini = true;
+        },
+      ),
+    );
+    for (int i = 0; i < 40 && !fini; i++) {
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 10)));
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    if (!fini) fail('L’écriture dans la base n’est pas terminée.');
+    if (erreur != null) Error.throwWithStackTrace(erreur!, pile!);
     return resultat as T;
   }
 
@@ -137,12 +171,17 @@ class EnvironnementTest {
     );
   }
 
-  /// Crée un client (hors temps simulé).
-  Future<Client> creerClient(WidgetTester tester, DonneesClient donnees) {
-    return travailler(tester, () => clients.creer(donnees));
+  Future<T> _faire<T>(WidgetTester tester, Future<T> Function() action, {required bool ecranOuvert}) {
+    return ecranOuvert ? ecrireEcranOuvert(tester, action) : travailler(tester, action);
+  }
+
+  /// Crée un client (hors temps simulé, sauf si [ecranOuvert] : voir [ecrireEcranOuvert]).
+  Future<Client> creerClient(WidgetTester tester, DonneesClient donnees, {bool ecranOuvert = false}) {
+    return _faire(tester, () => clients.creer(donnees), ecranOuvert: ecranOuvert);
   }
 
   /// Enregistre une vente (sans ligne) au nom de ce client, avec son paiement si [paiement] est donné.
+  /// [ecranOuvert] : voir [ecrireEcranOuvert].
   Future<int> ajouterVenteClient(
     WidgetTester tester, {
     required int clientId,
@@ -150,8 +189,9 @@ class EnvironnementTest {
     DateTime? date,
     StatutVente statut = StatutVente.validee,
     ModePaiement? paiement,
+    bool ecranOuvert = false,
   }) {
-    return travailler(tester, () async {
+    return _faire(tester, () async {
       final int venteId = await db
           .into(db.ventes)
           .insert(
@@ -176,7 +216,7 @@ class EnvironnementTest {
             );
       }
       return venteId;
-    });
+    }, ecranOuvert: ecranOuvert);
   }
 
   /// Libère la base et le dossier temporaire (à appeler en fin de test).

@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:crochet_creations/app.dart';
 import 'package:crochet_creations/data/database/app_database.dart';
 import 'package:crochet_creations/data/providers.dart';
+import 'package:crochet_creations/data/repositories/client_repository.dart';
 import 'package:crochet_creations/data/repositories/numerotation_repository.dart';
 import 'package:crochet_creations/data/repositories/produit_repository.dart';
 import 'package:crochet_creations/data/stockage/selecteur_photo.dart';
@@ -30,11 +32,14 @@ class FauxSelecteurPhoto implements SelecteurPhoto {
 /// Tout ce qu'il faut pour tester des écrans : base en mémoire, dossier de photos temporaire,
 /// faux sélecteur de photo.
 class EnvironnementTest {
-  EnvironnementTest._(this.db, this.dossier) : produits = ProduitRepository(db, NumerotationRepository(db));
+  EnvironnementTest._(this.db, this.dossier)
+    : produits = ProduitRepository(db, NumerotationRepository(db)),
+      clients = ClientRepository(db);
 
   final AppDatabase db;
   final Directory dossier;
   final ProduitRepository produits;
+  final ClientRepository clients;
   final FauxSelecteurPhoto selecteur = FauxSelecteurPhoto();
 
   static Future<EnvironnementTest> creer(WidgetTester tester) async {
@@ -58,6 +63,39 @@ class EnvironnementTest {
   /// Exécute un travail « réel » (base, fichiers) hors du temps simulé du test.
   Future<T> travailler<T>(WidgetTester tester, Future<T> Function() action) async {
     final T? resultat = await tester.runAsync<T>(action);
+    return resultat as T;
+  }
+
+  /// Écrit dans la base **pendant qu'un écran qui la lit « en direct » est affiché**.
+  ///
+  /// Le travail s'exécute dans le temps simulé du test, comme un enregistrement fait depuis
+  /// l'application : les écrans ouverts se mettent alors à jour tout seuls. Le faire avec
+  /// [travailler] (hors temps simulé) bloquait le test (verrou de la base pris par une lecture en
+  /// direct qui attend le temps simulé) ou n'actualisait pas l'écran.
+  Future<T> ecrireEcranOuvert<T>(WidgetTester tester, Future<T> Function() action) async {
+    bool fini = false;
+    T? resultat;
+    Object? erreur;
+    StackTrace? pile;
+    unawaited(
+      action().then(
+        (T valeur) {
+          resultat = valeur;
+          fini = true;
+        },
+        onError: (Object e, StackTrace p) {
+          erreur = e;
+          pile = p;
+          fini = true;
+        },
+      ),
+    );
+    for (int i = 0; i < 40 && !fini; i++) {
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 10)));
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    if (!fini) fail('L’écriture dans la base n’est pas terminée.');
+    if (erreur != null) Error.throwWithStackTrace(erreur!, pile!);
     return resultat as T;
   }
 
@@ -133,6 +171,54 @@ class EnvironnementTest {
     );
   }
 
+  Future<T> _faire<T>(WidgetTester tester, Future<T> Function() action, {required bool ecranOuvert}) {
+    return ecranOuvert ? ecrireEcranOuvert(tester, action) : travailler(tester, action);
+  }
+
+  /// Crée un client (hors temps simulé, sauf si [ecranOuvert] : voir [ecrireEcranOuvert]).
+  Future<Client> creerClient(WidgetTester tester, DonneesClient donnees, {bool ecranOuvert = false}) {
+    return _faire(tester, () => clients.creer(donnees), ecranOuvert: ecranOuvert);
+  }
+
+  /// Enregistre une vente (sans ligne) au nom de ce client, avec son paiement si [paiement] est donné.
+  /// [ecranOuvert] : voir [ecrireEcranOuvert].
+  Future<int> ajouterVenteClient(
+    WidgetTester tester, {
+    required int clientId,
+    int total = 2500,
+    DateTime? date,
+    StatutVente statut = StatutVente.validee,
+    ModePaiement? paiement,
+    bool ecranOuvert = false,
+  }) {
+    return _faire(tester, () async {
+      final int venteId = await db
+          .into(db.ventes)
+          .insert(
+            VentesCompanion.insert(
+              sousTotalCentimes: total,
+              totalCentimes: total,
+              clientId: Value(clientId),
+              dateVente: date == null ? const Value.absent() : Value(date),
+              statut: Value(statut),
+            ),
+          );
+      if (paiement != null) {
+        await db
+            .into(db.paiements)
+            .insert(
+              PaiementsCompanion.insert(
+                venteId: venteId,
+                montantCentimes: total,
+                modePaiement: paiement,
+                datePaiement: date == null ? const Value.absent() : Value(date),
+              ),
+            );
+      }
+      return venteId;
+    }, ecranOuvert: ecranOuvert);
+  }
+
   /// Libère la base et le dossier temporaire (à appeler en fin de test).
   Future<void> fermer(WidgetTester tester) async {
     await tester.pumpWidget(const SizedBox());
@@ -147,6 +233,16 @@ class EnvironnementTest {
 /// puis redessine l'écran.
 Future<void> laisserFinir(WidgetTester tester) async {
   for (int i = 0; i < 8; i++) {
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 10)));
+    await tester.pump(const Duration(milliseconds: 50));
+  }
+}
+
+/// Fait avancer le temps simulé, en laissant la base travailler, jusqu'à ce que [condition] soit
+/// vraie (au plus [essais] tours). Utile quand un écran se met à jour après une chaîne de lectures
+/// de la base (l'historique d'un client en enchaîne sept) : huit tours de [laisserFinir] ne suffisent pas.
+Future<void> attendreJusqua(WidgetTester tester, bool Function() condition, {int essais = 200}) async {
+  for (int i = 0; i < essais && !condition(); i++) {
     await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 10)));
     await tester.pump(const Duration(milliseconds: 50));
   }

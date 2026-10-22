@@ -78,9 +78,16 @@ jobs:
         if: ${{ !cancelled() && steps.generer.outcome == 'success' }}
         run: |
           set +e
-          flutter test --reporter expanded 2>&1 | tee test-output.log
+          # Un test de widget bloqué n'est arrêté par Flutter qu'après 10 minutes : en dernier
+          # recours, tout s'arrête après 12 min (la suite complète en prend 2 ou 3) et la fin du
+          # journal indique où ça bloquait.
+          timeout 12m flutter test --reporter expanded 2>&1 | tee test-output.log
           code=${PIPESTATUS[0]}
           if [ "$code" -ne 0 ]; then
+            FIN=$(tail -n 15 test-output.log | cut -c1-300)
+            FIN="${FIN//'%'/'%25'}"
+            FIN="${FIN//$'\n'/'%0A'}"
+            echo "::error title=Dernières lignes du journal des tests (code $code)::$FIN"
             LISTE=$(grep -E "\[E\]" test-output.log | sort -u | head -c 2000)
             LISTE="${LISTE//'%'/'%25'}"
             LISTE="${LISTE//$'\n'/'%0A'}"

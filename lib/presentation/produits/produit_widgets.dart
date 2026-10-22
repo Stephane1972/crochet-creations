@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/money.dart';
+import '../../core/widgets/etiquette.dart';
 import '../../data/database/app_database.dart';
 import '../../data/providers.dart';
 import '../../data/repositories/produit_vues.dart';
 import '../../domain/calculs/stock.dart';
 import '../../domain/enums.dart';
+
+export '../../core/widgets/etiquette.dart';
 
 /// Icône associée à chaque catégorie (affichée quand un produit n'a pas de photo).
 IconData iconeCategorie(CategorieProduit categorie) {
@@ -81,40 +84,6 @@ class ImageProduit extends ConsumerWidget {
           );
 
     return ClipRRect(borderRadius: BorderRadius.circular(rayon), child: contenu);
-  }
-}
-
-/// Petite pastille d'information (« Stock faible », « Archivé »...).
-class Etiquette extends StatelessWidget {
-  const Etiquette(this.texte, {super.key, required this.fond, required this.couleurTexte, this.icone});
-
-  final String texte;
-  final Color fond;
-  final Color couleurTexte;
-  final IconData? icone;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(color: fond, borderRadius: BorderRadius.circular(8)),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          if (icone != null) ...<Widget>[
-            Icon(icone, size: 14, color: couleurTexte),
-            const SizedBox(width: 4),
-          ],
-          Text(
-            texte,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: couleurTexte,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }
 

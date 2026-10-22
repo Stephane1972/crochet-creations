@@ -25,7 +25,7 @@ Règles :
   modèles à toutes les couches. On n'a pas créé de seconde série de classes « métier » identiques : ce serait du
   code en double à maintenir. La couche `domain` contient les règles et les listes de choix, pas les entités.
 
-## Arborescence (étape 3)
+## Arborescence (étape 4)
 
 ```
 crochet-creations/
@@ -51,10 +51,11 @@ crochet-creations/
 │   │   │   ├── recherche.dart                recherche sans majuscules ni accents
 │   │   │   ├── validateurs.dart              règles des champs de formulaire (obligatoire, montant, entier…)
 │   │   │   └── texte.dart                    nettoyage des saisies facultatives
-│   │   └── widgets/                          logo SVG, icônes de barre d'état, dialogues de confirmation
+│   │   └── widgets/                          logo SVG, icônes de barre d'état, dialogues de confirmation, étiquette
 │   ├── domain/
 │   │   ├── enums.dart                        listes de choix (catégories, statuts, modes de paiement…)
 │   │   ├── erreurs.dart                      erreurs métier à message clair
+│   │   ├── regles_client.dart                règles de saisie d'une fiche client (e-mail, téléphone, code postal, SIRET)
 │   │   └── calculs/
 │   │       ├── totaux.dart                   sous-total, remise, frais de port, total
 │   │       ├── statut_paiement.dart          payée / partielle / impayée / remboursée
@@ -64,19 +65,28 @@ crochet-creations/
 │   │   ├── database/
 │   │   │   ├── tables.dart                   les 15 tables (contraintes, index)
 │   │   │   ├── app_database.dart             base, version du schéma, migrations
+│   │   │   ├── flux_en_direct.dart           lecture « en direct » de plusieurs tables (observerTables)
 │   │   │   └── app_database.g.dart           (généré par build_runner, non versionné)
 │   │   ├── repositories/
 │   │   │   ├── numerotation_repository.dart  FACT-…, DEVIS-…, PRD-…
 │   │   │   ├── parametres_repository.dart    profil entreprise, mode jour/nuit
 │   │   │   ├── produit_repository.dart       catalogue : créer, modifier, dupliquer, archiver, stock, historique
 │   │   │   ├── produit_vues.dart             ce que lisent les écrans : ProduitResume, ProduitDetail, historique
-│   │   │   └── client_repository.dart        clients (base posée à l'étape 2, écrans à l'étape 4)
+│   │   │   ├── client_repository.dart        clients : créer, modifier, archiver, fiche et historique en direct
+│   │   │   └── client_vues.dart              nom affiché, initiales, historique d'un client (ventes, paiements, cours…)
 │   │   ├── stockage/
 │   │   │   ├── stockage_photos.dart          copie les photos dans le dossier privé de l'application
 │   │   │   └── selecteur_photo.dart          choix d'une photo (galerie / appareil), remplaçable en test
 │   │   └── providers.dart                    accès Riverpod à la base, aux repositories et aux photos
 │   └── presentation/
 │       ├── common/                   placeholder_screen.dart, menu_tile.dart
+│       ├── clients/                          onglet Clients et ses écrans (voir « Clients »)
+│       │   ├── clients_screen.dart           liste, recherche, filtres (écran 6)
+│       │   ├── client_fiche_screen.dart      fiche et historique d'un client (écran 7)
+│       │   ├── client_form_screen.dart       ajout / modification
+│       │   ├── filtres_clients.dart          recherche + filtres, et fonction de filtrage
+│       │   ├── clients_providers.dart        flux Riverpod (liste, fiche, historique)
+│       │   └── client_widgets.dart           pastille d'initiales, étiquettes, résumé des coordonnées
 │       ├── home/home_screen.dart             accueil / tableau de bord
 │       ├── more/more_screen.dart             onglet « Plus »
 │       ├── produits/                         onglet Produits et ses écrans (voir « Produits et stock »)
@@ -136,7 +146,11 @@ les produits : `domain/produits/`, `data/produits/`, `presentation/produits/`.
   `produitDetailProvider(id)` et `historiqueProduitProvider(id)` (fiche et historique, en direct),
   `nombreAReapprovisionnerProvider` (pastille de l'accueil et du filtre) ;
 - `filtresProduitsProvider` : recherche, catégorie, « Archivés », « À réapprovisionner ». Il vit au-dessus des écrans :
-  le filtre choisi depuis l'accueil (« Stock faible ») s'applique à l'ouverture de l'onglet Produits.
+  le filtre choisi depuis l'accueil (« Stock faible ») s'applique à l'ouverture de l'onglet Produits ;
+- clients (`presentation/clients/clients_providers.dart`) : `clientsProvider` (tous les clients, archivés compris, en
+  direct), `clientProvider(id)` (fiche) et `historiqueClientProvider(id)` (devis, ventes, factures, paiements, cours) ;
+- `filtresClientsProvider` : recherche, type (particulier / professionnel), « Archivés ». Le filtrage et le tri
+  se font côté écran (`filtrerClients`), sur la liste complète : un client archivé apparaît ou disparaît sans relecture.
 
 Les flux « en direct » sont des `StreamProvider.autoDispose` : l'écran se met à jour tout seul après chaque
 enregistrement, sans rechargement manuel.
@@ -151,8 +165,8 @@ Navigation Flutter standard (`Navigator` + routes nommées), sans bibliothèque 
 - les autres écrans (factures, devis, cours…) s'ouvrent par-dessus, depuis *Plus* ou l'accueil ;
 - les écrans qui concernent un élément précis reçoivent son identifiant en **argument de route**
   (`Navigator.pushNamed(context, AppRoutes.produitFiche, arguments: produit.id)`) ; `AppRouter` le lit et
-  affiche un message d'erreur si l'identifiant manque. Aujourd'hui : `produitFiche` et `produitModifier` ;
-  `produitNouveau` n'en prend pas ;
+  affiche un message d'erreur si l'identifiant manque. Aujourd'hui : `produitFiche`, `produitModifier`,
+  `clientFiche` et `clientModifier` ; `produitNouveau` et `clientNouveau` n'en prennent pas ;
 - « Vendre » et « Ajouter au panier » depuis une fiche produit ramènent à la racine et ouvrent l'onglet Vente
   (`navIndexProvider`) ; cet onglet reste un écran « Bientôt disponible » jusqu'à l'étape 5 ;
 - le bouton « retour » d'Android ramène d'abord à l'accueil avant de quitter l'application ;
@@ -274,10 +288,17 @@ Après une migration, `PRAGMA foreign_key_check` vérifie qu'aucune liaison n'a 
 
 ### Lecture en direct des tables liées
 
-`ProduitRepository._observer` combine plusieurs tables sans bibliothèque supplémentaire :
-`customSelect('SELECT 1', readsFrom: tables).watch().asyncMap((_) => lire())`. Dès qu'une des tables change
-(produit, variante, photo, vente, client), la lecture complète est refaite et l'écran se met à jour.
+`observerTables` (`data/database/flux_en_direct.dart`), utilisé par `ProduitRepository` et `ClientRepository`,
+combine plusieurs tables sans bibliothèque supplémentaire :
+`customSelect('SELECT 1 /* tables */', readsFrom: tables).watch().asyncMap((_) => lire())`. Dès qu'une des tables
+change (produit, variante, photo, vente, client), la lecture complète est refaite et l'écran se met à jour.
 Un produit et ses variantes sont ainsi toujours lus ensemble, jamais l'un sans l'autre.
+
+⚠️ **Drift partage un même flux entre toutes les requêtes de même texte SQL, sans regarder les tables
+surveillées.** Avec un `SELECT 1` identique partout, le premier flux ouvert (la liste des produits, toujours
+affichée dans l'onglet Produits) « volait » les suivants, qui ne se rafraîchissaient plus quand une vente était
+ajoutée. Les noms des tables sont donc écrits en commentaire dans le texte SQL : deux flux sur des tables
+différentes ne se confondent plus (test `test/data/flux_en_direct_test.dart`).
 
 ### Photos
 
@@ -302,6 +323,40 @@ Un produit et ses variantes sont ainsi toujours lus ensemble, jamais l'un sans l
   « Client de passage ». Vide tant que les ventes (étape 5) n'existent pas.
 - **Vendable** : ni archivé, ni « épuisé », et stock > 0 sauf produit « sur commande ». Règle provisoire, à
   confirmer à l'étape 5.
+
+## Clients (étape 4)
+
+### Règles de gestion retenues
+
+- **Un nom suffit** : une fiche doit avoir au moins un prénom, un nom ou une raison sociale ; tout le reste est facultatif.
+- **Nom affiché** (`libelleClient`) : la raison sociale pour un professionnel qui en a une (la personne à contacter
+  s'affiche dessous), sinon « Prénom Nom ». La liste est triée sur ce nom, sans tenir compte des accents ni des
+  majuscules, puis par ordre de création.
+- **Raison sociale et SIREN/SIRET** n'existent que pour un professionnel : le formulaire les masque pour un
+  particulier et ne les enregistre pas (repasser de Professionnel à Particulier les efface).
+- **Règles de saisie** (`domain/regles_client.dart`), appliquées par le formulaire **et** par `DonneesClient.valider()` :
+  une fiche refusée à l'écran l'est aussi par le dépôt de données, avec le même message. Elles contrôlent la **forme**
+  seulement : e-mail `nom@domaine.ext`, téléphone de 6 à 15 chiffres (espaces et `+ ( ) . - /` acceptés), code postal de
+  3 à 10 caractères (lettres, chiffres, espace, tiret : adresses étrangères acceptées), SIREN à 9 chiffres ou SIRET à 14
+  (espaces et points acceptés). Aucun contrôle de l'existence du numéro ni de sa clé.
+- **Archiver** : le client disparaît de la liste (filtre « Archivés » pour le retrouver), mais ses ventes, factures et
+  devis restent liés à lui et lisibles. Aucune suppression définitive (la base l'interdit d'ailleurs tant qu'une vente
+  le référence : `ON DELETE RESTRICT`).
+- **Client de passage** : pas de fiche, `ventes.client_id` reste vide ; il se choisit au moment de la vente (étape 5).
+
+### Historique d'un client
+
+`ClientRepository.historique(id)` réunit, du plus récent au plus ancien :
+
+- les **devis** et les **factures** liés au client (`client_id`) ;
+- ses **ventes** (`VenteClient`), dont le total n'additionne que les ventes **validées** : une vente annulée est
+  listée, marquée « Annulée », mais ne compte pas dans « N ventes validées · total » ;
+- ses **paiements**, retrouvés par la vente (jointure `paiements` → `ventes`) : un remboursement a un montant négatif ;
+- ses **inscriptions aux cours** (jointure avec `cours` pour le titre et la date), liste d'attente comprise.
+
+`observerHistorique` relit le tout dès qu'une de ces tables change (même technique que le catalogue :
+`observerTables`, voir « Lecture en direct des tables liées »). La fiche s'ouvre donc déjà à jour quand
+les ventes, factures, devis et cours seront créés dans les étapes suivantes : aucun changement d'écran à prévoir.
 
 ## Dossier `android/`
 
@@ -350,15 +405,18 @@ Le cahier des charges ne tranchait pas ces points ; voici ce qui a été retenu 
 - `test/core/` : montants (affichage et saisie), dates, durées, recherche sans accents, validateurs de formulaire,
   thèmes (couleurs de la charte et contrastes), mode d'affichage et sa mémorisation.
 - `test/domain/` : total d'une vente (remise, frais de port, arrondis), statut de paiement, règles de stock,
-  format des numéros, noms des listes de choix. Aucun accès à la base ni à l'interface.
+  format des numéros, noms des listes de choix, règles de saisie d'un client. Aucun accès à la base ni à l'interface.
 - `test/data/` : sur une vraie base SQLite **en mémoire** (mêmes tables, index et contraintes que sur le téléphone) :
   structure et contraintes (`schema_test.dart`), numérotation continue et sans doublon, décrémentation du stock
   « tout ou rien », archivage, variantes, réglages ; catalogue produits (résumés, fiche, duplication, inventaire,
-  historique, noms de variantes uniques, flux en direct).
+  historique, noms de variantes uniques, flux en direct, flux simultanés qui ne se confondent pas) ; clients (règles de saisie refusées avec le bon message,
+  historique complet et limité au bon client, flux en direct).
 - `test/widget_test.dart` et `test/presentation/` : parcours splash → accueil → réglages, écran d'erreur de
   démarrage ; liste de produits (recherche, filtres, alertes), fiche, formulaire (validations, abandon, photos),
-  gestion des photos du formulaire. `aide_widget.dart` fournit l'environnement commun : base en mémoire, dossier
-  temporaire, faux sélecteur de photo.
+  gestion des photos du formulaire ; liste de clients (recherche, filtres, archivés), fiche (coordonnées, historique,
+  « Voir tout », archivage), formulaire (champs selon le type, validations, modification, abandon).
+  `aide_widget.dart` fournit l'environnement commun : base en mémoire, dossier temporaire, faux sélecteur de photo,
+  création de clients et de ventes.
 
 Restent à écrire avec leur étape : conversion devis → facture (étape 7) et statistiques (étape 10).
 

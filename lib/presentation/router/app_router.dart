@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../core/router/app_routes.dart';
+import '../clients/client_fiche_screen.dart';
+import '../clients/client_form_screen.dart';
 import '../common/placeholder_screen.dart';
 import '../produits/produit_fiche_screen.dart';
 import '../produits/produit_form_screen.dart';
@@ -35,6 +37,20 @@ abstract final class AppRouter {
         return _page(
           settings,
           idModif == null ? const _PageIntrouvable() : ProduitFormScreen(produitId: idModif),
+        );
+      case AppRoutes.clientNouveau:
+        return _page(settings, const ClientFormScreen());
+      case AppRoutes.clientFiche:
+        final int? idClient = _identifiant(settings);
+        return _page(
+          settings,
+          idClient == null ? const _PageIntrouvable() : ClientFicheScreen(clientId: idClient),
+        );
+      case AppRoutes.clientModifier:
+        final int? idClientModif = _identifiant(settings);
+        return _page(
+          settings,
+          idClientModif == null ? const _PageIntrouvable() : ClientFormScreen(clientId: idClientModif),
         );
     }
 

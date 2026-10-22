@@ -29,8 +29,9 @@ Hypothèse à confirmer : le profil « Mon entreprise » (écran 22) est constru
 
 - [x] Étape 1 : terminée et validée (PR #1)
 - [x] Étape 2 : terminée et validée (PR #2)
-- [x] Étape 3 : terminée, **en attente de validation** (PR #3)
-- [ ] Étapes 4 à 12
+- [x] Étape 3 : terminée et validée (PR #3)
+- [x] Étape 4 : terminée, **en attente de validation** (PR #4)
+- [ ] Étapes 5 à 12
 
 ## Version 2 : confort et échanges (propositions, non engagées)
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../clients/clients_screen.dart';
 import '../common/placeholder_screen.dart';
 import '../home/home_screen.dart';
 import '../more/more_screen.dart';
@@ -61,7 +62,7 @@ class MainShell extends ConsumerWidget {
             HomeScreen(),
             ProduitsScreen(),
             PlaceholderScreen(info: EcransAVenir.nouvelleVente, integre: true),
-            PlaceholderScreen(info: EcransAVenir.clients, integre: true),
+            ClientsScreen(),
             MoreScreen(),
           ],
         ),

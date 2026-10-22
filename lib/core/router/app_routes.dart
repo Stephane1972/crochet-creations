@@ -12,8 +12,11 @@ abstract final class AppRoutes {
   static const String produitFiche = '/produits/fiche';
   static const String produitModifier = '/produits/modifier';
 
-  // Clients (étape 4)
+  // Clients (étape 4). La fiche et la modification reçoivent l'identifiant du client
+  // (un entier) dans `arguments`.
   static const String clientNouveau = '/clients/nouveau';
+  static const String clientFiche = '/clients/fiche';
+  static const String clientModifier = '/clients/modifier';
 
   // Ventes (étape 5)
   static const String venteNouvelle = '/ventes/nouvelle';

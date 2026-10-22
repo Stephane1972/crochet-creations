@@ -6,7 +6,48 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
 
 ## [Non publié]
 
-## [0.3.0] — Étape 3 : produits et stock (en attente de validation)
+## [0.4.0] — Étape 4 : clients (en attente de validation)
+
+### Ajouté
+- Onglet **Clients** (écran 6) : liste triée par nom affiché, recherche sans accents ni majuscules (nom, raison
+  sociale, téléphone avec ou sans espaces, e-mail, adresse, ville, SIREN/SIRET, notes), filtres Particuliers /
+  Professionnels / Archivés, étiquettes Professionnel / Archivé, état vide et message « aucun résultat ».
+- **Fiche client** (écran 7) : coordonnées, historique des ventes (avec le total des ventes validées), paiements
+  (remboursements compris), factures, devis et inscriptions aux cours, du plus récent au plus ancien (5 lignes puis
+  « Voir tout »), archiver / restaurer avec confirmation, bandeau « Client archivé ».
+- **Formulaire client** : choix Particulier / Professionnel, civilité, prénom, nom, raison sociale et SIREN/SIRET
+  (professionnels seulement), téléphone, e-mail, adresse, code postal, ville, notes ; confirmation avant d'abandonner
+  une saisie ; à la création, la fiche du nouveau client s'ouvre.
+- Règles de saisie (`domain/regles_client.dart`) : e-mail, téléphone (6 à 15 chiffres), code postal (3 à 10 caractères,
+  étranger accepté), SIREN (9 chiffres) ou SIRET (14 chiffres). Le formulaire et le dépôt de données appliquent les
+  mêmes règles, avec les mêmes messages.
+- Accès aux données : `observerClient` (fiche en direct), `historique` et `observerHistorique` (devis, ventes,
+  factures, paiements et inscriptions d'un client, mis à jour automatiquement).
+- Accueil : la tuile « Nouveau client » ouvre le formulaire (au lieu de « Bientôt disponible »).
+
+### Modifié
+- Le dépôt de clients refuse désormais un e-mail, un téléphone, un code postal ou un SIREN/SIRET mal formé
+  (avant : seul le nom était contrôlé).
+- Le composant d'étiquette (`Etiquette`) est partagé entre produits et clients (`core/widgets/etiquette.dart`).
+- Le texte des réglages indique « étape 4 sur 12 ».
+
+### Corrigé
+- **Mises à jour en direct des fiches** (anomalie de l'étape 3, découverte par un test de l'étape 4) : Drift
+  partage un même flux entre toutes les requêtes de même texte SQL, sans regarder les tables surveillées. Les flux
+  du catalogue, de la fiche produit et de son historique, qui s'écrivaient tous `SELECT 1`, pouvaient donc se
+  confondre : un écran ouvert ne se rafraîchissait plus quand une vente était ajoutée. `observerTables`
+  (`data/database/flux_en_direct.dart`) distingue les flux par leurs tables ; test de non-régression ajouté.
+
+### Limites connues
+- Le « client de passage » (vente rapide sans fiche) est géré avec les ventes, à l'étape 5.
+- L'historique d'un client reste vide tant que les ventes, factures, devis et cours ne peuvent pas être créés
+  (étapes 5 à 8).
+- Les contrôles de téléphone, de code postal et de SIREN/SIRET vérifient la **forme** (pas la clé de Luhn du SIRET,
+  ni l'existence du numéro).
+- Pas d'appel ni d'e-mail en un geste depuis la fiche (non demandé).
+- Le schéma de la base n'a pas changé : pas de migration.
+
+## [0.3.0] — Étape 3 : produits et stock
 
 ### Ajouté
 - Onglet **Produits** (écran 3) : liste avec recherche sans accents ni majuscules (nom, référence, catégorie, matières,

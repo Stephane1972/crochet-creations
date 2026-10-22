@@ -3,7 +3,10 @@ import 'package:drift/drift.dart';
 import '../../core/utils/texte.dart';
 import '../../domain/enums.dart';
 import '../../domain/erreurs.dart';
+import '../../domain/regles_client.dart';
 import '../database/app_database.dart';
+import '../database/flux_en_direct.dart';
+import 'client_vues.dart';
 
 /// Données saisies pour créer ou modifier un client.
 class DonneesClient {
@@ -46,14 +49,17 @@ class DonneesClient {
     if (!aUnNom) {
       throw const DonneeInvalide('Indiquez au moins un prénom, un nom ou une raison sociale.');
     }
-    final String? courriel = nullSiVide(email);
-    if (courriel != null && !courriel.contains('@')) {
-      throw const DonneeInvalide('L’adresse e-mail n’est pas valide.');
-    }
+    // Mêmes règles et mêmes messages que le formulaire (voir `regles_client.dart`).
+    final String? probleme =
+        verifierEmail(email) ??
+        verifierTelephone(telephone) ??
+        verifierCodePostal(codePostal) ??
+        verifierSiret(siret);
+    if (probleme != null) throw DonneeInvalide(probleme);
   }
 }
 
-/// Fiches clients. La recherche et l'historique arrivent à l'étape 4 (écrans clients).
+/// Fiches clients et historique (devis, ventes, factures, paiements, cours).
 /// Une vente « client de passage » n'a pas de fiche (`client_id` vide).
 class ClientRepository {
   ClientRepository(this._db);
@@ -119,6 +125,105 @@ class ClientRepository {
   Future<void> archiver(int id) => _marquerArchive(id, DateTime.now());
 
   Future<void> restaurer(int id) => _marquerArchive(id, null);
+
+  // --- Fiche et historique ---------------------------------------------------
+
+  /// Fiche d'un client (`null` s'il n'existe pas), mise à jour automatiquement.
+  Stream<Client?> observerClient(int id) =>
+      (_db.select(_db.clients)..where((t) => t.id.equals(id))).watchSingleOrNull();
+
+  /// Devis, ventes, factures, paiements et inscriptions à des cours d'un client,
+  /// du plus récent au plus ancien.
+  Future<HistoriqueClient> historique(int clientId) async {
+    final List<DevisFiche> devis =
+        await (_db.select(_db.devis)
+              ..where((t) => t.clientId.equals(clientId))
+              ..orderBy([(t) => OrderingTerm.desc(t.dateEmission), (t) => OrderingTerm.desc(t.id)]))
+            .get();
+
+    final List<Vente> ventes =
+        await (_db.select(_db.ventes)
+              ..where((t) => t.clientId.equals(clientId))
+              ..orderBy([(t) => OrderingTerm.desc(t.dateVente), (t) => OrderingTerm.desc(t.id)]))
+            .get();
+
+    final List<Facture> factures =
+        await (_db.select(_db.factures)
+              ..where((t) => t.clientId.equals(clientId))
+              ..orderBy([(t) => OrderingTerm.desc(t.dateEmission), (t) => OrderingTerm.desc(t.id)]))
+            .get();
+
+    final JoinedSelectStatement<HasResultSet, dynamic> requetePaiements =
+        _db.select(_db.paiements).join(<Join>[
+            innerJoin(_db.ventes, _db.ventes.id.equalsExp(_db.paiements.venteId)),
+          ])
+          ..where(_db.ventes.clientId.equals(clientId))
+          ..orderBy(<OrderingTerm>[
+            OrderingTerm.desc(_db.paiements.datePaiement),
+            OrderingTerm.desc(_db.paiements.id),
+          ]);
+    final List<TypedResult> lignesPaiements = await requetePaiements.get();
+
+    final JoinedSelectStatement<HasResultSet, dynamic> requeteInscriptions =
+        _db.select(_db.inscriptionsCours).join(<Join>[
+            innerJoin(_db.cours, _db.cours.id.equalsExp(_db.inscriptionsCours.coursId)),
+          ])
+          ..where(_db.inscriptionsCours.clientId.equals(clientId))
+          ..orderBy(<OrderingTerm>[
+            OrderingTerm.desc(_db.cours.debutLe),
+            OrderingTerm.desc(_db.inscriptionsCours.id),
+          ]);
+    final List<TypedResult> lignesInscriptions = await requeteInscriptions.get();
+
+    return HistoriqueClient(
+      devis: devis,
+      ventes: <VenteClient>[
+        for (final Vente v in ventes)
+          VenteClient(
+            venteId: v.id,
+            dateVente: v.dateVente,
+            totalCentimes: v.totalCentimes,
+            statut: v.statut,
+            statutPaiement: v.statutPaiement,
+          ),
+      ],
+      factures: factures,
+      paiements: <PaiementClient>[
+        for (final TypedResult ligne in lignesPaiements)
+          PaiementClient(
+            paiementId: ligne.readTable(_db.paiements).id,
+            venteId: ligne.readTable(_db.paiements).venteId,
+            datePaiement: ligne.readTable(_db.paiements).datePaiement,
+            mode: ligne.readTable(_db.paiements).modePaiement,
+            montantCentimes: ligne.readTable(_db.paiements).montantCentimes,
+          ),
+      ],
+      inscriptions: <InscriptionClient>[
+        for (final TypedResult ligne in lignesInscriptions)
+          InscriptionClient(
+            inscriptionId: ligne.readTable(_db.inscriptionsCours).id,
+            titreCours: ligne.readTable(_db.cours).titre,
+            debutCours: ligne.readTable(_db.cours).debutLe,
+            statut: ligne.readTable(_db.inscriptionsCours).statut,
+            prixCentimes: ligne.readTable(_db.inscriptionsCours).prixCentimes,
+          ),
+      ],
+    );
+  }
+
+  /// L'historique, relu automatiquement dès qu'une vente, un paiement, une facture, un devis
+  /// ou une inscription change.
+  Stream<HistoriqueClient> observerHistorique(int clientId) {
+    final Set<ResultSetImplementation> tables = <ResultSetImplementation>{
+      _db.devis,
+      _db.ventes,
+      _db.factures,
+      _db.paiements,
+      _db.inscriptionsCours,
+      _db.cours,
+    };
+    return observerTables(_db, tables, () => historique(clientId));
+  }
 
   // --- Interne --------------------------------------------------------------
 

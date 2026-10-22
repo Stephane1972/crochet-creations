@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:crochet_creations/app.dart';
 import 'package:crochet_creations/data/database/app_database.dart';
 import 'package:crochet_creations/data/providers.dart';
+import 'package:crochet_creations/data/repositories/client_repository.dart';
 import 'package:crochet_creations/data/repositories/numerotation_repository.dart';
 import 'package:crochet_creations/data/repositories/produit_repository.dart';
 import 'package:crochet_creations/data/stockage/selecteur_photo.dart';
@@ -30,11 +31,14 @@ class FauxSelecteurPhoto implements SelecteurPhoto {
 /// Tout ce qu'il faut pour tester des écrans : base en mémoire, dossier de photos temporaire,
 /// faux sélecteur de photo.
 class EnvironnementTest {
-  EnvironnementTest._(this.db, this.dossier) : produits = ProduitRepository(db, NumerotationRepository(db));
+  EnvironnementTest._(this.db, this.dossier)
+    : produits = ProduitRepository(db, NumerotationRepository(db)),
+      clients = ClientRepository(db);
 
   final AppDatabase db;
   final Directory dossier;
   final ProduitRepository produits;
+  final ClientRepository clients;
   final FauxSelecteurPhoto selecteur = FauxSelecteurPhoto();
 
   static Future<EnvironnementTest> creer(WidgetTester tester) async {
@@ -131,6 +135,48 @@ class EnvironnementTest {
         ),
       ),
     );
+  }
+
+  /// Crée un client (hors temps simulé).
+  Future<Client> creerClient(WidgetTester tester, DonneesClient donnees) {
+    return travailler(tester, () => clients.creer(donnees));
+  }
+
+  /// Enregistre une vente (sans ligne) au nom de ce client, avec son paiement si [paiement] est donné.
+  Future<int> ajouterVenteClient(
+    WidgetTester tester, {
+    required int clientId,
+    int total = 2500,
+    DateTime? date,
+    StatutVente statut = StatutVente.validee,
+    ModePaiement? paiement,
+  }) {
+    return travailler(tester, () async {
+      final int venteId = await db
+          .into(db.ventes)
+          .insert(
+            VentesCompanion.insert(
+              sousTotalCentimes: total,
+              totalCentimes: total,
+              clientId: Value(clientId),
+              dateVente: date == null ? const Value.absent() : Value(date),
+              statut: Value(statut),
+            ),
+          );
+      if (paiement != null) {
+        await db
+            .into(db.paiements)
+            .insert(
+              PaiementsCompanion.insert(
+                venteId: venteId,
+                montantCentimes: total,
+                modePaiement: paiement,
+                datePaiement: date == null ? const Value.absent() : Value(date),
+              ),
+            );
+      }
+      return venteId;
+    });
   }
 
   /// Libère la base et le dossier temporaire (à appeler en fin de test).

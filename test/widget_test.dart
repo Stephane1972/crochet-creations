@@ -1,3 +1,4 @@
+import 'package:crochet_creations/presentation/clients/client_form_screen.dart';
 import 'package:crochet_creations/presentation/settings/settings_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -57,6 +58,19 @@ void main() {
 
     expect(find.text('Nouveau produit'), findsOneWidget);
     expect(find.text('Nom du produit *'), findsOneWidget);
+
+    await env.fermer(tester);
+  });
+
+  testWidgets('« Nouveau client » ouvre le formulaire de nouveau client', (WidgetTester tester) async {
+    final EnvironnementTest env = await EnvironnementTest.creer(tester);
+    await ouvrirAccueil(tester, env);
+
+    await tester.tap(find.text('Nouveau client').hitTestable());
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ClientFormScreen), findsOneWidget);
+    expect(find.text('Prénom'), findsOneWidget);
 
     await env.fermer(tester);
   });

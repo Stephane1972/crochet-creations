@@ -21,18 +21,6 @@ class PlaceholderInfo {
 
 /// Écrans prévus mais pas encore développés (voir ROADMAP.md).
 abstract final class EcransAVenir {
-  static const PlaceholderInfo clients = PlaceholderInfo(
-    titre: 'Clients',
-    icone: Icons.people_outline,
-    etape: 4,
-    description: 'Liste des clients, fiches et historique.',
-  );
-  static const PlaceholderInfo clientNouveau = PlaceholderInfo(
-    titre: 'Nouveau client',
-    icone: Icons.person_add_alt_outlined,
-    etape: 4,
-    description: 'Création d’une fiche client.',
-  );
   static const PlaceholderInfo nouvelleVente = PlaceholderInfo(
     titre: 'Nouvelle vente',
     icone: Icons.point_of_sale_outlined,
@@ -90,7 +78,6 @@ abstract final class EcransAVenir {
 
   /// Écran « Bientôt disponible » à afficher pour chaque route non développée.
   static const Map<String, PlaceholderInfo> parRoute = <String, PlaceholderInfo>{
-    AppRoutes.clientNouveau: clientNouveau,
     AppRoutes.venteNouvelle: nouvelleVente,
     AppRoutes.factures: factures,
     AppRoutes.devis: devis,

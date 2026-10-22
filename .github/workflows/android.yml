@@ -78,9 +78,15 @@ jobs:
         if: ${{ !cancelled() && steps.generer.outcome == 'success' }}
         run: |
           set +e
-          flutter test --reporter expanded 2>&1 | tee test-output.log
+          # Un test qui ne se termine pas est arrêté au bout de 60 s ; en dernier recours, tout
+          # s'arrête après 12 min (la suite complète prend quelques minutes) pour garder le journal.
+          timeout 12m flutter test --reporter expanded --timeout 60s 2>&1 | tee test-output.log
           code=${PIPESTATUS[0]}
           if [ "$code" -ne 0 ]; then
+            FIN=$(tail -n 15 test-output.log | cut -c1-300)
+            FIN="${FIN//'%'/'%25'}"
+            FIN="${FIN//$'\n'/'%0A'}"
+            echo "::error title=Dernières lignes du journal des tests (code $code)::$FIN"
             LISTE=$(grep -E "\[E\]" test-output.log | sort -u | head -c 2000)
             LISTE="${LISTE//'%'/'%25'}"
             LISTE="${LISTE//$'\n'/'%0A'}"

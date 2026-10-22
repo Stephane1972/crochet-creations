@@ -18,8 +18,8 @@ Le développement se fait en 12 étapes validées une par une (détail dans [ROA
 |------:|---------|------|
 | 1 | Projet Flutter, thème rose/vert, mode jour/nuit, navigation, logo, splash, accueil | terminée et validée |
 | 2 | Base de données, modèles, migrations, repositories | terminée et validée |
-| 3 | Produits et stock | **à valider** (PR #3) |
-| 4 | Clients | à venir |
+| 3 | Produits et stock | terminée et validée |
+| 4 | Clients | **à valider** (PR #4) |
 | 5 | Ventes et panier | à venir |
 | 6 | Factures PDF | à venir |
 | 7 | Devis | à venir |
@@ -28,6 +28,25 @@ Le développement se fait en 12 étapes validées une par une (détail dans [ROA
 | 10 | Statistiques | à venir |
 | 11 | Sauvegarde / export | à venir |
 | 12 | Tests, corrections, optimisation de l'interface | à venir |
+
+### Ce que contient l'étape 4 : clients
+
+- **Onglet Clients** : liste triée par nom, avec **recherche** (sans tenir compte des accents ni des majuscules :
+  nom, raison sociale, téléphone — même sans les espaces —, e-mail, adresse, ville, SIREN/SIRET, notes) et filtres
+  **Particuliers**, **Professionnels** et **Archivés**. Un professionnel s'affiche sous le nom de son entreprise,
+  avec la personne à contacter dessous.
+- **Fiche client** : coordonnées (civilité, téléphone, e-mail, adresse, SIREN/SIRET pour un professionnel, notes) et
+  **historique** : ventes (avec le total des ventes validées), paiements, factures, devis et cours. Chaque rubrique
+  montre les 5 plus récents, avec « Voir tout » pour déplier. Actions : Modifier, **Archiver / Restaurer** (avec
+  confirmation).
+- **Ajout et modification** : choix Particulier ou Professionnel (la raison sociale et le SIREN/SIRET n'apparaissent
+  que pour un professionnel), contrôle du nom, du téléphone, de l'e-mail, du code postal et du SIREN (9 chiffres) ou
+  SIRET (14 chiffres). Un client n'a besoin que d'un prénom, d'un nom ou d'une raison sociale. Quitter un formulaire
+  modifié demande confirmation.
+- **Accueil** : la tuile « Nouveau client » ouvre le formulaire.
+
+À savoir : l'historique d'un client reste vide tant que les ventes, factures, devis et cours n'existent pas
+(étapes 5 à 8). Le « client de passage » (vente rapide sans fiche) sera proposé avec les ventes, à l'étape 5.
 
 ### Ce que contient l'étape 3 : produits et stock
 

@@ -5,6 +5,7 @@ import 'repositories/client_repository.dart';
 import 'repositories/numerotation_repository.dart';
 import 'repositories/parametres_repository.dart';
 import 'repositories/produit_repository.dart';
+import 'repositories/vente_repository.dart';
 import 'stockage/selecteur_photo.dart';
 import 'stockage/stockage_photos.dart';
 
@@ -33,6 +34,10 @@ final produitRepositoryProvider = Provider<ProduitRepository>(
 
 final clientRepositoryProvider = Provider<ClientRepository>(
   (ref) => ClientRepository(ref.watch(appDatabaseProvider)),
+);
+
+final venteRepositoryProvider = Provider<VenteRepository>(
+  (ref) => VenteRepository(ref.watch(appDatabaseProvider), ref.watch(produitRepositoryProvider)),
 );
 
 /// Dossier des photos des produits, fourni au démarrage (voir `lib/main.dart`).

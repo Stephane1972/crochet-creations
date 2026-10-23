@@ -25,7 +25,7 @@ Règles :
   modèles à toutes les couches. On n'a pas créé de seconde série de classes « métier » identiques : ce serait du
   code en double à maintenir. La couche `domain` contient les règles et les listes de choix, pas les entités.
 
-## Arborescence (étape 4)
+## Arborescence (étape 5)
 
 ```
 crochet-creations/
@@ -59,6 +59,7 @@ crochet-creations/
 │   │   └── calculs/
 │   │       ├── totaux.dart                   sous-total, remise, frais de port, total
 │   │       ├── statut_paiement.dart          payée / partielle / impayée / remboursée
+│   │       ├── panier.dart                   panier d'une vente : lignes, stock, remise, frais de port, paiement saisi
 │   │       ├── stock.dart                    alerte de stock, produit « sur commande »
 │   │       └── numero_document.dart          FACT-2026-0001, DEVIS-2026-0001, PRD-0001
 │   ├── data/
@@ -73,7 +74,9 @@ crochet-creations/
 │   │   │   ├── produit_repository.dart       catalogue : créer, modifier, dupliquer, archiver, stock, historique
 │   │   │   ├── produit_vues.dart             ce que lisent les écrans : ProduitResume, ProduitDetail, historique
 │   │   │   ├── client_repository.dart        clients : créer, modifier, archiver, fiche et historique en direct
-│   │   │   └── client_vues.dart              nom affiché, initiales, historique d'un client (ventes, paiements, cours…)
+│   │   │   ├── client_vues.dart              nom affiché, initiales, historique d'un client (ventes, paiements, cours…)
+│   │   │   ├── vente_repository.dart         ventes : valider, annuler, encaisser, détail en direct
+│   │   │   └── vente_vues.dart               VenteDetail : vente, lignes, paiements, client, solde dû
 │   │   ├── stockage/
 │   │   │   ├── stockage_photos.dart          copie les photos dans le dossier privé de l'application
 │   │   │   └── selecteur_photo.dart          choix d'une photo (galerie / appareil), remplaçable en test
@@ -100,6 +103,15 @@ crochet-creations/
 │       │   ├── produits_providers.dart       flux Riverpod (résumés, détail, historique)
 │       │   └── produit_widgets.dart          image, étiquettes, textes de stock et de prix
 │       ├── router/app_router.dart            route → écran
+│       ├── ventes/                           onglet Vente et ses écrans (voir « Ventes et panier »)
+│       │   ├── vente_screen.dart             nouvelle vente : client, produits, barre du panier (écran 8)
+│       │   ├── panier_screen.dart            panier, remise, frais de port, paiement, validation (écran 9)
+│       │   ├── vente_confirmation_screen.dart  confirmation et détail d'une vente : encaisser, annuler (écran 10)
+│       │   ├── panier_provider.dart          vente en cours (panier, client, note), conservée entre les écrans
+│       │   ├── ajout_panier.dart             ajout d'un produit (choix de variante) ou d'une ligne libre
+│       │   ├── selecteur_client.dart         choix du client ou « client de passage »
+│       │   ├── recap_widgets.dart            lignes de montant et cartes de rubrique
+│       │   └── ventes_providers.dart         détail d'une vente en direct
 │       ├── settings/settings_screen.dart     réglages (thème)
 │       ├── shell/                            barre de navigation + onglet courant
 │       ├── splash/splash_screen.dart         écran de démarrage
@@ -288,7 +300,8 @@ Après une migration, `PRAGMA foreign_key_check` vérifie qu'aucune liaison n'a 
 
 ### Lecture en direct des tables liées
 
-`observerTables` (`data/database/flux_en_direct.dart`), utilisé par `ProduitRepository` et `ClientRepository`,
+`observerTables` (`data/database/flux_en_direct.dart`), utilisé par `ProduitRepository`, `ClientRepository` et
+`VenteRepository`,
 combine plusieurs tables sans bibliothèque supplémentaire :
 `customSelect('SELECT 1 /* tables */', readsFrom: tables).watch().asyncMap((_) => lire())`. Dès qu'une des tables
 change (produit, variante, photo, vente, client), la lecture complète est refaite et l'écran se met à jour.
@@ -358,6 +371,55 @@ différentes ne se confondent plus (test `test/data/flux_en_direct_test.dart`).
 `observerTables`, voir « Lecture en direct des tables liées »). La fiche s'ouvre donc déjà à jour quand
 les ventes, factures, devis et cours seront créés dans les étapes suivantes : aucun changement d'écran à prévoir.
 
+## Ventes et panier (étape 5)
+
+### La vente en cours
+
+`venteEnCoursProvider` (`presentation/ventes/panier_provider.dart`) garde le panier, le client et la note de la
+vente en cours : on peut passer de l'onglet Vente au panier, ou à une fiche produit, sans rien perdre. Il se vide
+quand la vente est validée. Le panier lui-même (`domain/calculs/panier.dart`) est **immuable** : chaque changement
+retourne un nouveau panier, ou lance une erreur métier (le panier reste alors inchangé).
+
+### Règles du panier
+
+- **Stock** : la quantité d'un article suivi en stock ne dépasse jamais le stock lu au moment de l'ajout
+  (`StockInsuffisant`, message clair). Un produit « sur commande » n'a pas de limite. Une ligne libre n'est jamais
+  limitée et ne touche jamais au stock.
+- **Un produit à variantes se vend par variante** : le panier tient une ligne par produit **et** variante ; la
+  désignation est « Produit – Variante ».
+- **Remise** : en pourcentage (centièmes de pour cent : 1000 = 10 %) ou en centimes, jamais supérieure au
+  sous-total ; frais de port ajoutés après la remise : total = sous-total − remise + frais de port
+  (les mêmes formules que `domain/calculs/totaux.dart`, que la base contrôle aussi).
+- **Paiement saisi** (`PaiementSaisi`) : un mode et un montant, jamais supérieur au total. À l'écran : « Payée »
+  (tout), « Acompte » (une partie) ou « Plus tard » (rien).
+
+### Valider, encaisser, annuler (`VenteRepository`)
+
+- **`valider`** : une **transaction** unique. Contrôles (panier non vide, client existant et non archivé, produit
+  existant, non archivé, non « épuisé », variante active ; un produit à variantes exige une variante), sortie de stock,
+  vente, lignes (avec le coût matière du moment, utile aux statistiques de l'étape 10), paiement éventuel, calcul du
+  statut de paiement. Au moindre échec, **rien** n'est enregistré, stock compris.
+- **`encaisser`** : ajoute un paiement à une vente non annulée, dans la limite du solde dû. Le statut de paiement est
+  recalculé à partir de **tous** les paiements (`calculerStatutPaiement`), jamais modifié à la main.
+- **`annuler`** : remet le stock des articles suivis, enregistre un **remboursement** (paiement négatif) égal au net
+  encaissé, avec le mode du dernier paiement, marque la vente « annulée » et les factures émises « annulées ». Une
+  vente annulée reste visible dans l'historique et ne compte plus dans les totaux d'un client. Annuler deux fois est
+  refusé.
+- Une vente **validée ne se modifie pas** : on l'annule et on la refait.
+
+### Facture à la demande
+
+Aucun numéro de facture n'est attribué à la vente. À l'étape 6, un bouton « Créer la facture » sur la vente
+réservera le numéro FACT-… (`NumerotationRepository`) et fabriquera le PDF ; la ligne « Facture PDF : bientôt
+disponible. » de l'écran de vente sera alors remplacée.
+
+### Où retrouver une vente
+
+Par l'historique d'une fiche client ou d'une fiche produit (appui sur la ligne) : les deux ouvrent
+`VenteConfirmationScreen`, qui sert donc aussi de détail d'une vente passée. `VenteRepository.observerDetail`
+(`observerTables` sur ventes, lignes, paiements et clients) la tient à jour pendant qu'on encaisse ou qu'on annule.
+Pas de liste générale des ventes pour l'instant.
+
 ## Dossier `android/`
 
 Le dossier `android/` n'est pas versionné. `tool/setup_android.sh` le crée avec `flutter create`,
@@ -404,17 +466,22 @@ Le cahier des charges ne tranchait pas ces points ; voici ce qui a été retenu 
 
 - `test/core/` : montants (affichage et saisie), dates, durées, recherche sans accents, validateurs de formulaire,
   thèmes (couleurs de la charte et contrastes), mode d'affichage et sa mémorisation.
-- `test/domain/` : total d'une vente (remise, frais de port, arrondis), statut de paiement, règles de stock,
+- `test/domain/` : total d'une vente (remise, frais de port, arrondis), panier (ajout, stock, quantités, remise,
+  paiement saisi), statut de paiement, règles de stock,
   format des numéros, noms des listes de choix, règles de saisie d'un client. Aucun accès à la base ni à l'interface.
 - `test/data/` : sur une vraie base SQLite **en mémoire** (mêmes tables, index et contraintes que sur le téléphone) :
   structure et contraintes (`schema_test.dart`), numérotation continue et sans doublon, décrémentation du stock
   « tout ou rien », archivage, variantes, réglages ; catalogue produits (résumés, fiche, duplication, inventaire,
   historique, noms de variantes uniques, flux en direct, flux simultanés qui ne se confondent pas) ; clients (règles de saisie refusées avec le bon message,
-  historique complet et limité au bon client, flux en direct).
+  historique complet et limité au bon client, flux en direct) ; ventes (validation avec stock, remise, frais de port,
+  paiement, tout-ou-rien en cas d'échec, encaissement du solde, annulation avec remboursement et remise en stock).
 - `test/widget_test.dart` et `test/presentation/` : parcours splash → accueil → réglages, écran d'erreur de
   démarrage ; liste de produits (recherche, filtres, alertes), fiche, formulaire (validations, abandon, photos),
   gestion des photos du formulaire ; liste de clients (recherche, filtres, archivés), fiche (coordonnées, historique,
   « Voir tout », archivage), formulaire (champs selon le type, validations, modification, abandon).
+  Ventes : onglet Vente (client, produits, variantes, ligne libre), panier (quantités, stock, remise, frais de port),
+  validation payée / acompte / plus tard, refus sans rien enregistrer, encaissement du solde, annulation,
+  réouverture d'une vente depuis l'historique d'un client.
   `aide_widget.dart` fournit l'environnement commun : base en mémoire, dossier temporaire, faux sélecteur de photo,
   création de clients et de ventes.
 

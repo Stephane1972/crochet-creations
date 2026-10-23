@@ -14,7 +14,12 @@ import 'panier_provider.dart';
 /// Ajoute un produit au panier de la vente en cours, en demandant la variante si le produit
 /// en a. Retourne `true` si l'article a été ajouté. Un refus (stock insuffisant, produit non
 /// vendable...) est affiché en français et retourne `false`.
-Future<bool> ajouterAuPanier(BuildContext context, WidgetRef ref, ProduitResume resume) async {
+Future<bool> ajouterAuPanier(
+  BuildContext context,
+  WidgetRef ref,
+  ProduitResume resume, {
+  double margeBas = 0,
+}) async {
   VarianteProduit? variante;
   if (resume.aDesVariantes) {
     variante = await choisirVariante(context, resume);
@@ -24,7 +29,7 @@ Future<bool> ajouterAuPanier(BuildContext context, WidgetRef ref, ProduitResume 
     ref.read(venteEnCoursProvider.notifier).ajouterProduit(resume, variante: variante);
     return true;
   } on ErreurMetier catch (erreur) {
-    if (context.mounted) afficherMessage(context, erreur.message);
+    if (context.mounted) afficherMessage(context, erreur.message, margeBas: margeBas);
     return false;
   }
 }
@@ -92,7 +97,7 @@ class _LigneLibreSaisie {
 }
 
 /// Demande une ligne libre (création sur mesure, cours, prestation...) et l'ajoute au panier.
-Future<bool> ajouterLigneLibre(BuildContext context, WidgetRef ref) async {
+Future<bool> ajouterLigneLibre(BuildContext context, WidgetRef ref, {double margeBas = 0}) async {
   final _LigneLibreSaisie? saisie = await showDialog<_LigneLibreSaisie>(
     context: context,
     builder: (BuildContext contexteDialogue) => const _DialogueLigneLibre(),
@@ -110,7 +115,7 @@ Future<bool> ajouterLigneLibre(BuildContext context, WidgetRef ref) async {
         );
     return true;
   } on ErreurMetier catch (erreur) {
-    afficherMessage(context, erreur.message);
+    afficherMessage(context, erreur.message, margeBas: margeBas);
     return false;
   }
 }

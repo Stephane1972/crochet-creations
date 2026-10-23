@@ -15,6 +15,9 @@ import 'ajout_panier.dart';
 import 'panier_provider.dart';
 import 'selecteur_client.dart';
 
+/// Hauteur dont on relève les messages pour qu'ils restent au-dessus de la barre du panier (en bas de l'écran).
+const double _margeAuDessusBarre = 76;
+
 /// Nouvelle vente (écran 8, onglet « Vente ») : choix du client, puis des articles à mettre
 /// dans le panier. Le récapitulatif, le paiement et la validation sont dans le panier.
 class VenteScreen extends ConsumerStatefulWidget {
@@ -35,13 +38,15 @@ class _VenteScreenState extends ConsumerState<VenteScreen> {
   }
 
   Future<void> _ajouterProduit(ProduitResume resume) async {
-    final bool ajoute = await ajouterAuPanier(context, ref, resume);
-    if (ajoute && mounted) afficherMessage(context, '« ${resume.produit.nom} » ajouté au panier.');
+    final bool ajoute = await ajouterAuPanier(context, ref, resume, margeBas: _margeAuDessusBarre);
+    if (ajoute && mounted) {
+      afficherMessage(context, '« ${resume.produit.nom} » ajouté au panier.', margeBas: _margeAuDessusBarre);
+    }
   }
 
   Future<void> _ajouterLigneLibre() async {
-    final bool ajoute = await ajouterLigneLibre(context, ref);
-    if (ajoute && mounted) afficherMessage(context, 'Article ajouté au panier.');
+    final bool ajoute = await ajouterLigneLibre(context, ref, margeBas: _margeAuDessusBarre);
+    if (ajoute && mounted) afficherMessage(context, 'Article ajouté au panier.', margeBas: _margeAuDessusBarre);
   }
 
   @override

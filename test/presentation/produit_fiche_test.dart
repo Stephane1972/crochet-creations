@@ -4,6 +4,8 @@ import 'package:crochet_creations/data/database/app_database.dart';
 import 'package:crochet_creations/data/repositories/produit_repository.dart';
 import 'package:crochet_creations/domain/enums.dart';
 import 'package:crochet_creations/presentation/produits/produits_screen.dart';
+import 'package:crochet_creations/presentation/ventes/panier_screen.dart';
+import 'package:crochet_creations/presentation/ventes/vente_confirmation_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -99,6 +101,12 @@ void main() {
       findsOneWidget,
     );
 
+    // Toucher une ligne ouvre la vente (détail, encaissement du solde, annulation).
+    await tester.tap(find.text('${formatDateCourte(DateTime(2026, 3, 5))} · 2 × ${formatEuros(2500)}'));
+    await tester.pumpAndSettle();
+    await laisserFinir(tester);
+    expect(find.byType(VenteConfirmationScreen), findsOneWidget);
+
     await env.fermer(tester);
   });
 
@@ -116,7 +124,7 @@ void main() {
     await env.fermer(tester);
   });
 
-  testWidgets('« Vendre » ouvre l’onglet Vente', (WidgetTester tester) async {
+  testWidgets('« Vendre » met le produit au panier et ouvre le panier', (WidgetTester tester) async {
     final EnvironnementTest env = await EnvironnementTest.creer(tester);
     await env.creerProduit(tester);
     await ouvrirFiche(tester, env, 'Doudou lapin');
@@ -125,9 +133,32 @@ void main() {
     expect(boutonActif(tester, 'Ajouter au panier'), isTrue);
     await tester.tap(find.text('Vendre'));
     await tester.pumpAndSettle();
+    await laisserFinir(tester);
 
-    expect(find.byType(NavigationBar), findsOneWidget);
-    expect(find.text('Prévu à l’étape 5 sur 12').hitTestable(), findsOneWidget);
+    expect(find.byType(PanierScreen), findsOneWidget);
+    final Finder dansPanier = find.descendant(of: find.byType(PanierScreen), matching: find.text('Doudou lapin'));
+    expect(dansPanier, findsOneWidget);
+
+    await env.fermer(tester);
+  });
+
+  testWidgets('« Ajouter au panier » reste sur la fiche et propose « Voir le panier »', (
+    WidgetTester tester,
+  ) async {
+    final EnvironnementTest env = await EnvironnementTest.creer(tester);
+    await env.creerProduit(tester);
+    await ouvrirFiche(tester, env, 'Doudou lapin');
+
+    await tester.tap(find.text('Ajouter au panier'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(PanierScreen), findsNothing);
+    expect(find.text('« Doudou lapin » ajouté au panier.'), findsOneWidget);
+
+    await tester.tap(find.text('Voir le panier'));
+    await tester.pumpAndSettle();
+    await laisserFinir(tester);
+    expect(find.byType(PanierScreen), findsOneWidget);
 
     await env.fermer(tester);
   });

@@ -18,8 +18,10 @@ abstract final class AppRoutes {
   static const String clientFiche = '/clients/fiche';
   static const String clientModifier = '/clients/modifier';
 
-  // Ventes (étape 5)
-  static const String venteNouvelle = '/ventes/nouvelle';
+  // Ventes (étape 5). La nouvelle vente est l'onglet « Vente » ; le panier s'ouvre par-dessus.
+  // La confirmation (et la consultation d'une vente) reçoit l'identifiant de la vente dans `arguments`.
+  static const String panier = '/ventes/panier';
+  static const String venteConfirmation = '/ventes/confirmation';
 
   // Documents (étapes 6 et 7)
   static const String factures = '/factures';

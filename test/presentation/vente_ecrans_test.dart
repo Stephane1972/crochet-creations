@@ -100,6 +100,8 @@ void main() {
 
     await ajouterDepuisOnglet(tester, 'Doudou lapin');
     expect(message('« Doudou lapin » ajouté au panier.'), findsWidgets);
+    // Le message flotte au-dessus de la barre : il ne cache pas « Voir le panier ».
+    expect(dansVente(find.text('Voir le panier')).hitTestable(), findsOneWidget);
     expect(dansVente(find.text('1 article')), findsOneWidget);
     expect(dansVente(find.text('Sous-total ${formatEuros(2500)}')), findsOneWidget);
     expect(dansVente(find.text('1 au panier')), findsOneWidget);
@@ -282,7 +284,7 @@ void main() {
     expect(vente.clientId, isNull);
 
     // « Nouvelle vente » revient à l'onglet Vente, avec un panier vide.
-    await tester.tap(find.text('Nouvelle vente'));
+    await tester.tap(dansConfirmation(find.text('Nouvelle vente')));
     await tester.pumpAndSettle();
     expect(find.byType(VenteConfirmationScreen), findsNothing);
     expect(dansVente(find.text('Panier vide')), findsOneWidget);
@@ -352,9 +354,9 @@ void main() {
     expect(find.text('Encaisser un paiement'), findsOneWidget);
     await tester.tap(find.widgetWithText(FilledButton, 'Encaisser'));
     await tester.pump();
+    await attendreTexte(tester, message('Paiement enregistré.'));
     await attendreTexte(tester, dansConfirmation(find.text('Payée')));
 
-    expect(message('Paiement enregistré.'), findsWidgets);
     expect(dansConfirmation(find.text('Reste à payer')), findsNothing);
     expect(dansConfirmation(find.textContaining('Encaisser le solde')), findsNothing);
     expect((await uniqueVente(tester, env)).statutPaiement, StatutPaiement.payee);

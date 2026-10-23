@@ -39,12 +39,13 @@ void main() {
   );
 
   /// Panier d'un produit du catalogue, comme le construit l'écran de vente.
-  Panier panierDe(Produit p, {int quantite = 1, int? stock}) => const Panier().ajouter(
+  /// [sansLimite] : produit « sur commande », dont le stock n'est pas suivi.
+  Panier panierDe(Produit p, {int quantite = 1, int? stock, bool sansLimite = false}) => const Panier().ajouter(
     produitId: p.id,
     designation: p.nom,
     prixUnitaireCentimes: p.prixVenteCentimes,
     quantite: quantite,
-    stockDisponible: stock ?? p.quantiteStock,
+    stockDisponible: sansLimite ? null : (stock ?? p.quantiteStock),
   );
 
   Future<int> stockDe(int produitId) async => (await produits.obtenir(produitId))!.quantiteStock;
@@ -166,7 +167,7 @@ void main() {
           statut: StatutProduit.surCommande,
         ),
       );
-      final Vente v = await ventes.valider(panier: panierDe(p, quantite: 3, stock: null));
+      final Vente v = await ventes.valider(panier: panierDe(p, quantite: 3, sansLimite: true));
       expect(v.totalCentimes, 27000);
       expect(await stockDe(p.id), 0);
     });
@@ -390,7 +391,7 @@ void main() {
           statut: StatutProduit.surCommande,
         ),
       );
-      final Vente v = await ventes.valider(panier: panierDe(p, stock: null));
+      final Vente v = await ventes.valider(panier: panierDe(p, sansLimite: true));
       await ventes.annuler(v.id);
       expect(await stockDe(p.id), 0);
     });

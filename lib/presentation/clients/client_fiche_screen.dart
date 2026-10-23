@@ -373,6 +373,7 @@ class _CarteHistorique extends ConsumerWidget {
                 titre: formatDateCourte(v.dateVente),
                 detail: v.statut == StatutVente.annulee ? 'Annulée' : v.statutPaiement.libelle,
                 montant: formatEuros(v.totalCentimes),
+                onTap: () => _ouvrirVente(context, v.venteId),
               ),
             ),
             _SectionHistorique<PaiementClient>(
@@ -383,6 +384,7 @@ class _CarteHistorique extends ConsumerWidget {
                 titre: formatDateCourte(p.datePaiement),
                 detail: p.montantCentimes < 0 ? 'Remboursement · ${p.mode.libelle}' : p.mode.libelle,
                 montant: formatEuros(p.montantCentimes),
+                onTap: () => _ouvrirVente(context, p.venteId),
               ),
             ),
             _SectionHistorique<Facture>(
@@ -423,13 +425,21 @@ class _CarteHistorique extends ConsumerWidget {
   }
 }
 
+/// Ouvre une vente du client : détail, encaissement du solde, annulation.
+void _ouvrirVente(BuildContext context, int venteId) {
+  Navigator.of(context).pushNamed(AppRoutes.venteConfirmation, arguments: venteId);
+}
+
 /// Une ligne de l'historique : titre, détail et montant à droite.
 class _LigneHistorique extends StatelessWidget {
-  const _LigneHistorique({required this.titre, required this.detail, required this.montant});
+  const _LigneHistorique({required this.titre, required this.detail, required this.montant, this.onTap});
 
   final String titre;
   final String detail;
   final String montant;
+
+  /// Ouvre l'élément (une vente, par exemple) ; `null` = ligne non cliquable.
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -440,6 +450,7 @@ class _LigneHistorique extends StatelessWidget {
       title: Text(titre),
       subtitle: Text(detail),
       trailing: Text(montant, style: theme.textTheme.titleSmall),
+      onTap: onTap,
     );
   }
 }

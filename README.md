@@ -19,8 +19,8 @@ Le développement se fait en 12 étapes validées une par une (détail dans [ROA
 | 1 | Projet Flutter, thème rose/vert, mode jour/nuit, navigation, logo, splash, accueil | terminée et validée |
 | 2 | Base de données, modèles, migrations, repositories | terminée et validée |
 | 3 | Produits et stock | terminée et validée |
-| 4 | Clients | **à valider** (PR #4) |
-| 5 | Ventes et panier | à venir |
+| 4 | Clients | terminée et validée |
+| 5 | Ventes et panier | **à valider** (PR #5) |
 | 6 | Factures PDF | à venir |
 | 7 | Devis | à venir |
 | 8 | Cours et inscriptions | à venir |
@@ -28,6 +28,33 @@ Le développement se fait en 12 étapes validées une par une (détail dans [ROA
 | 10 | Statistiques | à venir |
 | 11 | Sauvegarde / export | à venir |
 | 12 | Tests, corrections, optimisation de l'interface | à venir |
+
+### Ce que contient l'étape 5 : ventes et panier
+
+- **Onglet Vente** (écran 8) : choix du **client** (une fiche, ou « client de passage » pour une vente rapide sans
+  fiche), recherche d'un produit, puis un appui sur le produit le met au panier. Un produit à variantes demande
+  d'abord laquelle (couleur, taille…). **« Article ou prestation libre »** ajoute une ligne qui n'est pas au catalogue
+  (création sur mesure, cours, frais…) : désignation, description, prix, quantité, objet ou prestation. La barre du
+  bas montre le nombre d'articles et le sous-total.
+- **Panier** (écran 9) : quantités (limitées au stock), retrait d'un article, **remise** (en % ou en €), **frais de
+  port**, note sur la vente, récapitulatif (sous-total, remise, frais de port, total) avec la mention « TVA non
+  applicable, article 293 B du CGI ». Le **paiement** se règle de trois façons : **Payée** (tout, maintenant),
+  **Acompte** (une partie maintenant, le solde plus tard) ou **Plus tard**, avec le mode : espèces, carte, virement,
+  PayPal, chèque ou autre. Le panier est conservé si on quitte l'écran.
+- **Validation** : une confirmation, puis la vente est enregistrée **en une seule fois** avec ses lignes et son
+  paiement, et le **stock est décompté** (tout ou rien : si un article manque entre-temps, rien n'est enregistré).
+- **Confirmation / détail d'une vente** (écran 10) : articles, totaux, statut de paiement (payée, partiellement
+  payée, impayée, remboursée, annulée) et paiements. On peut **encaisser le solde** (en une ou plusieurs fois) et
+  **annuler la vente** : le stock est remis et un remboursement est enregistré ; la vente reste dans l'historique.
+- **Historiques** : une vente se rouvre depuis l'historique d'une fiche client (ventes et paiements) ou d'une fiche
+  produit.
+- **Fiche produit** : « Vendre » met le produit au panier et ouvre le panier ; « Ajouter au panier » reste sur la
+  fiche et propose « Voir le panier ».
+
+À savoir : la **facture PDF** arrive à l'étape 6. Elle se crée à la demande, depuis une vente (bouton « Créer la
+facture ») : le numéro FACT-… n'est attribué qu'à ce moment-là, pas à chaque vente. En attendant, la vente affiche
+« Facture PDF : bientôt disponible. ». Il n'y a pas encore de liste de toutes les ventes : on les retrouve par la fiche
+du client ou celle du produit (à discuter si une liste complète est utile).
 
 ### Ce que contient l'étape 4 : clients
 
@@ -45,8 +72,8 @@ Le développement se fait en 12 étapes validées une par une (détail dans [ROA
   modifié demande confirmation.
 - **Accueil** : la tuile « Nouveau client » ouvre le formulaire.
 
-À savoir : l'historique d'un client reste vide tant que les ventes, factures, devis et cours n'existent pas
-(étapes 5 à 8). Le « client de passage » (vente rapide sans fiche) sera proposé avec les ventes, à l'étape 5.
+À savoir : l'historique d'un client se remplit avec les ventes (étape 5) ; les factures, devis et cours viendront
+aux étapes 6 à 8. Le « client de passage » (vente rapide sans fiche) se choisit dans l'onglet Vente.
 
 ### Ce que contient l'étape 3 : produits et stock
 
@@ -62,8 +89,8 @@ Le développement se fait en 12 étapes validées une par une (détail dans [ROA
   Quitter un formulaire modifié demande confirmation.
 - **Accueil** : la tuile « Stock faible » compte les produits à réapprovisionner et ouvre la liste filtrée.
 
-À savoir : « Vendre » et « Ajouter au panier » ouvrent pour l'instant l'onglet Vente, encore provisoire
-(le panier arrive à l'étape 5). L'historique des ventes se remplira à partir de cette étape.
+À savoir : depuis l'étape 5, « Vendre » et « Ajouter au panier » alimentent le panier, et l'historique des ventes
+de la fiche produit se remplit.
 
 (Les étapes 1 et 2 — fondations et base de données — sont décrites dans [CHANGELOG.md](CHANGELOG.md).)
 

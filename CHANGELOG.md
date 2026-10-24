@@ -6,7 +6,49 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
 
 ## [Non publié]
 
-## [0.4.0] — Étape 4 : clients (en attente de validation)
+## [0.5.0] — Étape 5 : ventes et panier (en attente de validation)
+
+### Ajouté
+- Onglet **Vente** (écran 8) : client (fiche ou « client de passage »), recherche d'un produit, ajout au panier d'un
+  appui (choix de la variante si le produit en a), ligne « Article ou prestation libre » (désignation, description,
+  prix, quantité, objet ou prestation), barre « N articles · sous-total · Voir le panier ». Un produit épuisé,
+  archivé ou marqué « épuisé » ne peut pas être mis au panier.
+- **Panier** (écran 9) : quantités plafonnées au stock, retrait d'un article, remise en pourcentage ou en euros, frais
+  de port, note, récapitulatif avec la mention « TVA non applicable, article 293 B du CGI ». Paiement : **Payée**,
+  **Acompte** ou **Plus tard**, avec le mode (espèces, carte, virement, PayPal, chèque, autre). Le panier survit à la
+  fermeture de l'écran et se vide quand la vente est validée.
+- **Validation d'une vente** (`VenteRepository.valider`) : une seule transaction qui contrôle le client et les
+  articles, décompte le stock, enregistre la vente, ses lignes (avec le coût matière du moment) et son paiement, puis
+  calcule le statut de paiement. Si quelque chose échoue (stock épuisé entre-temps, acompte supérieur au total…), rien
+  n'est enregistré.
+- **Confirmation et détail d'une vente** (écran 10, aussi utilisé pour consulter une vente passée) : articles,
+  totaux, statut de paiement, paiements, **encaissement du solde** (`VenteRepository.encaisser`, en plusieurs fois
+  possible) et **annulation** (`VenteRepository.annuler`) : le stock est remis, un remboursement égal au net encaissé
+  est enregistré, les factures émises pour la vente sont marquées annulées, et la vente reste dans l'historique.
+- Règles du panier (`domain/calculs/panier.dart`, sans accès à la base) : `Panier` immuable, `LignePanier`,
+  `PaiementSaisi`. Mêmes règles à l'écran et dans le dépôt de données.
+- Une vente se rouvre depuis l'historique d'une fiche client (ventes et paiements) ou d'une fiche produit.
+- Fiche produit : « Vendre » met le produit au panier et ouvre le panier ; « Ajouter au panier » reste sur la fiche et
+  propose « Voir le panier ».
+
+### Modifié
+- Les tuiles « Nouvelle vente » (accueil) et l'onglet Vente ouvrent le vrai écran de vente (plus de « Bientôt
+  disponible » pour la vente).
+- Le texte des réglages indique « étape 5 sur 12 ».
+
+### Décisions prises avec Stéphane
+- **Facture à la demande** : le numéro FACT-… est attribué à l'étape 6, par un bouton « Créer la facture » sur la
+  vente, pas à chaque vente.
+- **Annulation et solde** : on peut annuler une vente et encaisser le solde dès cette étape.
+
+### Limites connues
+- Pas de **liste de toutes les ventes** : on les retrouve par la fiche d'un client ou d'un produit. À ajouter si utile.
+- La **facture PDF** n'existe pas encore (étape 6) : la vente affiche « Facture PDF : bientôt disponible. ».
+- Une vente validée ne se modifie pas : en cas d'erreur, on l'annule et on la refait.
+- Les articles libres ne touchent jamais au stock. Le stock est contrôlé à la validation (tout ou rien).
+- Le schéma de la base n'a pas changé : pas de migration.
+
+## [0.4.0] — Étape 4 : clients
 
 ### Ajouté
 - Onglet **Clients** (écran 6) : liste triée par nom affiché, recherche sans accents ni majuscules (nom, raison

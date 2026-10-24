@@ -7,8 +7,10 @@ import 'package:crochet_creations/data/providers.dart';
 import 'package:crochet_creations/data/repositories/client_repository.dart';
 import 'package:crochet_creations/data/repositories/numerotation_repository.dart';
 import 'package:crochet_creations/data/repositories/produit_repository.dart';
+import 'package:crochet_creations/data/repositories/vente_repository.dart';
 import 'package:crochet_creations/data/stockage/selecteur_photo.dart';
 import 'package:crochet_creations/data/stockage/stockage_photos.dart';
+import 'package:crochet_creations/domain/calculs/panier.dart';
 import 'package:crochet_creations/domain/enums.dart';
 import 'package:crochet_creations/presentation/splash/splash_screen.dart';
 import 'package:drift/drift.dart' show DatabaseConnection, Value, driftRuntimeOptions;
@@ -40,6 +42,7 @@ class EnvironnementTest {
   final Directory dossier;
   final ProduitRepository produits;
   final ClientRepository clients;
+  late final VenteRepository ventes = VenteRepository(db, produits);
   final FauxSelecteurPhoto selecteur = FauxSelecteurPhoto();
 
   static Future<EnvironnementTest> creer(WidgetTester tester) async {
@@ -217,6 +220,33 @@ class EnvironnementTest {
       }
       return venteId;
     }, ecranOuvert: ecranOuvert);
+  }
+
+  /// Valide une vente de ce produit (hors temps simulé), au nom du client si [clientId] est donné,
+  /// avec un paiement du total si [paiement] est donné. À faire **avant** d'ouvrir l'application.
+  Future<Vente> validerVente(
+    WidgetTester tester, {
+    required Produit produit,
+    int quantite = 1,
+    int? clientId,
+    ModePaiement? paiement,
+  }) {
+    return travailler(
+      tester,
+      () => ventes.valider(
+        clientId: clientId,
+        panier: const Panier().ajouter(
+          produitId: produit.id,
+          designation: produit.nom,
+          prixUnitaireCentimes: produit.prixVenteCentimes,
+          quantite: quantite,
+          stockDisponible: produit.quantiteStock,
+        ),
+        paiement: paiement == null
+            ? null
+            : PaiementSaisi(mode: paiement, montantCentimes: produit.prixVenteCentimes * quantite),
+      ),
+    );
   }
 
   /// Libère la base et le dossier temporaire (à appeler en fin de test).

@@ -9,6 +9,8 @@ import '../produits/produit_form_screen.dart';
 import '../settings/settings_screen.dart';
 import '../shell/main_shell.dart';
 import '../splash/splash_screen.dart';
+import '../ventes/panier_screen.dart';
+import '../ventes/vente_confirmation_screen.dart';
 
 /// Associe chaque nom de route (voir AppRoutes) à son écran.
 ///
@@ -45,6 +47,14 @@ abstract final class AppRouter {
         return _page(
           settings,
           idClient == null ? const _PageIntrouvable() : ClientFicheScreen(clientId: idClient),
+        );
+      case AppRoutes.panier:
+        return _page(settings, const PanierScreen());
+      case AppRoutes.venteConfirmation:
+        final int? idVente = _identifiant(settings);
+        return _page(
+          settings,
+          idVente == null ? const _PageIntrouvable() : VenteConfirmationScreen(venteId: idVente),
         );
       case AppRoutes.clientModifier:
         final int? idClientModif = _identifiant(settings);

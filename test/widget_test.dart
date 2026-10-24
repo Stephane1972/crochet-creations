@@ -29,7 +29,7 @@ void main() {
     await tester.tap(find.text('Nouvelle vente').hitTestable());
     await tester.pumpAndSettle();
 
-    expect(find.text('Prévu à l’étape 5 sur 12').hitTestable(), findsOneWidget);
+    expect(find.text('Article ou prestation libre').hitTestable(), findsOneWidget);
 
     await env.fermer(tester);
   });

@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../clients/clients_screen.dart';
-import '../common/placeholder_screen.dart';
 import '../home/home_screen.dart';
 import '../more/more_screen.dart';
 import '../produits/produits_screen.dart';
+import '../ventes/vente_screen.dart';
 import 'nav_provider.dart';
 
 /// Structure principale : 5 onglets en bas (Accueil, Produits, Vente, Clients, Plus).
@@ -61,7 +61,7 @@ class MainShell extends ConsumerWidget {
           children: const <Widget>[
             HomeScreen(),
             ProduitsScreen(),
-            PlaceholderScreen(info: EcransAVenir.nouvelleVente, integre: true),
+            VenteScreen(),
             ClientsScreen(),
             MoreScreen(),
           ],

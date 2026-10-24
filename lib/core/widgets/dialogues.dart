@@ -31,10 +31,20 @@ Future<bool> confirmer(
 }
 
 /// Affiche un court message en bas de l'écran.
-void afficherMessage(BuildContext context, String message) {
+///
+/// [margeBas] relève le message au-dessus d'une barre posée en bas du contenu d'un onglet (la barre du
+/// panier de l'onglet Vente) : les onglets sont dans le Scaffold de l'accueil, c'est lui qui affiche le
+/// message, tout en bas, et il recouvrirait cette barre pendant quelques secondes.
+void afficherMessage(BuildContext context, String message, {double margeBas = 0}) {
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
-    ..showSnackBar(SnackBar(content: Text(message)));
+    ..showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: margeBas > 0 ? SnackBarBehavior.floating : null,
+        margin: margeBas > 0 ? EdgeInsets.fromLTRB(16, 0, 16, margeBas) : null,
+      ),
+    );
 }
 
 /// Message à montrer pour une erreur : celui de l'erreur « métier » telle quelle,

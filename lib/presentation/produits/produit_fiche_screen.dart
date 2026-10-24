@@ -12,7 +12,7 @@ import '../../data/repositories/produit_repository.dart';
 import '../../data/repositories/produit_vues.dart';
 import '../../domain/calculs/stock.dart';
 import '../../domain/enums.dart';
-import '../shell/nav_provider.dart';
+import '../ventes/ajout_panier.dart';
 import 'produit_widgets.dart';
 import 'produits_providers.dart';
 import 'stock_dialog.dart';
@@ -126,10 +126,28 @@ class _ProduitFicheScreenState extends ConsumerState<ProduitFicheScreen> {
   Future<void> _restaurerVariante(VarianteProduit variante) =>
       _executer(() => _repo.restaurerVariante(variante.id));
 
-  /// Les écrans de vente arrivent à l'étape 5 : en attendant, on ouvre l'onglet « Vente ».
-  void _versLaVente() {
-    ref.read(navIndexProvider.notifier).aller(OngletsNav.vente);
-    Navigator.of(context).popUntil((Route<dynamic> route) => route.isFirst);
+  /// « Ajouter au panier » : met le produit dans le panier de la vente en cours (en demandant la
+  /// variante si besoin) et reste sur la fiche, avec un raccourci vers le panier.
+  Future<void> _ajouterAuPanier(ProduitResume resume) async {
+    final bool ajoute = await ajouterAuPanier(context, ref, resume);
+    if (!ajoute || !mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text('« ${resume.produit.nom} » ajouté au panier.'),
+          action: SnackBarAction(
+            label: 'Voir le panier',
+            onPressed: () => Navigator.of(context).pushNamed(AppRoutes.panier),
+          ),
+        ),
+      );
+  }
+
+  /// « Vendre » : met le produit dans le panier puis ouvre le panier pour finir la vente.
+  Future<void> _vendre(ProduitResume resume) async {
+    final bool ajoute = await ajouterAuPanier(context, ref, resume);
+    if (ajoute && mounted) await Navigator.of(context).pushNamed(AppRoutes.panier);
   }
 
   @override
@@ -233,8 +251,8 @@ class _ProduitFicheScreenState extends ConsumerState<ProduitFicheScreen> {
           ? null
           : _BarreVente(
               resume: donnees.resume,
-              onVendre: _versLaVente,
-              onAjouterAuPanier: _versLaVente,
+              onVendre: () => _vendre(donnees.resume),
+              onAjouterAuPanier: () => _ajouterAuPanier(donnees.resume),
             ),
     );
   }
@@ -865,6 +883,8 @@ class _CarteHistoriqueState extends ConsumerState<_CarteHistorique> {
                     formatEuros(l.totalLigneCentimes),
                     style: theme.textTheme.titleSmall,
                   ),
+                  // Ouvre la vente : détail, encaissement du solde, annulation.
+                  onTap: () => Navigator.of(context).pushNamed(AppRoutes.venteConfirmation, arguments: l.venteId),
                 ),
               if (lignes.length > _apercu)
                 TextButton(

@@ -36,6 +36,20 @@ class StockInsuffisant extends ErreurMetier {
   final int demande;
 }
 
+/// Le profil « Mon entreprise » ne permet pas encore d'établir une facture : il manque [manque].
+class ProfilIncomplet extends ErreurMetier {
+  ProfilIncomplet(this.manque)
+    : super('Pour établir une facture, renseignez d’abord ${_enumerer(manque)} dans « Mon entreprise ».');
+
+  /// Ce qui manque, en toutes lettres : « le nom de l’entreprise », « l’adresse »...
+  final List<String> manque;
+
+  static String _enumerer(List<String> elements) {
+    if (elements.length <= 1) return elements.join();
+    return '${elements.sublist(0, elements.length - 1).join(', ')} et ${elements.last}';
+  }
+}
+
 /// La remise saisie est impossible (pourcentage au-delà de 100 %, montant supérieur au total...).
 class RemiseInvalide extends ErreurMetier {
   const RemiseInvalide(super.message);

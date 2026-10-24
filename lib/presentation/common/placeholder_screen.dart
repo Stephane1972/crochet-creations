@@ -57,12 +57,6 @@ abstract final class EcransAVenir {
     etape: 10,
     description: 'Chiffre d’affaires, meilleures ventes, marge estimée.',
   );
-  static const PlaceholderInfo monEntreprise = PlaceholderInfo(
-    titre: 'Mon entreprise',
-    icone: Icons.storefront_outlined,
-    etape: 6,
-    description: 'Nom, adresse, SIREN, IBAN et message affichés sur les factures.',
-  );
   static const PlaceholderInfo sauvegarde = PlaceholderInfo(
     titre: 'Sauvegarde et export',
     icone: Icons.backup_outlined,
@@ -78,7 +72,6 @@ abstract final class EcransAVenir {
     AppRoutes.cours: cours,
     AppRoutes.depenses: depenses,
     AppRoutes.statistiques: statistiques,
-    AppRoutes.monEntreprise: monEntreprise,
     AppRoutes.sauvegarde: sauvegarde,
   };
 }

@@ -6,6 +6,7 @@ import 'package:crochet_creations/data/database/app_database.dart';
 import 'package:crochet_creations/data/providers.dart';
 import 'package:crochet_creations/data/repositories/client_repository.dart';
 import 'package:crochet_creations/data/repositories/numerotation_repository.dart';
+import 'package:crochet_creations/data/repositories/parametres_repository.dart';
 import 'package:crochet_creations/data/repositories/produit_repository.dart';
 import 'package:crochet_creations/data/repositories/vente_repository.dart';
 import 'package:crochet_creations/data/stockage/selecteur_photo.dart';
@@ -43,6 +44,7 @@ class EnvironnementTest {
   final ProduitRepository produits;
   final ClientRepository clients;
   late final VenteRepository ventes = VenteRepository(db, produits);
+  late final ParametresRepository parametres = ParametresRepository(db);
   final FauxSelecteurPhoto selecteur = FauxSelecteurPhoto();
 
   static Future<EnvironnementTest> creer(WidgetTester tester) async {

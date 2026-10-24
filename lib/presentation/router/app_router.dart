@@ -4,6 +4,7 @@ import '../../core/router/app_routes.dart';
 import '../clients/client_fiche_screen.dart';
 import '../clients/client_form_screen.dart';
 import '../common/placeholder_screen.dart';
+import '../entreprise/mon_entreprise_screen.dart';
 import '../produits/produit_fiche_screen.dart';
 import '../produits/produit_form_screen.dart';
 import '../settings/settings_screen.dart';
@@ -26,6 +27,8 @@ abstract final class AppRouter {
         return _fondu(settings, const MainShell());
       case AppRoutes.reglages:
         return _page(settings, const SettingsScreen());
+      case AppRoutes.monEntreprise:
+        return _page(settings, const MonEntrepriseScreen());
       case AppRoutes.produitNouveau:
         return _page(settings, const ProduitFormScreen());
       case AppRoutes.produitFiche:

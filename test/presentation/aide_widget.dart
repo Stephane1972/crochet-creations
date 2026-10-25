@@ -12,12 +12,14 @@ import 'package:crochet_creations/data/repositories/numerotation_repository.dart
 import 'package:crochet_creations/data/repositories/parametres_repository.dart';
 import 'package:crochet_creations/data/repositories/produit_repository.dart';
 import 'package:crochet_creations/data/repositories/vente_repository.dart';
+import 'package:crochet_creations/data/partage/service_documents.dart';
 import 'package:crochet_creations/data/stockage/selecteur_photo.dart';
 import 'package:crochet_creations/data/stockage/stockage_factures.dart';
 import 'package:crochet_creations/data/stockage/stockage_photos.dart';
 import 'package:crochet_creations/domain/calculs/panier.dart';
 import 'package:crochet_creations/domain/document_facture.dart';
 import 'package:crochet_creations/domain/enums.dart';
+import 'package:crochet_creations/presentation/factures/factures_providers.dart';
 import 'package:crochet_creations/presentation/splash/splash_screen.dart';
 import 'package:drift/drift.dart' show DatabaseConnection, Value, driftRuntimeOptions;
 import 'package:drift/native.dart';
@@ -52,6 +54,32 @@ class FauxGenerateurPdf {
   }
 }
 
+/// Faux partage et fausse impression : gardent ce qui serait envoyé à Android (feuille de partage,
+/// dialogue d'impression), qu'un test ne peut pas ouvrir.
+class FauxServiceDocuments implements ServiceDocuments {
+  /// « nom du fichier | sujet » de chaque partage.
+  final List<String> partages = <String>[];
+  final List<String> cheminsPartages = <String>[];
+
+  /// « nom du document : contenu du PDF » de chaque impression.
+  final List<String> impressions = <String>[];
+
+  @override
+  Future<void> partager({
+    required String cheminFichier,
+    required String nomFichier,
+    required String sujet,
+  }) async {
+    cheminsPartages.add(cheminFichier);
+    partages.add('$nomFichier | $sujet');
+  }
+
+  @override
+  Future<void> imprimer({required Uint8List octets, required String nomDocument}) async {
+    impressions.add('$nomDocument : ${utf8.decode(octets)}');
+  }
+}
+
 /// Tout ce qu'il faut pour tester des écrans : base en mémoire, dossiers de photos et de factures
 /// temporaires, faux sélecteur de photo, faux fabricant de PDF.
 class EnvironnementTest {
@@ -67,6 +95,7 @@ class EnvironnementTest {
   late final ParametresRepository parametres = ParametresRepository(db);
   final FauxSelecteurPhoto selecteur = FauxSelecteurPhoto();
   final FauxGenerateurPdf generateurPdf = FauxGenerateurPdf();
+  final FauxServiceDocuments documents = FauxServiceDocuments();
   late final StockageFactures stockageFactures = StockageFactures(dossierFactures);
   late final FactureRepository factures = FactureRepository(
     db,
@@ -95,6 +124,11 @@ class EnvironnementTest {
     selecteurPhotoProvider.overrideWithValue(selecteur),
     stockageFacturesProvider.overrideWithValue(stockageFactures),
     generateurFacturePdfProvider.overrideWithValue(generateurPdf.call),
+    serviceDocumentsProvider.overrideWithValue(documents),
+    // L'aperçu réel rasterise le PDF avec le moteur d'impression d'Android : ici, on en affiche le texte.
+    constructeurApercuPdfProvider.overrideWithValue(
+      (BuildContext context, Uint8List pdf, String nomFichier) => Center(child: Text('Aperçu : ${utf8.decode(pdf)}')),
+    ),
   ];
 
   /// Exécute un travail « réel » (base, fichiers) hors du temps simulé du test.

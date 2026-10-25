@@ -1,12 +1,17 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../domain/document_facture.dart';
 import 'database/app_database.dart';
+import 'pdf/facture_pdf.dart';
+import 'pdf/ressources_pdf.dart';
 import 'repositories/client_repository.dart';
+import 'repositories/facture_repository.dart';
 import 'repositories/numerotation_repository.dart';
 import 'repositories/parametres_repository.dart';
 import 'repositories/produit_repository.dart';
 import 'repositories/vente_repository.dart';
 import 'stockage/selecteur_photo.dart';
+import 'stockage/stockage_factures.dart';
 import 'stockage/stockage_photos.dart';
 
 /// Base de données ouverte par `main()` au démarrage (voir `lib/main.dart`).
@@ -50,3 +55,32 @@ final stockagePhotosProvider = Provider<StockagePhotos>((ref) {
 
 /// Appareil photo et galerie. Les tests le remplacent par un faux sélecteur.
 final selecteurPhotoProvider = Provider<SelecteurPhoto>((ref) => SelecteurPhotoSysteme());
+
+/// Dossier des PDF des factures, fourni au démarrage (voir `lib/main.dart`).
+/// Les tests le remplacent par un dossier temporaire.
+final stockageFacturesProvider = Provider<StockageFactures>((ref) {
+  throw UnimplementedError(
+    'stockageFacturesProvider doit être fourni au démarrage (overrides du ProviderScope).',
+  );
+});
+
+/// Polices et logo des PDF, lus une seule fois dans les ressources de l'application.
+final ressourcesPdfProvider = FutureProvider<RessourcesPdf>((ref) => chargerRessourcesPdf());
+
+/// Fabrique le PDF d'une facture. Les tests le remplacent par un générateur rapide, sans ressources.
+final generateurFacturePdfProvider = Provider<GenerateurFacturePdf>((ref) {
+  return (DocumentFacture document) async {
+    final RessourcesPdf ressources = await ref.read(ressourcesPdfProvider.future);
+    return genererFacturePdf(document, ressources);
+  };
+});
+
+final factureRepositoryProvider = Provider<FactureRepository>(
+  (ref) => FactureRepository(
+    ref.watch(appDatabaseProvider),
+    ref.watch(numerotationRepositoryProvider),
+    ref.watch(parametresRepositoryProvider),
+    ref.watch(stockageFacturesProvider),
+    ref.watch(generateurFacturePdfProvider),
+  ),
+);

@@ -1,17 +1,22 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:crochet_creations/app.dart';
 import 'package:crochet_creations/data/database/app_database.dart';
 import 'package:crochet_creations/data/providers.dart';
 import 'package:crochet_creations/data/repositories/client_repository.dart';
+import 'package:crochet_creations/data/repositories/facture_repository.dart';
 import 'package:crochet_creations/data/repositories/numerotation_repository.dart';
 import 'package:crochet_creations/data/repositories/parametres_repository.dart';
 import 'package:crochet_creations/data/repositories/produit_repository.dart';
 import 'package:crochet_creations/data/repositories/vente_repository.dart';
 import 'package:crochet_creations/data/stockage/selecteur_photo.dart';
+import 'package:crochet_creations/data/stockage/stockage_factures.dart';
 import 'package:crochet_creations/data/stockage/stockage_photos.dart';
 import 'package:crochet_creations/domain/calculs/panier.dart';
+import 'package:crochet_creations/domain/document_facture.dart';
 import 'package:crochet_creations/domain/enums.dart';
 import 'package:crochet_creations/presentation/splash/splash_screen.dart';
 import 'package:drift/drift.dart' show DatabaseConnection, Value, driftRuntimeOptions;
@@ -32,8 +37,23 @@ class FauxSelecteurPhoto implements SelecteurPhoto {
   }
 }
 
-/// Tout ce qu'il faut pour tester des écrans : base en mémoire, dossier de photos temporaire,
-/// faux sélecteur de photo.
+/// Faux fabricant de PDF : rapide, sans polices ni logo. Garde les documents reçus pour que les tests
+/// vérifient ce qui serait imprimé ; peut être réglé pour échouer.
+class FauxGenerateurPdf {
+  final List<DocumentFacture> documents = <DocumentFacture>[];
+  bool echouer = false;
+
+  DocumentFacture? get dernier => documents.isEmpty ? null : documents.last;
+
+  Future<Uint8List> call(DocumentFacture document) async {
+    documents.add(document);
+    if (echouer) throw StateError('Fabrication du PDF impossible.');
+    return Uint8List.fromList(utf8.encode('%PDF-FAUX ${document.numero}'));
+  }
+}
+
+/// Tout ce qu'il faut pour tester des écrans : base en mémoire, dossiers de photos et de factures
+/// temporaires, faux sélecteur de photo, faux fabricant de PDF.
 class EnvironnementTest {
   EnvironnementTest._(this.db, this.dossier)
     : produits = ProduitRepository(db, NumerotationRepository(db)),
@@ -46,6 +66,15 @@ class EnvironnementTest {
   late final VenteRepository ventes = VenteRepository(db, produits);
   late final ParametresRepository parametres = ParametresRepository(db);
   final FauxSelecteurPhoto selecteur = FauxSelecteurPhoto();
+  final FauxGenerateurPdf generateurPdf = FauxGenerateurPdf();
+  late final StockageFactures stockageFactures = StockageFactures(dossierFactures);
+  late final FactureRepository factures = FactureRepository(
+    db,
+    NumerotationRepository(db),
+    parametres,
+    stockageFactures,
+    generateurPdf.call,
+  );
 
   static Future<EnvironnementTest> creer(WidgetTester tester) async {
     driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
@@ -58,11 +87,14 @@ class EnvironnementTest {
   }
 
   Directory get dossierPhotos => Directory('${dossier.path}/photos_produits');
+  Directory get dossierFactures => Directory('${dossier.path}/factures');
 
   List<Override> get overrides => <Override>[
     appDatabaseProvider.overrideWithValue(db),
     stockagePhotosProvider.overrideWithValue(StockagePhotos(dossierPhotos)),
     selecteurPhotoProvider.overrideWithValue(selecteur),
+    stockageFacturesProvider.overrideWithValue(stockageFactures),
+    generateurFacturePdfProvider.overrideWithValue(generateurPdf.call),
   ];
 
   /// Exécute un travail « réel » (base, fichiers) hors du temps simulé du test.

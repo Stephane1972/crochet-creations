@@ -29,6 +29,14 @@ String? verifierSiren(String? valeur) {
 /// Le SIREN sans espaces ni points : « 123 456 789 » → « 123456789 ».
 String normaliserSiren(String valeur) => _chiffres(valeur);
 
+/// Le SIREN présenté par groupes de trois chiffres, comme sur un avis de situation :
+/// « 123456789 » → « 123 456 789 ». Une valeur qui n'a pas 9 chiffres est rendue telle quelle.
+String formaterSiren(String valeur) {
+  final String chiffres = _chiffres(valeur);
+  if (chiffres.length != 9) return valeur.trim();
+  return '${chiffres.substring(0, 3)} ${chiffres.substring(3, 6)} ${chiffres.substring(6)}';
+}
+
 /// Un IBAN : forme (2 lettres, 2 chiffres, puis 11 à 30 lettres ou chiffres) et clé de contrôle
 /// (modulo 97). Les espaces sont acceptés.
 String? verifierIban(String? valeur) {

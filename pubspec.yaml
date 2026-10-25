@@ -28,9 +28,13 @@ dependencies:
   # Photos des produits (étape 3) : appareil photo et galerie.
   image_picker: ^1.1.2
 
-  # Les dépendances des étapes suivantes (pdf, printing, share_plus...)
-  # seront ajoutées au fur et à mesure, pour ne pas alourdir l'application
-  # avant d'en avoir besoin.
+  # Factures PDF (étape 6) : fabrication du document, aperçu et impression, partage.
+  pdf: ^3.11.3
+  printing: ^5.14.2
+  share_plus: ^13.1.0
+
+  # Les dépendances des étapes suivantes seront ajoutées au fur et à mesure,
+  # pour ne pas alourdir l'application avant d'en avoir besoin.
 
 dev_dependencies:
   flutter_test:
@@ -47,6 +51,8 @@ flutter:
 
   assets:
     - assets/images/
+    # Polices lues aussi directement, pour les PDF (voir lib/data/pdf/ressources_pdf.dart).
+    - assets/fonts/
 
   fonts:
     # Titres : Poppins (licence OFL, voir assets/fonts/OFL-Poppins.txt).

@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/document_facture.dart';
 import 'database/app_database.dart';
+import 'partage/service_documents.dart';
 import 'pdf/facture_pdf.dart';
 import 'pdf/ressources_pdf.dart';
 import 'repositories/client_repository.dart';
@@ -84,3 +85,7 @@ final factureRepositoryProvider = Provider<FactureRepository>(
     ref.watch(generateurFacturePdfProvider),
   ),
 );
+
+/// Partage et impression du PDF (feuille de partage et dialogue d'impression d'Android).
+/// Les tests le remplacent par un faux service.
+final serviceDocumentsProvider = Provider<ServiceDocuments>((ref) => ServiceDocumentsSysteme());

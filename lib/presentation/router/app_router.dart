@@ -5,6 +5,8 @@ import '../clients/client_fiche_screen.dart';
 import '../clients/client_form_screen.dart';
 import '../common/placeholder_screen.dart';
 import '../entreprise/mon_entreprise_screen.dart';
+import '../factures/facture_detail_screen.dart';
+import '../factures/factures_screen.dart';
 import '../produits/produit_fiche_screen.dart';
 import '../produits/produit_form_screen.dart';
 import '../settings/settings_screen.dart';
@@ -29,6 +31,14 @@ abstract final class AppRouter {
         return _page(settings, const SettingsScreen());
       case AppRoutes.monEntreprise:
         return _page(settings, const MonEntrepriseScreen());
+      case AppRoutes.factures:
+        return _page(settings, const FacturesScreen());
+      case AppRoutes.factureDetail:
+        final int? idFacture = _identifiant(settings);
+        return _page(
+          settings,
+          idFacture == null ? const _PageIntrouvable() : FactureDetailScreen(factureId: idFacture),
+        );
       case AppRoutes.produitNouveau:
         return _page(settings, const ProduitFormScreen());
       case AppRoutes.produitFiche:

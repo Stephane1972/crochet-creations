@@ -395,6 +395,7 @@ class _CarteHistorique extends ConsumerWidget {
                 titre: f.numero,
                 detail: '${formatDateCourte(f.dateEmission)} · ${f.statut.libelle}',
                 montant: formatEuros(f.totalCentimes),
+                onTap: () => Navigator.of(context).pushNamed(AppRoutes.factureDetail, arguments: f.id),
               ),
             ),
             _SectionHistorique<DevisFiche>(

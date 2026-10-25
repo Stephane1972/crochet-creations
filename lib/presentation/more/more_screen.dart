@@ -8,12 +8,17 @@ import '../common/placeholder_screen.dart';
 class MoreScreen extends StatelessWidget {
   const MoreScreen({super.key});
 
-  static const List<_Entree> _entrees = <_Entree>[
-    _Entree(AppRoutes.factures, EcransAVenir.factures),
-    _Entree(AppRoutes.devis, EcransAVenir.devis),
-    _Entree(AppRoutes.cours, EcransAVenir.cours),
-    _Entree(AppRoutes.depenses, EcransAVenir.depenses),
-    _Entree(AppRoutes.statistiques, EcransAVenir.statistiques),
+  static final List<_Entree> _entrees = <_Entree>[
+    const _Entree(
+      AppRoutes.factures,
+      'Factures',
+      Icons.receipt_long_outlined,
+      'Liste, aperçu, impression et partage des factures PDF.',
+    ),
+    _Entree.avenir(AppRoutes.devis, EcransAVenir.devis),
+    _Entree.avenir(AppRoutes.cours, EcransAVenir.cours),
+    _Entree.avenir(AppRoutes.depenses, EcransAVenir.depenses),
+    _Entree.avenir(AppRoutes.statistiques, EcransAVenir.statistiques),
   ];
 
   @override
@@ -24,9 +29,9 @@ class MoreScreen extends StatelessWidget {
       final _Entree entree = _entrees[i];
       lignes.add(
         MenuTile(
-          icone: entree.info.icone,
-          titre: entree.info.titre,
-          description: entree.info.description,
+          icone: entree.icone,
+          titre: entree.titre,
+          description: entree.description,
           route: entree.route,
         ),
       );
@@ -54,8 +59,16 @@ class MoreScreen extends StatelessWidget {
 }
 
 class _Entree {
-  const _Entree(this.route, this.info);
+  const _Entree(this.route, this.titre, this.icone, this.description);
+
+  /// Une entrée dont l'écran n'est pas encore développé : titre, icône et description de l'écran « Bientôt ».
+  _Entree.avenir(this.route, PlaceholderInfo info)
+    : titre = info.titre,
+      icone = info.icone,
+      description = info.description;
 
   final String route;
-  final PlaceholderInfo info;
+  final String titre;
+  final IconData icone;
+  final String description;
 }

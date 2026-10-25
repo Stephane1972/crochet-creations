@@ -398,7 +398,7 @@ void main() {
       await sub.cancel();
 
       expect(vus.first, isEmpty);
-      expect(vus, contains(<String>['FACT-2026-0001:emise']));
+      expect(vus, contains(equals(<String>['FACT-2026-0001:emise'])));
       expect(vus.last, <String>['FACT-2026-0001:annulee']);
     });
 

@@ -47,7 +47,10 @@ Future<void> attendre(WidgetTester tester, Finder cible) async {
 Future<void> ouvrirRoute(WidgetTester tester, String route, {Object? arguments}) async {
   final NavigatorState navigateur = Navigator.of(tester.element(find.byType(NavigationBar)));
   unawaited(navigateur.pushNamed(route, arguments: arguments));
-  await tester.pumpAndSettle();
+  // Pas de pumpAndSettle : l'aperçu d'une facture lit un fichier (vrai travail), l'indicateur d'attente tourne
+  // tant qu'il n'est pas fini et le temps simulé ne se « calme » donc jamais. `attendre` suit la suite.
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 500));
   await laisserFinir(tester);
 }
 
@@ -152,7 +155,7 @@ void main() {
 
     // Un appui sur la facture la rouvre.
     await tester.tap(dansVente(find.text(numero(1))));
-    await tester.pumpAndSettle();
+    await tester.pump();
     await attendre(tester, dansDetail(apercu(numero(1))));
 
     await env.fermer(tester);
@@ -195,7 +198,7 @@ void main() {
     await ouvrirAccueil(tester, env);
     await ouvrirLaVente(tester, vente.id);
     await tester.tap(dansVente(find.text(numero(1))));
-    await tester.pumpAndSettle();
+    await tester.pump();
     await attendre(tester, dansDetail(apercu(numero(1))));
 
     // On garde la facture : rien ne change.
@@ -302,7 +305,7 @@ void main() {
 
     // Un appui ouvre la facture.
     await tester.tap(dansListe(find.text('FACT-2026-0002')));
-    await tester.pumpAndSettle();
+    await tester.pump();
     await attendre(tester, dansDetail(apercu('FACT-2026-0002')));
     expect(find.byType(FactureDetailScreen), findsOneWidget);
 
@@ -332,7 +335,7 @@ void main() {
     final Finder ligne = find.descendant(of: find.byType(ClientFicheScreen), matching: find.text(numero(1)));
     await attendre(tester, ligne);
     await tester.tap(ligne);
-    await tester.pumpAndSettle();
+    await tester.pump();
     await attendre(tester, dansDetail(apercu(numero(1))));
 
     await env.fermer(tester);

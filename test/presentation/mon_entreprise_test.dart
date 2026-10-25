@@ -1,4 +1,5 @@
 import 'package:crochet_creations/data/database/app_database.dart';
+import 'package:crochet_creations/data/repositories/parametres_repository.dart';
 import 'package:crochet_creations/domain/regles_entreprise.dart';
 import 'package:crochet_creations/presentation/entreprise/mon_entreprise_screen.dart';
 import 'package:flutter/material.dart';

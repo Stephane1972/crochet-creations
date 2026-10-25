@@ -21,12 +21,6 @@ class PlaceholderInfo {
 
 /// Écrans prévus mais pas encore développés (voir ROADMAP.md).
 abstract final class EcransAVenir {
-  static const PlaceholderInfo factures = PlaceholderInfo(
-    titre: 'Factures',
-    icone: Icons.receipt_long_outlined,
-    etape: 6,
-    description: 'Liste, aperçu, impression et partage des factures PDF.',
-  );
   static const PlaceholderInfo devis = PlaceholderInfo(
     titre: 'Devis',
     icone: Icons.request_quote_outlined,
@@ -57,12 +51,6 @@ abstract final class EcransAVenir {
     etape: 10,
     description: 'Chiffre d’affaires, meilleures ventes, marge estimée.',
   );
-  static const PlaceholderInfo monEntreprise = PlaceholderInfo(
-    titre: 'Mon entreprise',
-    icone: Icons.storefront_outlined,
-    etape: 6,
-    description: 'Nom, adresse, SIREN, IBAN et message affichés sur les factures.',
-  );
   static const PlaceholderInfo sauvegarde = PlaceholderInfo(
     titre: 'Sauvegarde et export',
     icone: Icons.backup_outlined,
@@ -72,13 +60,11 @@ abstract final class EcransAVenir {
 
   /// Écran « Bientôt disponible » à afficher pour chaque route non développée.
   static const Map<String, PlaceholderInfo> parRoute = <String, PlaceholderInfo>{
-    AppRoutes.factures: factures,
     AppRoutes.devis: devis,
     AppRoutes.devisNouveau: devisNouveau,
     AppRoutes.cours: cours,
     AppRoutes.depenses: depenses,
     AppRoutes.statistiques: statistiques,
-    AppRoutes.monEntreprise: monEntreprise,
     AppRoutes.sauvegarde: sauvegarde,
   };
 }

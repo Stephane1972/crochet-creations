@@ -20,14 +20,43 @@ Le développement se fait en 12 étapes validées une par une (détail dans [ROA
 | 2 | Base de données, modèles, migrations, repositories | terminée et validée |
 | 3 | Produits et stock | terminée et validée |
 | 4 | Clients | terminée et validée |
-| 5 | Ventes et panier | **à valider** (PR #5) |
-| 6 | Factures PDF | à venir |
+| 5 | Ventes et panier | terminée et validée |
+| 6 | Factures PDF et « Mon entreprise » | **à valider** (PR #6) |
 | 7 | Devis | à venir |
 | 8 | Cours et inscriptions | à venir |
 | 9 | Dépenses | à venir |
 | 10 | Statistiques | à venir |
 | 11 | Sauvegarde / export | à venir |
 | 12 | Tests, corrections, optimisation de l'interface | à venir |
+
+### Ce que contient l'étape 6 : factures PDF et « Mon entreprise »
+
+- **Mon entreprise** (écran 22, *Plus → Réglages → Mon entreprise*) : nom de l'entreprise, votre nom, adresse, code
+  postal, ville, **SIREN** (9 chiffres, vérifié ; un SIRET est reconnu et expliqué), téléphone, e-mail, **conditions
+  de paiement** (par défaut « Paiement à réception de la facture. »), **IBAN** facultatif (vérifié) et **message de
+  remerciement** personnalisable. La mention « TVA non applicable, article 293 B du CGI » est automatique.
+- **Créer la facture** : bouton sur l'écran d'une vente. Tant que le nom, l'adresse, le code postal, la ville et un
+  SIREN valide ne sont pas renseignés, la facture n'est pas créée : un message liste ce qui manque et propose
+  d'ouvrir « Mon entreprise » (aucun numéro n'est consommé). Sinon la facture reçoit son numéro
+  **FACT-AAAA-NNNN** (unique, dans l'ordre, une suite par année) et s'ouvre aussitôt.
+- **Le PDF** : fond blanc (même en mode nuit), bande rose et verte, logo monochrome, vos coordonnées, celles du
+  client, tableau des articles (quantités, prix unitaires, totaux), remise, frais de port, **total mis en valeur**,
+  mention de franchise de TVA, conditions de paiement, IBAN et remerciement s'ils sont renseignés, pied de page
+  numéroté. Une longue facture continue sur plusieurs pages. Les coordonnées du client et les mentions sont
+  **recopiées à la création** : modifier plus tard la fiche client ou « Mon entreprise » ne change pas une facture
+  déjà créée.
+- **Liste des factures** (écran 11, *Plus → Factures*) : la plus récente d'abord, avec client, date, total et
+  l'étiquette « Annulée » le cas échéant.
+- **Aperçu et détail** (écran 12) : le PDF tel qu'il sera envoyé, puis **Partager** (messagerie, e-mail…),
+  **Imprimer**, **Voir la vente** et **Annuler la facture**. Une facture se rouvre aussi depuis la vente et depuis
+  l'historique du client.
+- **Annuler la facture** : la facture reste dans la liste, marquée « annulée » ; son numéro reste utilisé ; **la
+  vente n'est pas annulée** (stock et paiements ne changent pas) et on peut créer une nouvelle facture pour la même
+  vente. Annuler une *vente* annule aussi sa facture.
+
+À savoir : le PDF est rangé sur le téléphone à la création ; s'il disparaît (fichier effacé, sauvegarde restaurée
+sans les PDF), il est refait à l'ouverture de la facture avec les coordonnées *actuelles* de l'entreprise. Une
+facture annulée ne peut plus être partagée ni imprimée. Le PDF n'affiche pas les paiements reçus.
 
 ### Ce que contient l'étape 5 : ventes et panier
 
@@ -51,10 +80,9 @@ Le développement se fait en 12 étapes validées une par une (détail dans [ROA
 - **Fiche produit** : « Vendre » met le produit au panier et ouvre le panier ; « Ajouter au panier » reste sur la
   fiche et propose « Voir le panier ».
 
-À savoir : la **facture PDF** arrive à l'étape 6. Elle se crée à la demande, depuis une vente (bouton « Créer la
-facture ») : le numéro FACT-… n'est attribué qu'à ce moment-là, pas à chaque vente. En attendant, la vente affiche
-« Facture PDF : bientôt disponible. ». Il n'y a pas encore de liste de toutes les ventes : on les retrouve par la fiche
-du client ou celle du produit (à discuter si une liste complète est utile).
+À savoir : la **facture PDF** se crée à la demande, depuis une vente (étape 6, ci-dessus) : le numéro FACT-… n'est
+attribué qu'à ce moment-là, pas à chaque vente. Il n'y a pas encore de liste de toutes les ventes : on les retrouve
+par la fiche du client ou celle du produit (à discuter si une liste complète est utile).
 
 ### Ce que contient l'étape 4 : clients
 
@@ -72,8 +100,8 @@ du client ou celle du produit (à discuter si une liste complète est utile).
   modifié demande confirmation.
 - **Accueil** : la tuile « Nouveau client » ouvre le formulaire.
 
-À savoir : l'historique d'un client se remplit avec les ventes (étape 5) ; les factures, devis et cours viendront
-aux étapes 6 à 8. Le « client de passage » (vente rapide sans fiche) se choisit dans l'onglet Vente.
+À savoir : l'historique d'un client se remplit avec les ventes (étape 5) ; les factures (étape 6), devis et cours viendront
+aux étapes suivantes. Le « client de passage » (vente rapide sans fiche) se choisit dans l'onglet Vente.
 
 ### Ce que contient l'étape 3 : produits et stock
 

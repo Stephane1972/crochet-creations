@@ -8,6 +8,7 @@ class VenteDetail {
     required this.lignes,
     required this.paiements,
     this.client,
+    this.factures = const <Facture>[],
   });
 
   final Vente vente;
@@ -20,6 +21,17 @@ class VenteDetail {
 
   /// `null` pour un client de passage.
   final Client? client;
+
+  /// Factures établies pour cette vente, la plus récente d'abord (les annulées comprises).
+  final List<Facture> factures;
+
+  /// La facture en cours de validité de cette vente, s'il y en a une.
+  Facture? get factureEmise {
+    for (final Facture f in factures) {
+      if (f.statut == StatutFacture.emise) return f;
+    }
+    return null;
+  }
 
   bool get estAnnulee => vente.statut == StatutVente.annulee;
 

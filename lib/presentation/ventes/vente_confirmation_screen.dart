@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/router/app_routes.dart';
 import '../../core/utils/date_fr.dart';
 import '../../core/utils/money.dart';
 import '../../core/utils/validateurs.dart';
@@ -11,6 +12,7 @@ import '../../data/providers.dart';
 import '../../data/repositories/client_vues.dart';
 import '../../data/repositories/vente_vues.dart';
 import '../../domain/enums.dart';
+import '../../domain/erreurs.dart';
 import '../shell/nav_provider.dart';
 import 'recap_widgets.dart';
 import 'ventes_providers.dart';
@@ -27,6 +29,9 @@ class VenteConfirmationScreen extends ConsumerStatefulWidget {
 }
 
 class _VenteConfirmationScreenState extends ConsumerState<VenteConfirmationScreen> {
+  /// La facture est en cours de création : le bouton est bloqué pour ne pas la créer deux fois.
+  bool _creationFacture = false;
+
   /// Exécute une action sur la vente en affichant l'erreur éventuelle en français.
   Future<void> _executer(Future<void> Function() action) async {
     try {
@@ -68,6 +73,37 @@ class _VenteConfirmationScreenState extends ConsumerState<VenteConfirmationScree
       await ref.read(venteRepositoryProvider).annuler(widget.venteId);
       if (mounted) afficherMessage(context, 'Vente annulée : le stock a été remis.');
     });
+  }
+
+  /// Établit la facture de la vente puis l'ouvre. Si « Mon entreprise » est incomplet, dit ce qui manque et
+  /// propose de l'ouvrir : aucun numéro n'est consommé.
+  Future<void> _creerFacture() async {
+    if (_creationFacture) return;
+    setState(() => _creationFacture = true);
+    try {
+      final Facture facture = await ref.read(factureRepositoryProvider).creer(widget.venteId);
+      if (!mounted) return;
+      await Navigator.of(context).pushNamed(AppRoutes.factureDetail, arguments: facture.id);
+    } on ProfilIncomplet catch (manque) {
+      if (!mounted) return;
+      final bool ouvrir = await confirmer(
+        context,
+        titre: 'Informations manquantes',
+        message: manque.message,
+        libelleConfirmer: 'Ouvrir « Mon entreprise »',
+        libelleAnnuler: 'Plus tard',
+      );
+      if (ouvrir && mounted) await Navigator.of(context).pushNamed(AppRoutes.monEntreprise);
+    } catch (erreur, pile) {
+      debugPrint('Création de la facture impossible : $erreur\n$pile');
+      if (mounted) afficherMessage(context, messageErreur(erreur));
+    } finally {
+      if (mounted) setState(() => _creationFacture = false);
+    }
+  }
+
+  void _ouvrirFacture(Facture facture) {
+    Navigator.of(context).pushNamed(AppRoutes.factureDetail, arguments: facture.id);
   }
 
   void _nouvelleVente() {
@@ -113,6 +149,9 @@ class _VenteConfirmationScreenState extends ConsumerState<VenteConfirmationScree
             onEncaisser: () => _encaisser(d),
             onAnnuler: () => _annuler(d),
             onNouvelleVente: _nouvelleVente,
+            creationFactureEnCours: _creationFacture,
+            onCreerFacture: _creerFacture,
+            onOuvrirFacture: _ouvrirFacture,
           );
         },
       ),
@@ -126,12 +165,18 @@ class _Contenu extends StatelessWidget {
     required this.onEncaisser,
     required this.onAnnuler,
     required this.onNouvelleVente,
+    required this.creationFactureEnCours,
+    required this.onCreerFacture,
+    required this.onOuvrirFacture,
   });
 
   final VenteDetail detail;
   final VoidCallback onEncaisser;
   final VoidCallback onAnnuler;
   final VoidCallback onNouvelleVente;
+  final bool creationFactureEnCours;
+  final VoidCallback onCreerFacture;
+  final void Function(Facture facture) onOuvrirFacture;
 
   @override
   Widget build(BuildContext context) {
@@ -224,19 +269,15 @@ class _Contenu extends StatelessWidget {
           const SizedBox(height: 12),
           CarteRubrique(titre: 'Note', child: Text(vente.notes!)),
         ],
-        const SizedBox(height: 12),
-        Row(
-          children: <Widget>[
-            Icon(Icons.picture_as_pdf_outlined, size: 20, color: discret),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'Facture PDF : bientôt disponible.',
-                style: theme.textTheme.bodyMedium?.copyWith(color: discret),
-              ),
-            ),
-          ],
-        ),
+        if (!annulee || detail.factures.isNotEmpty) ...<Widget>[
+          const SizedBox(height: 12),
+          _BlocFacture(
+            detail: detail,
+            enCours: creationFactureEnCours,
+            onCreer: onCreerFacture,
+            onOuvrir: onOuvrirFacture,
+          ),
+        ],
         const SizedBox(height: 20),
         if (detail.peutEncaisser) ...<Widget>[
           FilledButton.icon(
@@ -261,6 +302,69 @@ class _Contenu extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+}
+
+/// La facture de la vente : la facture en cours (qui s'ouvre), ou le bouton pour la créer. Les factures
+/// annulées de la vente sont rappelées en dessous.
+class _BlocFacture extends StatelessWidget {
+  const _BlocFacture({
+    required this.detail,
+    required this.enCours,
+    required this.onCreer,
+    required this.onOuvrir,
+  });
+
+  final VenteDetail detail;
+  final bool enCours;
+  final VoidCallback onCreer;
+  final void Function(Facture facture) onOuvrir;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final Facture? emise = detail.factureEmise;
+    final List<Facture> annulees = detail.factures
+        .where((Facture f) => f.statut == StatutFacture.annulee)
+        .toList();
+
+    return CarteRubrique(
+      titre: 'Facture',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          if (emise != null)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.receipt_long_outlined),
+              title: Text(emise.numero),
+              subtitle: Text('Émise le ${formatDateCourte(emise.dateEmission)}'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => onOuvrir(emise),
+            )
+          else if (!detail.estAnnulee) ...<Widget>[
+            Text(
+              'Cette vente n’a pas encore de facture.',
+              style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: 10),
+            FilledButton.tonalIcon(
+              onPressed: enCours ? null : onCreer,
+              icon: const Icon(Icons.receipt_long_outlined),
+              label: const Text('Créer la facture'),
+            ),
+          ],
+          for (final Facture f in annulees)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                'Facture annulée : ${f.numero}',
+                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

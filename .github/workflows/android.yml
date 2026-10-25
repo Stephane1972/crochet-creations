@@ -125,6 +125,10 @@ jobs:
             --repo "$GITHUB_REPOSITORY" --target "$COMMIT" --prerelease \
             --title "APK de test — $BRANCHE ($COURT)" \
             --notes "Version de test construite automatiquement à partir du commit $COURT. Remplacée à chaque nouvel envoi sur la branche."
+          # Exemples de factures PDF fabriqués par les tests : permettent de vérifier la mise en page à l'œil.
+          if ls build/exemples_pdf/*.pdf >/dev/null 2>&1; then
+            gh release upload "$TAG" build/exemples_pdf/*.pdf --repo "$GITHUB_REPOSITORY" --clobber
+          fi
 
       # Publication n°2 : artefact Actions (peut échouer si le quota du compte est plein : sans gravité).
       - name: Publier l'APK en artefact

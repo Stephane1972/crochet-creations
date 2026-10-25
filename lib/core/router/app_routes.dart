@@ -23,8 +23,9 @@ abstract final class AppRoutes {
   static const String panier = '/ventes/panier';
   static const String venteConfirmation = '/ventes/confirmation';
 
-  // Documents (étapes 6 et 7)
+  // Documents (étapes 6 et 7). L'aperçu d'une facture reçoit l'identifiant de la facture dans `arguments`.
   static const String factures = '/factures';
+  static const String factureDetail = '/factures/detail';
   static const String devis = '/devis';
   static const String devisNouveau = '/devis/nouveau';
 

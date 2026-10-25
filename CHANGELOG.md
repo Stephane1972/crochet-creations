@@ -6,7 +6,58 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
 
 ## [Non publié]
 
-## [0.5.0] — Étape 5 : ventes et panier (en attente de validation)
+## [0.6.0] — Étape 6 : factures PDF et « Mon entreprise » (en attente de validation)
+
+### Ajouté
+- **Mon entreprise** (écran 22) : nom de l'entreprise, nom de l'entrepreneuse, adresse, code postal, ville, SIREN,
+  téléphone, e-mail, conditions de paiement (par défaut « Paiement à réception de la facture. »), IBAN et message de
+  remerciement (« Merci pour votre confiance ! » par défaut, modifiable ou vide). SIREN vérifié (9 chiffres, un SIRET
+  est reconnu et expliqué), IBAN vérifié (forme et clé), quitter un formulaire modifié demande confirmation.
+- **Créer la facture** sur l'écran d'une vente (`FactureRepository.creer`) : refusée tant que « Mon entreprise » est
+  incomplet (message qui liste ce qui manque + bouton pour l'ouvrir ; aucun numéro consommé), sinon une facture par
+  vente avec son numéro **FACT-AAAA-NNNN** attribué dans la même transaction que son enregistrement, le client, la
+  mention « TVA non applicable, article 293 B du CGI », les conditions, l'IBAN et le remerciement **recopiés** à ce
+  moment-là. Une vente annulée ne se facture pas ; une vente déjà facturée non plus (tant que sa facture n'est pas
+  annulée).
+- **PDF** (`genererFacturePdf`, paquets `pdf` et `printing`) : A4, fond blanc même en mode nuit, bande décorative rose
+  et verte, logo monochrome, cartes émetteur et client, tableau (en-tête répété sur chaque page), remise, frais de
+  port, total mis en valeur, mention 293 B, conditions, IBAN, remerciement, pied de page avec pagination. Polices
+  Poppins embarquées. Rangé dans le dossier privé de l'application, un fichier par numéro.
+- **Liste des factures** (écran 11, *Plus → Factures*) et **aperçu / détail** (écran 12) : aperçu du PDF, **Partager**
+  (`share_plus`), **Imprimer** (dialogue d'impression d'Android), **Voir la vente**, **Annuler la facture**. Une
+  facture s'ouvre aussi depuis la vente et depuis l'historique d'un client.
+- **Annuler la facture** (`FactureRepository.annuler`) : la facture reste, marquée « annulée » ; son numéro reste
+  utilisé ; la vente n'est pas touchée ; on peut établir une nouvelle facture (numéro suivant). Annuler la vente
+  annule toujours sa facture.
+- `VenteDetail.factures` / `factureEmise` : l'écran de vente affiche la facture en cours, ou le bouton pour la créer,
+  et rappelle les factures annulées.
+- La CI publie des exemples de PDF (facture complète, simple, longue) avec l'APK de test pour contrôler la mise en
+  page à l'œil.
+
+### Modifié
+- Plus de « Bientôt disponible » pour les factures ; la ligne « Facture PDF : bientôt disponible. » de la vente est
+  remplacée par la rubrique « Facture ».
+- Les polices Poppins sont aussi déclarées comme ressources (lecture directe pour les PDF).
+- Le texte des réglages indique « étape 6 sur 12 ».
+
+### Décisions prises avec Stéphane
+- Le bouton « Créer la facture » est **bloqué** tant que « Mon entreprise » est incomplet (message précis + accès
+  direct au profil).
+- Un bouton **« Annuler la facture »** annule la facture seule (pas la vente) ; le numéro reste utilisé.
+- Le PDF utilise le **logo monochrome** de l'application.
+- La facture est **à la demande**, avec son numéro attribué à ce moment-là (décidé à l'étape 5).
+
+### Limites connues et hypothèses
+- Pas d'**avoir** (note de crédit) : annuler une facture ne change qu'un statut. À discuter si nécessaire.
+- Le PDF est fabriqué à la création et rangé sur le téléphone ; s'il manque, il est refait avec les coordonnées
+  *actuelles* de l'entreprise (celles du client et les mentions restent celles de la création).
+- Une facture annulée ne se partage ni ne s'imprime plus (son aperçu reste consultable).
+- Le PDF n'indique ni paiements reçus ni acompte ; pas de date d'échéance (les conditions de paiement sont un texte).
+- Un client de passage apparaît comme « Client de passage » sur la facture.
+- Pas de recherche dans la liste des factures ni d'état de paiement dans la liste.
+- Le schéma de la base n'a pas changé : pas de migration.
+
+## [0.5.0] — Étape 5 : ventes et panier (validée)
 
 ### Ajouté
 - Onglet **Vente** (écran 8) : client (fiche ou « client de passage »), recherche d'un produit, ajout au panier d'un
@@ -43,7 +94,7 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
 
 ### Limites connues
 - Pas de **liste de toutes les ventes** : on les retrouve par la fiche d'un client ou d'un produit. À ajouter si utile.
-- La **facture PDF** n'existe pas encore (étape 6) : la vente affiche « Facture PDF : bientôt disponible. ».
+- La **facture PDF** n'existait pas encore (arrivée à l'étape 6).
 - Une vente validée ne se modifie pas : en cas d'erreur, on l'annule et on la refait.
 - Les articles libres ne touchent jamais au stock. Le stock est contrôlé à la validation (tout ou rien).
 - Le schéma de la base n'a pas changé : pas de migration.

@@ -240,13 +240,24 @@ class VenteRepository {
     final Client? client = clientId == null
         ? null
         : await (_db.select(_db.clients)..where((t) => t.id.equals(clientId))).getSingleOrNull();
-    return VenteDetail(vente: vente, lignes: lignes, paiements: await _paiements(id), client: client);
+    final List<Facture> factures =
+        await (_db.select(_db.factures)
+              ..where((t) => t.venteId.equals(id))
+              ..orderBy([(t) => OrderingTerm(expression: t.id, mode: OrderingMode.desc)]))
+            .get();
+    return VenteDetail(
+      vente: vente,
+      lignes: lignes,
+      paiements: await _paiements(id),
+      client: client,
+      factures: factures,
+    );
   }
 
-  /// Détail d'une vente, mis à jour automatiquement (paiement, annulation, modification du client).
+  /// Détail d'une vente, mis à jour automatiquement (paiement, annulation, facture, modification du client).
   Stream<VenteDetail?> observerDetail(int id) => observerTables(
     _db,
-    <ResultSetImplementation>{_db.ventes, _db.lignesVente, _db.paiements, _db.clients},
+    <ResultSetImplementation>{_db.ventes, _db.lignesVente, _db.paiements, _db.clients, _db.factures},
     () => detail(id),
   );
 

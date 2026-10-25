@@ -54,9 +54,9 @@ Future<Uint8List> genererFacturePdf(DocumentFacture d, RessourcesPdf ressources)
         pw.SizedBox(height: 22),
         _tableau(d, p),
         pw.SizedBox(height: 14),
-        _totaux(d, p),
+        _enBloc(_totaux(d, p)),
         pw.SizedBox(height: 22),
-        _mentions(d, p),
+        _enBloc(_mentions(d, p)),
       ],
     ),
   );
@@ -80,6 +80,10 @@ class _Polices {
   pw.TextStyle style(pw.Font police, double taille, [PdfColor couleur = _encre]) =>
       pw.TextStyle(font: police, fontSize: taille, color: couleur);
 }
+
+/// Garde un bloc d'un seul tenant : un `Stack` n'est pas coupé entre deux pages (une `Column` ou un
+/// `Container` le seraient), le bloc passe en entier à la page suivante s'il ne tient pas.
+pw.Widget _enBloc(pw.Widget bloc) => pw.Stack(children: <pw.Widget>[bloc]);
 
 /// Bande décorative tout en haut de chaque page : rose, avec un bout vert.
 pw.Widget _bande() {
@@ -264,6 +268,7 @@ pw.Widget _totaux(DocumentFacture d, _Polices p) {
     child: pw.SizedBox(
       width: 240,
       child: pw.Column(
+        mainAxisSize: pw.MainAxisSize.min,
         children: <pw.Widget>[
           ligne('Sous-total', formatEuros(d.sousTotalCentimes)),
           if (d.remiseCentimes > 0) ligne(d.libelleRemise, formatEuros(-d.remiseCentimes)),
@@ -307,6 +312,7 @@ pw.Widget _mentions(DocumentFacture d, _Polices p) {
 
   return pw.Container(
     child: pw.Column(
+      mainAxisSize: pw.MainAxisSize.min,
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: <pw.Widget>[
         pw.Container(

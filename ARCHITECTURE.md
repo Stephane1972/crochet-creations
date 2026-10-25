@@ -25,7 +25,7 @@ Règles :
   modèles à toutes les couches. On n'a pas créé de seconde série de classes « métier » identiques : ce serait du
   code en double à maintenir. La couche `domain` contient les règles et les listes de choix, pas les entités.
 
-## Arborescence (étape 5)
+## Arborescence (étape 6)
 
 ```
 crochet-creations/
@@ -33,7 +33,7 @@ crochet-creations/
 ├── assets/
 │   ├── fonts/                        Poppins (titres) + licence OFL
 │   ├── icon/                         PNG d'icône générés (voir tool/generate_icons.py)
-│   └── images/                       logo.svg (couleur) et logo_mono.svg (monochrome)
+│   └── images/                       logo.svg (couleur), logo_mono.svg et logo_mono.png (monochrome, pour les PDF)
 ├── lib/
 │   ├── main.dart                     ouvre la base, lit le mode jour/nuit, lance l'application
 │   ├── app.dart                      MaterialApp : thèmes, langue française, routes
@@ -56,6 +56,8 @@ crochet-creations/
 │   │   ├── enums.dart                        listes de choix (catégories, statuts, modes de paiement…)
 │   │   ├── erreurs.dart                      erreurs métier à message clair
 │   │   ├── regles_client.dart                règles de saisie d'une fiche client (e-mail, téléphone, code postal, SIRET)
+│   │   ├── regles_entreprise.dart            SIREN, IBAN, informations manquantes pour facturer, textes par défaut
+│   │   ├── document_facture.dart             DocumentFacture : tout ce qui s'imprime sur une facture (sans PDF ni base)
 │   │   └── calculs/
 │   │       ├── totaux.dart                   sous-total, remise, frais de port, total
 │   │       ├── statut_paiement.dart          payée / partielle / impayée / remboursée
@@ -76,9 +78,16 @@ crochet-creations/
 │   │   │   ├── client_repository.dart        clients : créer, modifier, archiver, fiche et historique en direct
 │   │   │   ├── client_vues.dart              nom affiché, initiales, historique d'un client (ventes, paiements, cours…)
 │   │   │   ├── vente_repository.dart         ventes : valider, annuler, encaisser, détail en direct
-│   │   │   └── vente_vues.dart               VenteDetail : vente, lignes, paiements, client, solde dû
+│   │   │   ├── vente_vues.dart               VenteDetail : vente, lignes, paiements, client, factures, solde dû
+│   │   │   └── facture_repository.dart       factures : créer (numéro + PDF), annuler, lister, obtenir le PDF
+│   │   ├── pdf/
+│   │   │   ├── facture_pdf.dart              mise en page du PDF d'une facture (genererFacturePdf)
+│   │   │   ├── construire_document.dart      facture + vente + profil → DocumentFacture
+│   │   │   └── ressources_pdf.dart           polices Poppins et logo lus dans les ressources
+│   │   ├── partage/service_documents.dart    partage (share_plus) et impression (printing), remplaçables en test
 │   │   ├── stockage/
 │   │   │   ├── stockage_photos.dart          copie les photos dans le dossier privé de l'application
+│   │   │   ├── stockage_factures.dart        range les PDF des factures (un fichier par numéro)
 │   │   │   └── selecteur_photo.dart          choix d'une photo (galerie / appareil), remplaçable en test
 │   │   └── providers.dart                    accès Riverpod à la base, aux repositories et aux photos
 │   └── presentation/
@@ -90,6 +99,11 @@ crochet-creations/
 │       │   ├── filtres_clients.dart          recherche + filtres, et fonction de filtrage
 │       │   ├── clients_providers.dart        flux Riverpod (liste, fiche, historique)
 │       │   └── client_widgets.dart           pastille d'initiales, étiquettes, résumé des coordonnées
+│       ├── entreprise/mon_entreprise_screen.dart  profil « Mon entreprise » (écran 22)
+│       ├── factures/                         factures (voir « Factures PDF »)
+│       │   ├── factures_screen.dart          liste des factures (écran 11)
+│       │   ├── facture_detail_screen.dart    aperçu et détail : partager, imprimer, annuler (écran 12)
+│       │   └── factures_providers.dart       flux Riverpod, PDF, aperçu remplaçable en test
 │       ├── home/home_screen.dart             accueil / tableau de bord
 │       ├── more/more_screen.dart             onglet « Plus »
 │       ├── produits/                         onglet Produits et ses écrans (voir « Produits et stock »)
@@ -409,16 +423,61 @@ retourne un nouveau panier, ou lance une erreur métier (le panier reste alors i
 
 ### Facture à la demande
 
-Aucun numéro de facture n'est attribué à la vente. À l'étape 6, un bouton « Créer la facture » sur la vente
-réservera le numéro FACT-… (`NumerotationRepository`) et fabriquera le PDF ; la ligne « Facture PDF : bientôt
-disponible. » de l'écran de vente sera alors remplacée.
+Aucun numéro de facture n'est attribué à la vente : il l'est quand on appuie sur « Créer la facture » (voir
+« Factures PDF »).
 
 ### Où retrouver une vente
 
 Par l'historique d'une fiche client ou d'une fiche produit (appui sur la ligne) : les deux ouvrent
 `VenteConfirmationScreen`, qui sert donc aussi de détail d'une vente passée. `VenteRepository.observerDetail`
-(`observerTables` sur ventes, lignes, paiements et clients) la tient à jour pendant qu'on encaisse ou qu'on annule.
+(`observerTables` sur ventes, lignes, paiements, clients et factures) la tient à jour pendant qu'on encaisse, qu'on
+annule ou qu'on crée une facture.
 Pas de liste générale des ventes pour l'instant.
+
+## Factures PDF (étape 6)
+
+### Créer une facture (`FactureRepository.creer`)
+
+1. **Profil d'abord** : `informationsManquantes` (domain) compare « Mon entreprise » à ce qu'exige une facture (nom,
+   adresse, code postal et ville, SIREN valide). S'il manque quelque chose : `ProfilIncomplet` (message listant
+   l'élément manquant), et **aucune** écriture, donc aucun numéro consommé.
+2. **Une transaction** : contrôle de la vente (existe, non annulée, pas déjà facturée), réservation du numéro par
+   `NumerotationRepository.prochainNumeroFacture` (dans la même transaction : si l'insertion échoue, le numéro n'est
+   pas consommé), enregistrement de la facture avec le client, la mention TVA, les conditions, l'IBAN et le
+   remerciement **recopiés**. Un index unique partiel (`idx_factures_vente_emise`) garantit une seule facture émise
+   par vente, même si deux appuis arrivent presque en même temps.
+3. **Le PDF, après l'enregistrement** : `construireDocumentFacture` rassemble les données dans un
+   `DocumentFacture`, `genererFacturePdf` fabrique le PDF, `StockageFactures` le range (`FACT-2026-0001.pdf`,
+   écrit dans un fichier provisoire puis renommé) et le nom du fichier est noté dans `factures.pdf_chemin`. Si cette
+   étape échoue, la facture existe quand même (la comptabilité d'abord) et `obtenirPdf` refabrique le PDF à la demande.
+
+Les lignes et les montants ne sont pas recopiés : on les relit dans la vente liée, qui n'est plus modifiable.
+Le profil de l'entreprise (nom, adresse, SIREN, téléphone, e-mail) n'est pas recopié non plus : un PDF refabriqué
+plus tard utilise les coordonnées *actuelles*.
+
+### Annuler une facture
+
+`FactureRepository.annuler` change seulement le statut en « annulée » : le numéro reste utilisé (pas de trou, pas de
+réutilisation), la vente n'est pas touchée et l'index unique partiel autorise une nouvelle facture pour la même vente.
+Annuler une **vente** (`VenteRepository.annuler`) marque toujours ses factures émises « annulées ». Il n'y a pas
+d'avoir (note de crédit) : voir les limites dans le CHANGELOG.
+
+### Le PDF
+
+`genererFacturePdf(DocumentFacture, RessourcesPdf)` ne lit aucun fichier : les polices et le logo lui sont
+fournis (`chargerRessourcesPdf` en production, lecture directe du dossier `assets/` dans les tests). A4, marges de
+42 pt, fond blanc, `MultiPage` (en-tête du tableau répété, bloc des totaux et des mentions d'un seul tenant, pied de
+page paginé). Les tests fabriquent trois PDF d'exemple dans `build/exemples_pdf/` ; la CI les joint à la
+pré-version de l'APK pour contrôler la mise en page à l'œil.
+
+### Écrans
+
+- `FacturesScreen` (liste), `FactureDetailScreen` (aperçu + actions) ; `facturePdfProvider` lit ou refabrique le PDF.
+- L'aperçu (`PdfPreview` du paquet `printing`) est derrière `constructeurApercuPdfProvider`, le partage et l'impression
+  derrière `serviceDocumentsProvider` : les tests les remplacent (le moteur d'impression et la feuille de partage sont
+  ceux d'Android). Le fabricant de PDF (`generateurFacturePdfProvider`) est lui aussi remplaçable.
+- `VenteConfirmationScreen` affiche la rubrique « Facture » : la facture en cours (qui s'ouvre) ou « Créer la
+  facture ». Si le profil est incomplet, une fenêtre dit ce qui manque et propose d'ouvrir « Mon entreprise ».
 
 ## Dossier `android/`
 
@@ -443,7 +502,8 @@ Si cette contrainte gêne, on pourra versionner `android/` à la place (il suffi
 | Mémorisation du mode jour/nuit | Dans la base (`parametres_entreprise`), sans bibliothèque supplémentaire | fait |
 | Photos des produits | `image_picker` (galerie et appareil photo, aucune permission à déclarer), copie dans le dossier privé de l'application ; chemin relatif en base | étape 3 |
 | Variantes dans l'étape 3 | L'interface des variantes (couleur / taille, stock propre) fait partie de l'étape 3 : c'est la réalisation du champ « couleur / variante » de la fiche produit | étape 3, à confirmer |
-| Dépendances des étapes suivantes | `pdf`, `printing`, `share_plus`… arriveront avec les étapes qui s'en servent | à venir |
+| Factures PDF | `pdf` (mise en page), `printing` (aperçu et impression), `share_plus` (partage) ; PDF rangés dans le dossier privé, nom du fichier en base | étape 6 |
+| Dépendances des étapes suivantes | arriveront avec les étapes qui s'en servent | à venir |
 
 ### Hypothèses du schéma, à confirmer
 

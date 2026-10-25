@@ -1,7 +1,7 @@
 name: crochet_creations
 description: "Crochet & Créations : stock, ventes, factures, devis et cours pour une créatrice auto-entrepreneuse."
 publish_to: "none"
-version: 0.5.0+5
+version: 0.6.0+6
 
 environment:
   # Drift 2.35 demande Dart 3.10 (Flutter 3.38 ou plus récent, canal « stable »).

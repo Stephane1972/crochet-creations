@@ -220,6 +220,91 @@ void main() {
     });
   });
 
+  group('avecLigneModifiee', () {
+    Panier deuxLignes() => const Panier()
+        .ajouter(designation: 'Bonnet', prixUnitaireCentimes: 2000, quantite: 2)
+        .ajouter(designation: 'Écharpe', prixUnitaireCentimes: 3500);
+
+    test('remplace le contenu de la ligne, à la même place et avec le même identifiant', () {
+      final Panier panier = deuxLignes();
+      final int id = panier.lignes.first.idLigne;
+
+      final Panier modifie = panier.avecLigneModifiee(
+        id,
+        designation: '  Bonnet « Hiver »  ',
+        description: '  Laine mérinos  ',
+        nature: NatureLigne.service,
+        prixUnitaireCentimes: 2400,
+        quantite: 3,
+      );
+
+      expect(modifie.lignes.map((LignePanier l) => l.idLigne), panier.lignes.map((LignePanier l) => l.idLigne));
+      expect(modifie.lignes.first.designation, 'Bonnet « Hiver »');
+      expect(modifie.lignes.first.description, 'Laine mérinos');
+      expect(modifie.lignes.first.nature, NatureLigne.service);
+      expect(modifie.lignes.first.totalCentimes, 7200);
+      expect(modifie.lignes.last.designation, 'Écharpe');
+      expect(modifie.totaux.sousTotalCentimes, 7200 + 3500);
+    });
+
+    test('la remise et les frais de port sont conservés', () {
+      final Panier panier = deuxLignes().avecRemise(RemiseType.montant, 500).avecFraisPort(300);
+      final Panier modifie = panier.avecLigneModifiee(
+        panier.lignes.first.idLigne,
+        designation: 'Bonnet',
+        nature: NatureLigne.bien,
+        prixUnitaireCentimes: 1000,
+        quantite: 1,
+      );
+      expect(modifie.remiseType, RemiseType.montant);
+      expect(modifie.remiseValeur, 500);
+      expect(modifie.fraisPortCentimes, 300);
+    });
+
+    test('une description vide est retirée', () {
+      final Panier panier = deuxLignes();
+      final Panier modifie = panier.avecLigneModifiee(
+        panier.lignes.first.idLigne,
+        designation: 'Bonnet',
+        description: '   ',
+        nature: NatureLigne.bien,
+        prixUnitaireCentimes: 1000,
+        quantite: 1,
+      );
+      expect(modifie.lignes.first.description, isNull);
+    });
+
+    test('refuse un nom vide, une quantité nulle, un prix négatif ou une ligne absente', () {
+      final Panier panier = deuxLignes();
+      final int id = panier.lignes.first.idLigne;
+      Panier essai({String nom = 'A', int prix = 100, int quantite = 1, int? ligne}) => panier.avecLigneModifiee(
+        ligne ?? id,
+        designation: nom,
+        nature: NatureLigne.bien,
+        prixUnitaireCentimes: prix,
+        quantite: quantite,
+      );
+      expect(() => essai(nom: '  '), throwsA(isA<DonneeInvalide>()));
+      expect(() => essai(quantite: 0), throwsA(isA<DonneeInvalide>()));
+      expect(() => essai(prix: -1), throwsA(isA<DonneeInvalide>()));
+      expect(() => essai(ligne: 999), throwsA(isA<DonneeInvalide>()));
+    });
+
+    test('ne modifie pas un produit du catalogue', () {
+      final Panier panier = _avecDoudou();
+      expect(
+        () => panier.avecLigneModifiee(
+          panier.lignes.single.idLigne,
+          designation: 'Autre',
+          nature: NatureLigne.bien,
+          prixUnitaireCentimes: 100,
+          quantite: 1,
+        ),
+        throwsA(isA<DonneeInvalide>()),
+      );
+    });
+  });
+
   group('PaiementSaisi', () {
     test('accepte un montant entre 1 centime et le total', () {
       const PaiementSaisi(mode: ModePaiement.carte, montantCentimes: 1).verifier(5000);

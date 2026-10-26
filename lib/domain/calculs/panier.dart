@@ -164,6 +164,38 @@ class Panier {
     return _avecLignes(<LignePanier>[...lignes]..[index] = mise);
   }
 
+  /// Remplace le contenu d'une ligne libre, à la même place et avec le même identifiant (les devis
+  /// reprennent le panier pour leurs lignes). Lance [DonneeInvalide] si une valeur est impossible, si la
+  /// ligne n'existe plus ou si c'est un produit du catalogue (on y change seulement la quantité).
+  Panier avecLigneModifiee(
+    int idLigne, {
+    required String designation,
+    String? description,
+    required NatureLigne nature,
+    required int prixUnitaireCentimes,
+    required int quantite,
+  }) {
+    final int index = lignes.indexWhere((LignePanier l) => l.idLigne == idLigne);
+    if (index < 0) throw const DonneeInvalide('Cette ligne n’existe plus.');
+    if (lignes[index].estUnProduit) {
+      throw const DonneeInvalide('Un produit du catalogue ne se modifie pas ici : changez sa quantité.');
+    }
+    final String nom = designation.trim();
+    if (nom.isEmpty) throw const DonneeInvalide('Indiquez le nom de l’article.');
+    if (quantite < 1) throw const DonneeInvalide('La quantité doit être d’au moins 1.');
+    if (prixUnitaireCentimes < 0) throw const DonneeInvalide('Un prix ne peut pas être négatif.');
+    final String? texte = description?.trim();
+    final LignePanier modifiee = LignePanier(
+      idLigne: idLigne,
+      designation: nom,
+      description: (texte == null || texte.isEmpty) ? null : texte,
+      nature: nature,
+      prixUnitaireCentimes: prixUnitaireCentimes,
+      quantite: quantite,
+    );
+    return _avecLignes(<LignePanier>[...lignes]..[index] = modifiee);
+  }
+
   Panier sans(int idLigne) =>
       _avecLignes(lignes.where((LignePanier l) => l.idLigne != idLigne).toList());
 

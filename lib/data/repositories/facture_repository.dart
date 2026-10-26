@@ -11,7 +11,7 @@ import '../../domain/regles_entreprise.dart';
 import '../database/app_database.dart';
 import '../database/flux_en_direct.dart';
 import '../pdf/construire_document.dart';
-import '../stockage/stockage_factures.dart';
+import '../stockage/stockage_pdf.dart';
 import 'client_vues.dart';
 import 'numerotation_repository.dart';
 import 'parametres_repository.dart';
@@ -31,7 +31,7 @@ class FactureRepository {
   final AppDatabase _db;
   final NumerotationRepository _numerotation;
   final ParametresRepository _parametres;
-  final StockageFactures _stockage;
+  final StockagePdf _stockage;
   final GenerateurFacturePdf _generateur;
 
   /// Établit la facture de la vente [venteId] et enregistre son PDF.
@@ -44,16 +44,7 @@ class FactureRepository {
   /// Le PDF est fabriqué une fois la facture enregistrée. Si cette étape échoue (disque plein...), la facture
   /// existe quand même : le PDF est refabriqué à la prochaine consultation (voir [obtenirPdf]).
   Future<Facture> creer(int venteId, {DateTime? date}) async {
-    final Entreprise entreprise = await _parametres.lire();
-    final List<String> manque = informationsManquantes(
-      nomCommercial: entreprise.nomCommercial,
-      nomResponsable: entreprise.nomResponsable,
-      adresse: entreprise.adresse,
-      codePostal: entreprise.codePostal,
-      ville: entreprise.ville,
-      siren: entreprise.siren,
-    );
-    if (manque.isNotEmpty) throw ProfilIncomplet(manque);
+    final Entreprise entreprise = await verifierProfil();
 
     final Facture facture = await _db.transaction(() async {
       final Vente? vente = await (_db.select(_db.ventes)..where((t) => t.id.equals(venteId))).getSingleOrNull();
@@ -103,6 +94,23 @@ class FactureRepository {
       // La facture est enregistrée ; son PDF sera refabriqué à la demande.
     }
     return _facture(facture.id);
+  }
+
+  /// Vérifie que « Mon entreprise » permet de facturer et retourne le profil. Lance [ProfilIncomplet] sinon.
+  /// Sert aussi à tout contrôler **avant** une opération qui créerait une facture en plus d'autre chose
+  /// (la conversion d'un devis en commande et facture) : rien n'est alors à moitié fait.
+  Future<Entreprise> verifierProfil() async {
+    final Entreprise entreprise = await _parametres.lire();
+    final List<String> manque = informationsManquantes(
+      nomCommercial: entreprise.nomCommercial,
+      nomResponsable: entreprise.nomResponsable,
+      adresse: entreprise.adresse,
+      codePostal: entreprise.codePostal,
+      ville: entreprise.ville,
+      siren: entreprise.siren,
+    );
+    if (manque.isNotEmpty) throw ProfilIncomplet(manque);
+    return entreprise;
   }
 
   /// Annule la facture : elle reste dans la liste, marquée « annulée ». Son numéro reste utilisé et la vente

@@ -14,7 +14,7 @@ import 'package:crochet_creations/data/repositories/produit_repository.dart';
 import 'package:crochet_creations/data/repositories/vente_repository.dart';
 import 'package:crochet_creations/data/partage/service_documents.dart';
 import 'package:crochet_creations/data/stockage/selecteur_photo.dart';
-import 'package:crochet_creations/data/stockage/stockage_factures.dart';
+import 'package:crochet_creations/data/stockage/stockage_pdf.dart';
 import 'package:crochet_creations/data/stockage/stockage_photos.dart';
 import 'package:crochet_creations/domain/calculs/panier.dart';
 import 'package:crochet_creations/domain/document_facture.dart';
@@ -96,7 +96,7 @@ class EnvironnementTest {
   final FauxSelecteurPhoto selecteur = FauxSelecteurPhoto();
   final FauxGenerateurPdf generateurPdf = FauxGenerateurPdf();
   final FauxServiceDocuments documents = FauxServiceDocuments();
-  late final StockageFactures stockageFactures = StockageFactures(dossierFactures);
+  late final StockagePdf stockageFactures = StockagePdf(dossierFactures);
   late final FactureRepository factures = FactureRepository(
     db,
     NumerotationRepository(db),

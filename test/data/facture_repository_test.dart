@@ -11,7 +11,7 @@ import 'package:crochet_creations/data/repositories/parametres_repository.dart';
 import 'package:crochet_creations/data/repositories/produit_repository.dart';
 import 'package:crochet_creations/data/repositories/vente_repository.dart';
 import 'package:crochet_creations/data/repositories/vente_vues.dart';
-import 'package:crochet_creations/data/stockage/stockage_factures.dart';
+import 'package:crochet_creations/data/stockage/stockage_pdf.dart';
 import 'package:crochet_creations/domain/calculs/panier.dart';
 import 'package:crochet_creations/domain/document_facture.dart';
 import 'package:crochet_creations/domain/enums.dart';
@@ -27,14 +27,14 @@ void main() {
   late ClientRepository clients;
   late VenteRepository ventes;
   late FactureRepository factures;
-  late StockageFactures stockage;
+  late StockagePdf stockage;
   late List<DocumentFacture> documents;
   late bool generateurEnPanne;
 
   setUp(() async {
     db = creerBaseEnMemoire();
     dossier = await Directory.systemTemp.createTemp('crochet_factures_');
-    stockage = StockageFactures(Directory('${dossier.path}/factures'));
+    stockage = StockagePdf(Directory('${dossier.path}/factures'));
     parametres = ParametresRepository(db);
     clients = ClientRepository(db);
     ventes = VenteRepository(db, ProduitRepository(db, NumerotationRepository(db)));

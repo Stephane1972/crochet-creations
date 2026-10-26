@@ -1,18 +1,19 @@
 import 'dart:io';
 import 'dart:typed_data';
 
-/// Dossier où sont rangés les PDF des factures, dans l'espace privé de l'application.
+/// Dossier où sont rangés des PDF (un dossier pour les factures, un autre pour les devis), dans l'espace
+/// privé de l'application.
 ///
-/// Un fichier par facture, nommé d'après son numéro (`FACT-2026-0001.pdf`) : c'est aussi le nom que verra
-/// la personne qui reçoit le PDF. La base ne garde que le **nom du fichier**, pas le chemin complet
-/// (comme pour les photos) : le dossier peut changer de place sans casser les factures.
-class StockageFactures {
-  StockageFactures(this.dossier);
+/// Un fichier par document, nommé d'après son numéro (`FACT-2026-0001.pdf`, `DEVIS-2026-0001.pdf`) : c'est
+/// aussi le nom que verra la personne qui reçoit le PDF. La base ne garde que le **nom du fichier**, pas le
+/// chemin complet (comme pour les photos) : le dossier peut changer de place sans casser les documents.
+class StockagePdf {
+  StockagePdf(this.dossier);
 
-  /// Dossier de destination (créé à la première facture).
+  /// Dossier de destination (créé au premier document).
   final Directory dossier;
 
-  /// Écrit le PDF de la facture [numero] et retourne le nom du fichier. Un fichier du même nom est remplacé.
+  /// Écrit le PDF du document [numero] et retourne le nom du fichier. Un fichier du même nom est remplacé.
   Future<String> enregistrer(String numero, Uint8List octets) async {
     await dossier.create(recursive: true);
     final String nom = '$numero.pdf';

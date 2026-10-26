@@ -10,7 +10,7 @@ import 'core/theme/theme_mode_provider.dart';
 import 'data/database/app_database.dart';
 import 'data/providers.dart';
 import 'data/repositories/parametres_repository.dart';
-import 'data/stockage/stockage_factures.dart';
+import 'data/stockage/stockage_pdf.dart';
 import 'data/stockage/stockage_photos.dart';
 import 'presentation/startup/erreur_demarrage_app.dart';
 
@@ -30,9 +30,12 @@ Future<void> main() async {
       Directory('${documents.path}${Platform.pathSeparator}photos_produits'),
     );
 
-    // PDF des factures : même espace privé, un fichier par facture.
-    final StockageFactures factures = StockageFactures(
+    // PDF des factures et des devis : même espace privé, un fichier par document.
+    final StockagePdf factures = StockagePdf(
       Directory('${documents.path}${Platform.pathSeparator}factures'),
+    );
+    final StockagePdf devis = StockagePdf(
+      Directory('${documents.path}${Platform.pathSeparator}devis'),
     );
 
     runApp(
@@ -41,6 +44,7 @@ Future<void> main() async {
           appDatabaseProvider.overrideWithValue(base),
           stockagePhotosProvider.overrideWithValue(photos),
           stockageFacturesProvider.overrideWithValue(factures),
+          stockageDevisProvider.overrideWithValue(devis),
           modeThemeInitialProvider.overrideWithValue(modeInitial),
           modeThemeStoreProvider.overrideWithValue(parametres),
         ],

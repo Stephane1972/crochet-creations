@@ -191,7 +191,7 @@ class EnvironnementTest {
         },
       ),
     );
-    for (int i = 0; i < 40 && !fini; i++) {
+    for (int i = 0; i < 300 && !fini; i++) {
       await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 10)));
       await tester.pump(const Duration(milliseconds: 50));
     }

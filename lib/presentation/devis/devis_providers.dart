@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../data/database/app_database.dart';
 import '../../data/providers.dart';
 import '../../data/repositories/devis_repository.dart';
 import '../../data/repositories/devis_vues.dart';
@@ -21,10 +22,31 @@ final devisDetailProvider = StreamProvider.autoDispose.family<DevisDetail?, int>
   yield* depot.observerDetail(id);
 });
 
-/// Identifie un PDF de devis : le devis et sa dernière modification (le PDF est refabriqué quand le devis change).
+/// Identifie un PDF de devis : le devis et une « version » de ce qui s'imprime (voir [versionPdfDevis]).
 typedef ClePdfDevis = ({int id, int version});
 
 /// Le PDF d'un devis, fabriqué à partir de son état actuel.
 final devisPdfProvider = FutureProvider.autoDispose.family<Uint8List, ClePdfDevis>(
   (ref, ClePdfDevis cle) => ref.watch(devisRepositoryProvider).obtenirPdf(cle.id),
 );
+
+/// Résumé de tout ce qui s'imprime sur le devis (contenu, conditions, client) : le PDF est refabriqué quand
+/// elle change, mais pas pour un simple changement de statut.
+int versionPdfDevis(DevisDetail detail) {
+  final DevisFiche d = detail.devis;
+  return Object.hash(
+    d.numero,
+    d.dateEmission,
+    d.dateValidite,
+    d.delaiRealisation,
+    d.acompteCentimes,
+    d.sousTotalCentimes,
+    d.remiseType,
+    d.remiseValeur,
+    d.remiseCentimes,
+    d.fraisPortCentimes,
+    d.totalCentimes,
+    Object.hashAll(detail.lignes),
+    detail.client,
+  );
+}

@@ -146,7 +146,7 @@ class _DevisDetailScreenState extends ConsumerState<DevisDetailScreen> {
           return Column(
             children: <Widget>[
               _EnTete(detail: d, maintenant: maintenant, onOuvrirCommande: _ouvrirCommande),
-              Expanded(child: _Apercu(devis: d.devis)),
+              Expanded(child: _Apercu(detail: d)),
               _Actions(
                 detail: d,
                 maintenant: maintenant,
@@ -266,13 +266,14 @@ class _EnTete extends StatelessWidget {
 
 /// Le PDF, tel qu'il sera partagé ou imprimé.
 class _Apercu extends ConsumerWidget {
-  const _Apercu({required this.devis});
+  const _Apercu({required this.detail});
 
-  final DevisFiche devis;
+  final DevisDetail detail;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final ClePdfDevis cle = (id: devis.id, version: devis.modifieLe.millisecondsSinceEpoch);
+    final DevisFiche devis = detail.devis;
+    final ClePdfDevis cle = (id: devis.id, version: versionPdfDevis(detail));
     final AsyncValue<Uint8List> pdf = ref.watch(devisPdfProvider(cle));
     return pdf.when(
       loading: () => const Center(child: CircularProgressIndicator()),

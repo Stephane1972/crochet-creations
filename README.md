@@ -21,13 +21,36 @@ Le développement se fait en 12 étapes validées une par une (détail dans [ROA
 | 3 | Produits et stock | terminée et validée |
 | 4 | Clients | terminée et validée |
 | 5 | Ventes et panier | terminée et validée |
-| 6 | Factures PDF et « Mon entreprise » | **à valider** (PR #6) |
-| 7 | Devis | à venir |
+| 6 | Factures PDF et « Mon entreprise » | terminée et validée |
+| 7 | Devis : lignes libres, validité, acompte, statuts, conversion en facture | **à valider** (PR #7) |
 | 8 | Cours et inscriptions | à venir |
 | 9 | Dépenses | à venir |
 | 10 | Statistiques | à venir |
 | 11 | Sauvegarde / export | à venir |
 | 12 | Tests, corrections, optimisation de l'interface | à venir |
+
+### Ce que contient l'étape 7 : devis
+
+- **Liste des devis** (écran 13, *Plus → Devis*) : le plus récent d'abord, avec son numéro **DEVIS-AAAA-NNNN**, le
+  client, la date, le total et son **statut** : brouillon, envoyé, accepté, refusé ou expiré.
+- **Créer / modifier un devis** (écran 14) : client facultatif, **lignes libres** (désignation, description détaillée,
+  quantité, prix), **remise** (en % ou en €), **frais de port**, **date de validité** (30 jours par défaut, à
+  modifier), **délai de réalisation**, **acompte demandé** et notes pour vous (non imprimées). Le numéro est attribué
+  à l'enregistrement.
+- **Statuts** : un brouillon peut être marqué envoyé, accepté ou refusé ; un devis envoyé peut être accepté ou
+  refusé ; un devis accepté (pas encore converti) peut encore être refusé. Un devis **dont la date de validité est passée devient
+  « expiré »** tout seul : il ne peut plus être accepté ni converti tant qu'on n'a pas repoussé la date (en le
+  modifiant, il redevient brouillon).
+- **Le PDF du devis** : même présentation que les factures, avec la validité, le délai, l'acompte demandé (et l'IBAN
+  pour le régler), la mention « TVA non applicable, article 293 B du CGI » et un cadre **« Bon pour accord »** à
+  signer. **Partager** et **Imprimer** comme pour une facture.
+- **Convertir un devis** (écran 15) : deux boutons, **« Créer la commande »** et **« Créer la commande et la
+  facture »**. Si le devis demande un acompte, la case **« Acompte reçu »** enregistre ce premier paiement (avec son
+  mode) : la commande est alors « partiellement payée », sinon elle est impayée. Le devis passe à **« accepté »**,
+  est marqué « converti en commande » et renvoie vers la commande. Si « Mon entreprise » est incomplet, **rien n'est créé** et un message dit ce qui manque.
+
+À savoir : un devis ne se supprime pas (on le marque « refusé »). La commande issue d'un devis est une vente
+validée **sans effet sur le stock** (lignes libres) ; le numéro du devis figure dans sa note.
 
 ### Ce que contient l'étape 6 : factures PDF et « Mon entreprise »
 

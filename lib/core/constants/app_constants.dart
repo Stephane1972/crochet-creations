@@ -4,7 +4,7 @@ abstract final class AppConstants {
   static const String accroche = 'Votre atelier, bien rangé';
 
   /// À garder synchronisée avec la ligne `version:` de pubspec.yaml.
-  static const String version = '0.6.0';
+  static const String version = '0.7.0';
 
   /// Seuils de la franchise en base de TVA (micro-entreprise), en centimes.
   /// Ventes de biens : 85 000 € — prestations de services : 37 500 €.

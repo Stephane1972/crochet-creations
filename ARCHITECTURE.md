@@ -25,7 +25,7 @@ Règles :
   modèles à toutes les couches. On n'a pas créé de seconde série de classes « métier » identiques : ce serait du
   code en double à maintenir. La couche `domain` contient les règles et les listes de choix, pas les entités.
 
-## Arborescence (étape 6)
+## Arborescence (étape 7)
 
 ```
 crochet-creations/
@@ -57,7 +57,9 @@ crochet-creations/
 │   │   ├── erreurs.dart                      erreurs métier à message clair
 │   │   ├── regles_client.dart                règles de saisie d'une fiche client (e-mail, téléphone, code postal, SIRET)
 │   │   ├── regles_entreprise.dart            SIREN, IBAN, informations manquantes pour facturer, textes par défaut
+│   │   ├── regles_devis.dart                 validité, statut affiché (expiré), transitions de statut, contrôle des dates et de l'acompte
 │   │   ├── document_facture.dart             DocumentFacture : tout ce qui s'imprime sur une facture (sans PDF ni base)
+│   │   ├── document_devis.dart               DocumentDevis : tout ce qui s'imprime sur un devis (réutilise les lignes et parties de la facture)
 │   │   └── calculs/
 │   │       ├── totaux.dart                   sous-total, remise, frais de port, total
 │   │       ├── statut_paiement.dart          payée / partielle / impayée / remboursée
@@ -79,15 +81,19 @@ crochet-creations/
 │   │   │   ├── client_vues.dart              nom affiché, initiales, historique d'un client (ventes, paiements, cours…)
 │   │   │   ├── vente_repository.dart         ventes : valider, annuler, encaisser, détail en direct
 │   │   │   ├── vente_vues.dart               VenteDetail : vente, lignes, paiements, client, factures, solde dû
-│   │   │   └── facture_repository.dart       factures : créer (numéro + PDF), annuler, lister, obtenir le PDF
+│   │   │   ├── facture_repository.dart       factures : créer (numéro + PDF), annuler, lister, obtenir le PDF
+│   │   │   ├── devis_repository.dart         devis : créer, modifier, statuts, expiration, convertir, PDF
+│   │   │   └── devis_vues.dart               DevisResume, DevisDetail (statut affiché, actions possibles), ResultatConversion
 │   │   ├── pdf/
+│   │   │   ├── elements_pdf.dart             éléments de mise en page communs aux factures et aux devis (en-tête, totaux, pied de page)
 │   │   │   ├── facture_pdf.dart              mise en page du PDF d'une facture (genererFacturePdf)
-│   │   │   ├── construire_document.dart      facture + vente + profil → DocumentFacture
+│   │   │   ├── devis_pdf.dart                mise en page du PDF d'un devis (genererDevisPdf)
+│   │   │   ├── construire_document.dart      facture ou devis + profil → DocumentFacture / DocumentDevis
 │   │   │   └── ressources_pdf.dart           polices Poppins et logo lus dans les ressources
 │   │   ├── partage/service_documents.dart    partage (share_plus) et impression (printing), remplaçables en test
 │   │   ├── stockage/
 │   │   │   ├── stockage_photos.dart          copie les photos dans le dossier privé de l'application
-│   │   │   ├── stockage_factures.dart        range les PDF des factures (un fichier par numéro)
+│   │   │   ├── stockage_pdf.dart             range les PDF (factures, devis) : un fichier par numéro
 │   │   │   └── selecteur_photo.dart          choix d'une photo (galerie / appareil), remplaçable en test
 │   │   └── providers.dart                    accès Riverpod à la base, aux repositories et aux photos
 │   └── presentation/
@@ -99,7 +105,16 @@ crochet-creations/
 │       │   ├── filtres_clients.dart          recherche + filtres, et fonction de filtrage
 │       │   ├── clients_providers.dart        flux Riverpod (liste, fiche, historique)
 │       │   └── client_widgets.dart           pastille d'initiales, étiquettes, résumé des coordonnées
-│       ├── entreprise/mon_entreprise_screen.dart  profil « Mon entreprise » (écran 22)
+│       ├── devis/                            devis (voir « Devis »)
+│       │   ├── devis_screen.dart             liste des devis (écran 13)
+│       │   ├── devis_form_screen.dart        création / modification d'un devis (écran 14)
+│       │   ├── devis_detail_screen.dart      détail, aperçu PDF, statut, partager, imprimer
+│       │   ├── devis_conversion_screen.dart  conversion en commande, avec ou sans facture (écran 15)
+│       │   ├── devis_providers.dart          flux Riverpod, PDF, clé de version de l'aperçu
+│       │   └── devis_widgets.dart            étiquette de statut
+│       ├── entreprise/
+│       │   ├── mon_entreprise_screen.dart    profil « Mon entreprise » (écran 22)
+│       │   └── profil_incomplet.dart         fenêtre « Informations manquantes » (factures, conversion de devis)
 │       ├── factures/                         factures (voir « Factures PDF »)
 │       │   ├── factures_screen.dart          liste des factures (écran 11)
 │       │   ├── facture_detail_screen.dart    aperçu et détail : partager, imprimer, annuler (écran 12)
@@ -122,8 +137,8 @@ crochet-creations/
 │       │   ├── panier_screen.dart            panier, remise, frais de port, paiement, validation (écran 9)
 │       │   ├── vente_confirmation_screen.dart  confirmation et détail d'une vente : encaisser, annuler (écran 10)
 │       │   ├── panier_provider.dart          vente en cours (panier, client, note), conservée entre les écrans
-│       │   ├── ajout_panier.dart             ajout d'un produit (choix de variante) ou d'une ligne libre
-│       │   ├── selecteur_client.dart         choix du client ou « client de passage »
+│       │   ├── ajout_panier.dart             ajout d'un produit (choix de variante) ou d'une ligne libre (aussi pour les devis)
+│       │   ├── selecteur_client.dart         choix du client ou « client de passage » (aussi pour les devis)
 │       │   ├── recap_widgets.dart            lignes de montant et cartes de rubrique
 │       │   └── ventes_providers.dart         détail d'une vente en direct
 │       ├── settings/settings_screen.dart     réglages (thème)
@@ -447,7 +462,7 @@ Pas de liste générale des ventes pour l'instant.
    remerciement **recopiés**. Un index unique partiel (`idx_factures_vente_emise`) garantit une seule facture émise
    par vente, même si deux appuis arrivent presque en même temps.
 3. **Le PDF, après l'enregistrement** : `construireDocumentFacture` rassemble les données dans un
-   `DocumentFacture`, `genererFacturePdf` fabrique le PDF, `StockageFactures` le range (`FACT-2026-0001.pdf`,
+   `DocumentFacture`, `genererFacturePdf` fabrique le PDF, `StockagePdf` le range (`FACT-2026-0001.pdf`,
    écrit dans un fichier provisoire puis renommé) et le nom du fichier est noté dans `factures.pdf_chemin`. Si cette
    étape échoue, la facture existe quand même (la comptabilité d'abord) et `obtenirPdf` refabrique le PDF à la demande.
 
@@ -478,6 +493,52 @@ pré-version de l'APK pour contrôler la mise en page à l'œil.
   ceux d'Android). Le fabricant de PDF (`generateurFacturePdfProvider`) est lui aussi remplaçable.
 - `VenteConfirmationScreen` affiche la rubrique « Facture » : la facture en cours (qui s'ouvre) ou « Créer la
   facture ». Si le profil est incomplet, une fenêtre dit ce qui manque et propose d'ouvrir « Mon entreprise ».
+
+## Devis (étape 7)
+
+### Règles (`domain/regles_devis.dart`)
+
+Des fonctions pures, testées sans base : `dateValiditeParDefaut` (émission + 30 jours calendaires), `validiteDepassee`,
+`statutAffiche` (un devis brouillon ou envoyé dont la validité est dépassée s'affiche « expiré »), `statutsPossibles`
+(brouillon → envoyé, accepté ou refusé ; envoyé → accepté ou refusé ; accepté non converti → refusé ; refusé, expiré
+et devis déjà converti : aucun), `peutEtreModifie` (brouillon, envoyé, expiré ; pas un devis converti), `peutEtreConverti`
+(brouillon, envoyé, accepté ; pas un devis déjà converti) et `verifierDevis` (validité ni avant l'émission ni déjà
+passée, acompte entre 0 et le total).
+
+### Le dépôt (`DevisRepository`)
+
+- **Créer / modifier** : lignes, remise et frais de port viennent d'un `Panier` (lignes libres), avec un client
+  facultatif, une date de validité, un délai de réalisation, un acompte et des notes. Le numéro **DEVIS-AAAA-NNNN**
+  est réservé dans la même transaction que l'enregistrement. Modifier un devis expiré avec une validité future le
+  remet « brouillon ».
+- **Expiration** : `actualiserExpirations` enregistre « expiré » pour les devis brouillon ou envoyé périmés. Elle est
+  appelée à l'ouverture de la liste, et **avant** toute transaction qui peut échouer (modifier, changer le statut,
+  convertir), sinon l'annulation de la transaction effacerait aussi l'expiration.
+- **Convertir** (`convertir`) : on vérifie d'abord que le devis est convertible et, si une facture est demandée, que
+  « Mon entreprise » est complet (`FactureRepository.verifierProfil`) : sinon rien n'est écrit. Une transaction crée la
+  vente par `VenteRepository.valider` (lignes libres, donc sans effet sur le stock ; remise et frais de port du devis ;
+  note « Commande issue du devis N »), puis le premier paiement si « Acompte reçu » (montant de l'acompte, mode au
+  choix), puis passe le devis à « accepté » et le relie à la vente (`devis.vente_id` : c'est ce lien qui le marque « converti »,
+  il n'existe pas de statut « converti »). La facture est créée **après** cette
+  transaction : si elle échoue, la commande existe et `ResultatConversion.problemeFacture` le dit.
+- **Consulter** : `lister` (`DevisResume`), `detail` (`DevisDetail` : statut affiché à l'instant donné, actions
+  possibles), flux en direct par `observerTables`.
+
+### Le PDF
+
+`genererDevisPdf(DocumentDevis, RessourcesPdf)` partage ses éléments avec la facture (`data/pdf/elements_pdf.dart` :
+en-tête, parties, tableau, totaux, mention 293 B, pied de page). Spécifique au devis : « Établi le » et « Valable
+jusqu'au », conditions (validité, délai, acompte, IBAN) **à gauche des totaux**, puis le cadre « Bon pour accord ».
+Le PDF est rangé dans `<documents>/devis/` (`StockagePdf`) et refait quand le contenu imprimé change : la clé de
+version de l'aperçu (`versionPdfDevis`) est calculée sur ce contenu, pas sur la date de modification, donc changer
+le statut ne le refait pas.
+
+### Écrans
+
+`DevisScreen` (liste), `DevisFormScreen` (création et modification, abandon confirmé), `DevisDetailScreen` (aperçu,
+statut, partager, imprimer, modifier, convertir), `DevisConversionScreen` (deux boutons, case « Acompte reçu »). Le
+fabricant de PDF (`generateurDevisPdfProvider`), l'aperçu et le partage sont remplaçables en test comme pour les
+factures.
 
 ## Dossier `android/`
 
@@ -545,6 +606,11 @@ Le cahier des charges ne tranchait pas ces points ; voici ce qui a été retenu 
   `aide_widget.dart` fournit l'environnement commun : base en mémoire, dossier temporaire, faux sélecteur de photo,
   création de clients et de ventes.
 
-Restent à écrire avec leur étape : conversion devis → facture (étape 7) et statistiques (étape 10).
+Devis (étape 7) : `regles_devis_test` (validité, expiration, transitions de statut), `devis_repository_test` (création et
+numéro, modification, statuts, expiration enregistrée, **conversion devis → facture** avec et sans acompte, profil
+incomplet, PDF), `devis_pdf_test` (une page pour un devis complet, plusieurs pour un long) et `devis_ecrans_test` (liste,
+création, modification, statuts, devis expiré, conversion avec et sans acompte reçu, avec facture, profil incomplet).
+
+Reste à écrire avec son étape : statistiques (étape 10).
 
 Commandes : `dart run build_runner build --delete-conflicting-outputs`, puis `flutter analyze` et `flutter test`.

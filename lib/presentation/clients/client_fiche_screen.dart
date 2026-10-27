@@ -10,6 +10,7 @@ import '../../data/providers.dart';
 import '../../data/repositories/client_repository.dart';
 import '../../data/repositories/client_vues.dart';
 import '../../domain/enums.dart';
+import '../../domain/regles_devis.dart';
 import 'client_widgets.dart';
 import 'clients_providers.dart';
 
@@ -404,8 +405,11 @@ class _CarteHistorique extends ConsumerWidget {
               elements: h.devis,
               ligne: (BuildContext context, DevisFiche d) => _LigneHistorique(
                 titre: d.numero,
-                detail: '${formatDateCourte(d.dateEmission)} · ${d.statut.libelle}',
+                detail:
+                    '${formatDateCourte(d.dateEmission)} · '
+                    '${statutAffiche(d.statut, d.dateValidite, DateTime.now()).libelle}',
                 montant: formatEuros(d.totalCentimes),
+                onTap: () => Navigator.of(context).pushNamed(AppRoutes.devisDetail, arguments: d.id),
               ),
             ),
             _SectionHistorique<InscriptionClient>(

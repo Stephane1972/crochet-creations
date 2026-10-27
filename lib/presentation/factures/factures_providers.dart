@@ -43,6 +43,6 @@ Widget apercuPdfSysteme(BuildContext context, Uint8List pdf, String nomFichier) 
     canDebug: false,
     maxPageWidth: 700,
     onError: (BuildContext context, Object erreur) =>
-        const Center(child: Text('Impossible d’afficher l’aperçu de cette facture.')),
+        const Center(child: Text('Impossible d’afficher l’aperçu de ce document.')),
   );
 }

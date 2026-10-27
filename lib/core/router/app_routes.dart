@@ -26,8 +26,14 @@ abstract final class AppRoutes {
   // Documents (étapes 6 et 7). L'aperçu d'une facture reçoit l'identifiant de la facture dans `arguments`.
   static const String factures = '/factures';
   static const String factureDetail = '/factures/detail';
+
+  // Devis (étape 7). L'aperçu, la modification et la conversion reçoivent l'identifiant du devis (un entier)
+  // dans `arguments`.
   static const String devis = '/devis';
   static const String devisNouveau = '/devis/nouveau';
+  static const String devisDetail = '/devis/detail';
+  static const String devisModifier = '/devis/modifier';
+  static const String devisConversion = '/devis/conversion';
 
   // Cours (étape 8)
   static const String cours = '/cours';

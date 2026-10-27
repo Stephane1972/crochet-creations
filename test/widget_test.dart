@@ -34,15 +34,16 @@ void main() {
     await env.fermer(tester);
   });
 
-  testWidgets('« Nouveau devis » ouvre un écran « Bientôt disponible »', (WidgetTester tester) async {
+  testWidgets('« Nouveau devis » ouvre le formulaire de devis', (WidgetTester tester) async {
     final EnvironnementTest env = await EnvironnementTest.creer(tester);
     await ouvrirAccueil(tester, env);
 
     await tester.tap(find.text('Nouveau devis'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Bientôt disponible'), findsOneWidget);
-    expect(find.text('Prévu à l’étape 7 sur 12'), findsOneWidget);
+    expect(find.text('Nouveau devis'), findsOneWidget);
+    expect(find.text('Lignes du devis'), findsOneWidget);
+    expect(find.text('Ajouter une ligne'), findsOneWidget);
 
     await env.fermer(tester);
   });

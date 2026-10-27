@@ -7,6 +7,7 @@ import 'package:crochet_creations/app.dart';
 import 'package:crochet_creations/data/database/app_database.dart';
 import 'package:crochet_creations/data/providers.dart';
 import 'package:crochet_creations/data/repositories/client_repository.dart';
+import 'package:crochet_creations/data/repositories/devis_repository.dart';
 import 'package:crochet_creations/data/repositories/facture_repository.dart';
 import 'package:crochet_creations/data/repositories/numerotation_repository.dart';
 import 'package:crochet_creations/data/repositories/parametres_repository.dart';
@@ -17,6 +18,7 @@ import 'package:crochet_creations/data/stockage/selecteur_photo.dart';
 import 'package:crochet_creations/data/stockage/stockage_pdf.dart';
 import 'package:crochet_creations/data/stockage/stockage_photos.dart';
 import 'package:crochet_creations/domain/calculs/panier.dart';
+import 'package:crochet_creations/domain/document_devis.dart';
 import 'package:crochet_creations/domain/document_facture.dart';
 import 'package:crochet_creations/domain/enums.dart';
 import 'package:crochet_creations/presentation/factures/factures_providers.dart';
@@ -48,6 +50,20 @@ class FauxGenerateurPdf {
   DocumentFacture? get dernier => documents.isEmpty ? null : documents.last;
 
   Future<Uint8List> call(DocumentFacture document) async {
+    documents.add(document);
+    if (echouer) throw StateError('Fabrication du PDF impossible.');
+    return Uint8List.fromList(utf8.encode('%PDF-FAUX ${document.numero}'));
+  }
+}
+
+/// Faux fabricant de PDF de devis : comme [FauxGenerateurPdf], pour les devis.
+class FauxGenerateurDevisPdf {
+  final List<DocumentDevis> documents = <DocumentDevis>[];
+  bool echouer = false;
+
+  DocumentDevis? get dernier => documents.isEmpty ? null : documents.last;
+
+  Future<Uint8List> call(DocumentDevis document) async {
     documents.add(document);
     if (echouer) throw StateError('Fabrication du PDF impossible.');
     return Uint8List.fromList(utf8.encode('%PDF-FAUX ${document.numero}'));
@@ -96,13 +112,24 @@ class EnvironnementTest {
   final FauxSelecteurPhoto selecteur = FauxSelecteurPhoto();
   final FauxGenerateurPdf generateurPdf = FauxGenerateurPdf();
   final FauxServiceDocuments documents = FauxServiceDocuments();
+  final FauxGenerateurDevisPdf generateurDevisPdf = FauxGenerateurDevisPdf();
   late final StockagePdf stockageFactures = StockagePdf(dossierFactures);
+  late final StockagePdf stockageDevis = StockagePdf(dossierDevis);
   late final FactureRepository factures = FactureRepository(
     db,
     NumerotationRepository(db),
     parametres,
     stockageFactures,
     generateurPdf.call,
+  );
+  late final DevisRepository devis = DevisRepository(
+    db,
+    NumerotationRepository(db),
+    ventes,
+    factures,
+    parametres,
+    stockageDevis,
+    generateurDevisPdf.call,
   );
 
   static Future<EnvironnementTest> creer(WidgetTester tester) async {
@@ -117,13 +144,16 @@ class EnvironnementTest {
 
   Directory get dossierPhotos => Directory('${dossier.path}/photos_produits');
   Directory get dossierFactures => Directory('${dossier.path}/factures');
+  Directory get dossierDevis => Directory('${dossier.path}/devis');
 
   List<Override> get overrides => <Override>[
     appDatabaseProvider.overrideWithValue(db),
     stockagePhotosProvider.overrideWithValue(StockagePhotos(dossierPhotos)),
     selecteurPhotoProvider.overrideWithValue(selecteur),
     stockageFacturesProvider.overrideWithValue(stockageFactures),
+    stockageDevisProvider.overrideWithValue(stockageDevis),
     generateurFacturePdfProvider.overrideWithValue(generateurPdf.call),
+    generateurDevisPdfProvider.overrideWithValue(generateurDevisPdf.call),
     serviceDocumentsProvider.overrideWithValue(documents),
     // L'aperçu réel rasterise le PDF avec le moteur d'impression d'Android : ici, on en affiche le texte.
     constructeurApercuPdfProvider.overrideWithValue(
@@ -314,6 +344,39 @@ class EnvironnementTest {
             ? null
             : PaiementSaisi(mode: paiement, montantCentimes: produit.prixVenteCentimes * quantite),
       ),
+    );
+  }
+
+  /// Crée un devis (hors temps simulé, sauf si [ecranOuvert] : voir [ecrireEcranOuvert]) : une couverture
+  /// sur mesure à [prix] centimes, valable 30 jours par défaut. À faire **avant** d'ouvrir l'application.
+  Future<DevisFiche> creerDevis(
+    WidgetTester tester, {
+    int? clientId,
+    String designation = 'Couverture bébé sur mesure',
+    int prix = 6000,
+    int quantite = 1,
+    int acompte = 0,
+    DateTime? validite,
+    String? delai,
+    bool ecranOuvert = false,
+  }) {
+    return _faire(
+      tester,
+      () => devis.creer(
+        DevisSaisi(
+          clientId: clientId,
+          panier: const Panier().ajouter(
+            designation: designation,
+            nature: NatureLigne.service,
+            prixUnitaireCentimes: prix,
+            quantite: quantite,
+          ),
+          dateValidite: validite ?? DateTime.now().add(const Duration(days: 30)),
+          delaiRealisation: delai,
+          acompteCentimes: acompte,
+        ),
+      ),
+      ecranOuvert: ecranOuvert,
     );
   }
 

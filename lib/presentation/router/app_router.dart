@@ -4,6 +4,10 @@ import '../../core/router/app_routes.dart';
 import '../clients/client_fiche_screen.dart';
 import '../clients/client_form_screen.dart';
 import '../common/placeholder_screen.dart';
+import '../devis/devis_conversion_screen.dart';
+import '../devis/devis_detail_screen.dart';
+import '../devis/devis_form_screen.dart';
+import '../devis/devis_screen.dart';
 import '../entreprise/mon_entreprise_screen.dart';
 import '../factures/facture_detail_screen.dart';
 import '../factures/factures_screen.dart';
@@ -38,6 +42,28 @@ abstract final class AppRouter {
         return _page(
           settings,
           idFacture == null ? const _PageIntrouvable() : FactureDetailScreen(factureId: idFacture),
+        );
+      case AppRoutes.devis:
+        return _page(settings, const DevisScreen());
+      case AppRoutes.devisNouveau:
+        return _page(settings, const DevisFormScreen());
+      case AppRoutes.devisDetail:
+        final int? idDevis = _identifiant(settings);
+        return _page(
+          settings,
+          idDevis == null ? const _PageIntrouvable() : DevisDetailScreen(devisId: idDevis),
+        );
+      case AppRoutes.devisModifier:
+        final int? idDevisModif = _identifiant(settings);
+        return _page(
+          settings,
+          idDevisModif == null ? const _PageIntrouvable() : DevisFormScreen(devisId: idDevisModif),
+        );
+      case AppRoutes.devisConversion:
+        final int? idDevisConv = _identifiant(settings);
+        return _page(
+          settings,
+          idDevisConv == null ? const _PageIntrouvable() : DevisConversionScreen(devisId: idDevisConv),
         );
       case AppRoutes.produitNouveau:
         return _page(settings, const ProduitFormScreen());

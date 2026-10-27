@@ -55,19 +55,9 @@ Future<Uint8List> genererDevisPdf(DocumentDevis d, RessourcesPdf ressources) {
         pw.SizedBox(height: 22),
         tableauLignes(d.lignes, p),
         pw.SizedBox(height: 14),
-        enBloc(
-          blocTotaux(
-            p: p,
-            sousTotalCentimes: d.sousTotalCentimes,
-            remiseCentimes: d.remiseCentimes,
-            libelleRemise: d.libelleRemise,
-            fraisPortCentimes: d.fraisPortCentimes,
-            totalCentimes: d.totalCentimes,
-          ),
-        ),
-        pw.SizedBox(height: 16),
-        enBloc(_conditions(d, p)),
-        pw.SizedBox(height: 10),
+        enBloc(_conditionsEtTotaux(d, p)),
+        pw.SizedBox(height: 14),
+        enBloc(encadreMentionTva(p, d.mentionTva)),
         enBloc(_bonPourAccord(p)),
       ],
     ),
@@ -76,39 +66,44 @@ Future<Uint8List> genererDevisPdf(DocumentDevis d, RessourcesPdf ressources) {
   return document.save();
 }
 
-/// Mention de franchise de TVA, puis validité, délai de réalisation, acompte demandé (et IBAN pour le régler)
-/// sur deux colonnes, pour que le devis tienne sur une page.
-pw.Widget _conditions(DocumentDevis d, PolicesPdf p) {
+/// Les conditions du devis (validité, délai de réalisation, acompte demandé, et IBAN pour le régler) à gauche,
+/// là où la page est vide, et les totaux à droite : le devis tient ainsi plus facilement sur une page.
+pw.Widget _conditionsEtTotaux(DocumentDevis d, PolicesPdf p) {
   final DateTime? validite = d.dateValidite;
   final String? delai = rempli(d.delaiRealisation) ? d.delaiRealisation!.trim() : null;
   final bool acompte = d.acompteCentimes > 0;
 
-  final List<pw.Widget> rubriques = <pw.Widget>[
-    if (validite != null)
-      rubriquePdf(p, 'VALIDITÉ DU DEVIS', 'Valable jusqu’au ${formatDateCourte(validite.toLocal())}.'),
-    if (delai != null) rubriquePdf(p, 'DÉLAI DE RÉALISATION', delai),
-    if (acompte)
-      rubriquePdf(p, 'ACOMPTE DEMANDÉ', '${formatEuros(d.acompteCentimes)} à verser à l’acceptation du devis.'),
-    if (acompte && rempli(d.iban)) rubriquePdf(p, 'PAIEMENT PAR VIREMENT', 'IBAN : ${d.iban}'),
-  ];
-
-  return pw.Container(
-    child: pw.Column(
-      mainAxisSize: pw.MainAxisSize.min,
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: <pw.Widget>[
-        encadreMentionTva(p, d.mentionTva),
-        for (int i = 0; i < rubriques.length; i += 2)
-          pw.Row(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: <pw.Widget>[
-              pw.Expanded(child: rubriques[i]),
-              pw.SizedBox(width: 16),
-              pw.Expanded(child: i + 1 < rubriques.length ? rubriques[i + 1] : pw.SizedBox()),
-            ],
-          ),
-      ],
-    ),
+  return pw.Row(
+    crossAxisAlignment: pw.CrossAxisAlignment.start,
+    children: <pw.Widget>[
+      pw.Expanded(
+        child: pw.Column(
+          mainAxisSize: pw.MainAxisSize.min,
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: <pw.Widget>[
+            if (validite != null)
+              rubriquePdf(p, 'VALIDITÉ DU DEVIS', 'Valable jusqu’au ${formatDateCourte(validite.toLocal())}.'),
+            if (delai != null) rubriquePdf(p, 'DÉLAI DE RÉALISATION', delai),
+            if (acompte)
+              rubriquePdf(
+                p,
+                'ACOMPTE DEMANDÉ',
+                '${formatEuros(d.acompteCentimes)} à verser à l’acceptation du devis.',
+              ),
+            if (acompte && rempli(d.iban)) rubriquePdf(p, 'PAIEMENT PAR VIREMENT', 'IBAN : ${d.iban}'),
+          ],
+        ),
+      ),
+      pw.SizedBox(width: 16),
+      colonneTotaux(
+        p: p,
+        sousTotalCentimes: d.sousTotalCentimes,
+        remiseCentimes: d.remiseCentimes,
+        libelleRemise: d.libelleRemise,
+        fraisPortCentimes: d.fraisPortCentimes,
+        totalCentimes: d.totalCentimes,
+      ),
+    ],
   );
 }
 
@@ -145,7 +140,7 @@ pw.Widget _bonPourAccord(PolicesPdf p) {
 
 pw.Widget _zoneASigner(PolicesPdf p, String titre) {
   return pw.Container(
-    height: 46,
+    height: 42,
     padding: const pw.EdgeInsets.all(6),
     decoration: pw.BoxDecoration(
       border: pw.Border.all(color: pdfFilet, width: 0.8),

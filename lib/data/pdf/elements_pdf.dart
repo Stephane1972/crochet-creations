@@ -243,6 +243,29 @@ pw.Widget blocTotaux({
   required int fraisPortCentimes,
   required int totalCentimes,
 }) {
+  return pw.Container(
+    alignment: pw.Alignment.centerRight,
+    child: colonneTotaux(
+      p: p,
+      sousTotalCentimes: sousTotalCentimes,
+      remiseCentimes: remiseCentimes,
+      libelleRemise: libelleRemise,
+      fraisPortCentimes: fraisPortCentimes,
+      totalCentimes: totalCentimes,
+    ),
+  );
+}
+
+/// Les totaux eux-mêmes, dans une colonne de largeur fixe (240 pt) : à placer dans une `Row` à côté d'un autre
+/// bloc (voir [blocTotaux] pour le bloc aligné à droite sur toute la largeur).
+pw.Widget colonneTotaux({
+  required PolicesPdf p,
+  required int sousTotalCentimes,
+  required int remiseCentimes,
+  required String libelleRemise,
+  required int fraisPortCentimes,
+  required int totalCentimes,
+}) {
   pw.Widget ligne(String libelle, String montant) => pw.Padding(
     padding: const pw.EdgeInsets.symmetric(vertical: 2.5),
     child: pw.Row(
@@ -254,35 +277,32 @@ pw.Widget blocTotaux({
     ),
   );
 
-  return pw.Container(
-    alignment: pw.Alignment.centerRight,
-    child: pw.SizedBox(
-      width: 240,
-      child: pw.Column(
-        mainAxisSize: pw.MainAxisSize.min,
-        children: <pw.Widget>[
-          ligne('Sous-total', formatEuros(sousTotalCentimes)),
-          if (remiseCentimes > 0) ligne(libelleRemise, formatEuros(-remiseCentimes)),
-          if (fraisPortCentimes > 0) ligne('Frais de port', formatEuros(fraisPortCentimes)),
-          pw.SizedBox(height: 6),
-          pw.Container(
-            padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: pw.BoxDecoration(
-              color: pdfRoseTresClair,
-              border: pw.Border.all(color: pdfRose, width: 1),
-              borderRadius: pw.BorderRadius.circular(6),
-            ),
-            child: pw.Row(
-              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: pw.CrossAxisAlignment.center,
-              children: <pw.Widget>[
-                pw.Text('TOTAL', style: p.style(p.semiGrasse, 12, pdfPrune)),
-                pw.Text(formatEuros(totalCentimes), style: p.style(p.grasse, 16, pdfPrune)),
-              ],
-            ),
+  return pw.SizedBox(
+    width: 240,
+    child: pw.Column(
+      mainAxisSize: pw.MainAxisSize.min,
+      children: <pw.Widget>[
+        ligne('Sous-total', formatEuros(sousTotalCentimes)),
+        if (remiseCentimes > 0) ligne(libelleRemise, formatEuros(-remiseCentimes)),
+        if (fraisPortCentimes > 0) ligne('Frais de port', formatEuros(fraisPortCentimes)),
+        pw.SizedBox(height: 6),
+        pw.Container(
+          padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: pw.BoxDecoration(
+            color: pdfRoseTresClair,
+            border: pw.Border.all(color: pdfRose, width: 1),
+            borderRadius: pw.BorderRadius.circular(6),
           ),
-        ],
-      ),
+          child: pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: pw.CrossAxisAlignment.center,
+            children: <pw.Widget>[
+              pw.Text('TOTAL', style: p.style(p.semiGrasse, 12, pdfPrune)),
+              pw.Text(formatEuros(totalCentimes), style: p.style(p.grasse, 16, pdfPrune)),
+            ],
+          ),
+        ),
+      ],
     ),
   );
 }

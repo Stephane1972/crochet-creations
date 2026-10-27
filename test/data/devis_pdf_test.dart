@@ -60,12 +60,12 @@ void main() {
   group('genererDevisPdf', () {
     test('fabrique un PDF valide d’une page pour un devis complet', () async {
       final Uint8List pdf = await genererDevisPdf(_devis(), ressources);
+      ecrireExemplePdf('devis-complet', pdf);
 
       expect(String.fromCharCodes(pdf.sublist(0, 5)), '%PDF-');
       expect(String.fromCharCodes(pdf.sublist(pdf.length - 6)).trim(), endsWith('%%EOF'));
       expect(pdf.length, greaterThan(10000));
       expect(nombreDePages(pdf), 1);
-      ecrireExemplePdf('devis-complet', pdf);
     });
 
     test('un devis minimal : sans client, validité, délai ni acompte', () async {
@@ -73,10 +73,10 @@ void main() {
         _devis(nombreDeLignes: 1, complet: false, numero: 'DEVIS-2026-0002'),
         ressources,
       );
+      ecrireExemplePdf('devis-simple', pdf);
 
       expect(String.fromCharCodes(pdf.sublist(0, 5)), '%PDF-');
       expect(nombreDePages(pdf), 1);
-      ecrireExemplePdf('devis-simple', pdf);
     });
 
     test('un devis long continue sur plusieurs pages, avec ses conditions et son bon pour accord', () async {
@@ -84,9 +84,9 @@ void main() {
         _devis(nombreDeLignes: 45, numero: 'DEVIS-2026-0003'),
         ressources,
       );
+      ecrireExemplePdf('devis-long', pdf);
 
       expect(nombreDePages(pdf), greaterThan(1));
-      ecrireExemplePdf('devis-long', pdf);
     });
   });
 }

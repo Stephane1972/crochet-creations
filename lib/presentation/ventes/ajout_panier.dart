@@ -79,9 +79,9 @@ Future<VarianteProduit?> choisirVariante(BuildContext context, ProduitResume res
   );
 }
 
-/// Ce que saisit la vendeuse pour une ligne libre.
-class _LigneLibreSaisie {
-  const _LigneLibreSaisie({
+/// Ce que saisit la vendeuse pour une ligne libre (vente ou devis).
+class LigneLibreSaisie {
+  const LigneLibreSaisie({
     required this.designation,
     required this.description,
     required this.nature,
@@ -96,12 +96,18 @@ class _LigneLibreSaisie {
   final int quantite;
 }
 
+/// Demande une ligne libre (création sur mesure, cours, prestation...). `null` si on ferme la fenêtre.
+/// Avec [initiale], la fenêtre sert à **modifier** une ligne existante.
+Future<LigneLibreSaisie?> demanderLigneLibre(BuildContext context, {LigneLibreSaisie? initiale}) {
+  return showDialog<LigneLibreSaisie>(
+    context: context,
+    builder: (BuildContext contexteDialogue) => DialogueLigneLibre(initiale: initiale),
+  );
+}
+
 /// Demande une ligne libre (création sur mesure, cours, prestation...) et l'ajoute au panier.
 Future<bool> ajouterLigneLibre(BuildContext context, WidgetRef ref, {double margeBas = 0}) async {
-  final _LigneLibreSaisie? saisie = await showDialog<_LigneLibreSaisie>(
-    context: context,
-    builder: (BuildContext contexteDialogue) => const _DialogueLigneLibre(),
-  );
+  final LigneLibreSaisie? saisie = await demanderLigneLibre(context);
   if (saisie == null || !context.mounted) return false;
   try {
     ref
@@ -120,20 +126,27 @@ Future<bool> ajouterLigneLibre(BuildContext context, WidgetRef ref, {double marg
   }
 }
 
-class _DialogueLigneLibre extends StatefulWidget {
-  const _DialogueLigneLibre();
+/// Fenêtre de saisie d'une ligne libre. Avec [initiale], les champs sont préremplis (modification).
+class DialogueLigneLibre extends StatefulWidget {
+  const DialogueLigneLibre({super.key, this.initiale});
+
+  final LigneLibreSaisie? initiale;
 
   @override
-  State<_DialogueLigneLibre> createState() => _DialogueLigneLibreState();
+  State<DialogueLigneLibre> createState() => _DialogueLigneLibreState();
 }
 
-class _DialogueLigneLibreState extends State<_DialogueLigneLibre> {
+class _DialogueLigneLibreState extends State<DialogueLigneLibre> {
   final GlobalKey<FormState> _formulaire = GlobalKey<FormState>();
-  final TextEditingController _designation = TextEditingController();
-  final TextEditingController _description = TextEditingController();
-  final TextEditingController _prix = TextEditingController();
-  final TextEditingController _quantite = TextEditingController(text: '1');
-  NatureLigne _nature = NatureLigne.service;
+  late final TextEditingController _designation = TextEditingController(text: widget.initiale?.designation ?? '');
+  late final TextEditingController _description = TextEditingController(text: widget.initiale?.description ?? '');
+  late final TextEditingController _prix = TextEditingController(
+    text: widget.initiale == null ? '' : formatMontantSaisie(widget.initiale!.prixCentimes),
+  );
+  late final TextEditingController _quantite = TextEditingController(text: '${widget.initiale?.quantite ?? 1}');
+  late NatureLigne _nature = widget.initiale?.nature ?? NatureLigne.service;
+
+  bool get _modification => widget.initiale != null;
 
   @override
   void dispose() {
@@ -148,7 +161,7 @@ class _DialogueLigneLibreState extends State<_DialogueLigneLibre> {
     if (!_formulaire.currentState!.validate()) return;
     final String description = _description.text.trim();
     Navigator.of(context).pop(
-      _LigneLibreSaisie(
+      LigneLibreSaisie(
         designation: _designation.text.trim(),
         description: description.isEmpty ? null : description,
         nature: _nature,
@@ -161,7 +174,7 @@ class _DialogueLigneLibreState extends State<_DialogueLigneLibre> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Article ou prestation libre'),
+      title: Text(_modification ? 'Modifier la ligne' : 'Article ou prestation libre'),
       content: SingleChildScrollView(
         child: Form(
           key: _formulaire,
@@ -218,7 +231,7 @@ class _DialogueLigneLibreState extends State<_DialogueLigneLibre> {
       ),
       actions: <Widget>[
         TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Annuler')),
-        FilledButton(onPressed: _ajouter, child: const Text('Ajouter')),
+        FilledButton(onPressed: _ajouter, child: Text(_modification ? 'Enregistrer' : 'Ajouter')),
       ],
     );
   }

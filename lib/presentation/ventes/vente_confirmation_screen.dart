@@ -13,6 +13,7 @@ import '../../data/repositories/client_vues.dart';
 import '../../data/repositories/vente_vues.dart';
 import '../../domain/enums.dart';
 import '../../domain/erreurs.dart';
+import '../entreprise/profil_incomplet.dart';
 import '../shell/nav_provider.dart';
 import 'recap_widgets.dart';
 import 'ventes_providers.dart';
@@ -86,14 +87,7 @@ class _VenteConfirmationScreenState extends ConsumerState<VenteConfirmationScree
       await Navigator.of(context).pushNamed(AppRoutes.factureDetail, arguments: facture.id);
     } on ProfilIncomplet catch (manque) {
       if (!mounted) return;
-      final bool ouvrir = await confirmer(
-        context,
-        titre: 'Informations manquantes',
-        message: manque.message,
-        libelleConfirmer: 'Ouvrir « Mon entreprise »',
-        libelleAnnuler: 'Plus tard',
-      );
-      if (ouvrir && mounted) await Navigator.of(context).pushNamed(AppRoutes.monEntreprise);
+      await proposerProfilComplet(context, manque);
     } catch (erreur, pile) {
       debugPrint('Création de la facture impossible : $erreur\n$pile');
       if (mounted) afficherMessage(context, messageErreur(erreur));

@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:crochet_creations/data/pdf/facture_pdf.dart';
@@ -7,26 +6,7 @@ import 'package:crochet_creations/domain/document_facture.dart';
 import 'package:crochet_creations/domain/enums.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Polices et logo lus directement dans le dossier `assets/` (les tests s'exécutent à la racine du projet).
-RessourcesPdf _ressources() {
-  Uint8List lire(String chemin) => File(chemin).readAsBytesSync();
-  return RessourcesPdf(
-    police: lire('assets/fonts/Poppins-Regular.ttf'),
-    policeMoyenne: lire('assets/fonts/Poppins-Medium.ttf'),
-    policeSemiGras: lire('assets/fonts/Poppins-SemiBold.ttf'),
-    policeGras: lire('assets/fonts/Poppins-Bold.ttf'),
-    logo: lire('assets/images/logo_mono.png'),
-  );
-}
-
-const EmetteurDocument _emetteur = EmetteurDocument(
-  nom: 'Crochet & Créations',
-  responsable: 'Camille Martin',
-  adresse: <String>['12 rue des Lilas', '31000 Toulouse'],
-  telephone: '06 12 34 56 78',
-  email: 'contact@exemple.fr',
-  siren: '123456789',
-);
+import 'aide_pdf.dart';
 
 DocumentFacture _facture({
   int nombreDeLignes = 2,
@@ -50,7 +30,7 @@ DocumentFacture _facture({
     numero: numero,
     dateEmission: DateTime(2026, 6, 15),
     dateVentePrestation: DateTime(2026, 6, 10),
-    emetteur: _emetteur,
+    emetteur: emetteurDeTest,
     client: complete
         ? const DestinataireDocument(
             nom: 'Atelier Soleil',
@@ -71,21 +51,10 @@ DocumentFacture _facture({
   );
 }
 
-int _pages(Uint8List pdf) {
-  final String texte = String.fromCharCodes(pdf);
-  return RegExp(r'/Type\s*/Page(?![A-Za-z])').allMatches(texte).length;
-}
-
-/// Écrit un exemple dans `build/exemples_pdf/` : la CI le publie avec l'APK pour vérifier la mise en page.
-void _exemple(String nom, Uint8List pdf) {
-  final Directory dossier = Directory('build/exemples_pdf')..createSync(recursive: true);
-  File('${dossier.path}/$nom.pdf').writeAsBytesSync(pdf);
-}
-
 void main() {
   late RessourcesPdf ressources;
 
-  setUpAll(() => ressources = _ressources());
+  setUpAll(() => ressources = ressourcesPdfDeTest());
 
   group('genererFacturePdf', () {
     test('fabrique un PDF valide d’une page pour une facture courte', () async {
@@ -94,8 +63,8 @@ void main() {
       expect(String.fromCharCodes(pdf.sublist(0, 5)), '%PDF-');
       expect(String.fromCharCodes(pdf.sublist(pdf.length - 6)).trim(), endsWith('%%EOF'));
       expect(pdf.length, greaterThan(10000));
-      expect(_pages(pdf), 1);
-      _exemple('facture-complete', pdf);
+      expect(nombreDePages(pdf), 1);
+      ecrireExemplePdf('facture-complete', pdf);
     });
 
     test('une facture de passage, sans remise, frais de port, IBAN ni remerciement', () async {
@@ -105,8 +74,8 @@ void main() {
       );
 
       expect(String.fromCharCodes(pdf.sublist(0, 5)), '%PDF-');
-      expect(_pages(pdf), 1);
-      _exemple('facture-simple', pdf);
+      expect(nombreDePages(pdf), 1);
+      ecrireExemplePdf('facture-simple', pdf);
     });
 
     test('une facture longue continue sur plusieurs pages', () async {
@@ -115,8 +84,8 @@ void main() {
         ressources,
       );
 
-      expect(_pages(pdf), greaterThan(1));
-      _exemple('facture-longue', pdf);
+      expect(nombreDePages(pdf), greaterThan(1));
+      ecrireExemplePdf('facture-longue', pdf);
     });
   });
 }

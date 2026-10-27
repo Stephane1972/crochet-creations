@@ -6,7 +6,67 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
 
 ## [Non publié]
 
-## [0.6.0] — Étape 6 : factures PDF et « Mon entreprise » (en attente de validation)
+## [0.7.0] — Étape 7 : devis (en attente de validation)
+
+### Ajouté
+- **Règles des devis** (`domain/regles_devis.dart`, sans base ni interface) : validité par défaut (30 jours), statut
+  affiché (un devis brouillon ou envoyé dont la validité est dépassée est « expiré »), transitions de statut
+  autorisées, devis modifiable / convertible, contrôle des dates et de l'acompte.
+- **`DevisRepository`** : créer (numéro **DEVIS-AAAA-NNNN** attribué dans la même transaction), modifier, changer le
+  statut, actualiser les expirations (enregistrées en base), **convertir** en commande ou en commande et facture,
+  lister et consulter en direct, fabriquer / ranger / relire le PDF. Les lignes, la remise et les frais de port
+  réutilisent le `Panier` de l'étape 5 (lignes libres).
+- **Conversion** : une vente validée (sans effet sur le stock) reprend les lignes, la remise, les frais de port et le
+  client du devis ; la note de la commande porte « Commande issue du devis N » et les notes du devis. Le devis passe
+  à « accepté » et est relié à la vente (c'est ce lien qui le marque « converti en commande »). Avec
+  **« Acompte reçu »**, le premier paiement (montant de l'acompte, mode au choix) est enregistré sur la vente. Le profil
+  « Mon entreprise » est vérifié **avant** toute écriture quand une facture est demandée ; si la facture échoue après
+  la commande, le message l'indique et la commande reste créée.
+- **PDF du devis** (`genererDevisPdf`) : même présentation que la facture (mise en page partagée dans
+  `data/pdf/elements_pdf.dart`), titre « DEVIS », « Établi le » et « Valable jusqu'au », conditions (validité, délai de
+  réalisation, acompte demandé, IBAN pour le régler) à gauche des totaux, mention 293 B, cadre **« Bon pour accord »**.
+  Un devis court tient sur une page, un long continue sur plusieurs.
+- **Écrans** : liste des devis (13), création / modification (14), détail avec aperçu PDF, **Partager**, **Imprimer**,
+  changement de statut, **Modifier** et **Convertir** (15 pour la conversion). L'aperçu n'est refait que si le contenu
+  imprimé change (pas à chaque changement de statut).
+- Tests : règles (`regles_devis_test`), dépôt (`devis_repository_test`, dont la **conversion devis → facture**), PDF
+  (`devis_pdf_test`) et 11 scénarios d'écran (`devis_ecrans_test`).
+- La CI publie aussi des exemples de PDF de devis (complet, simple, long).
+
+### Modifié
+- *Plus → Devis* ouvre la vraie liste ; les écrans « Bientôt disponible » des devis disparaissent. L'historique d'un
+  client affiche le statut réel du devis et l'ouvre.
+- `Panier.avecLigneModifiee` : modification d'une ligne libre (utilisée par le formulaire de devis).
+- Réutilisation depuis l'étape 5 : dialogue de ligne libre, choix du client (avec libellés « Aucun client » pour un
+  devis) et fenêtre « Informations manquantes » (`proposerProfilComplet`).
+- `StockageFactures` devient `StockagePdf` (factures et devis, chacun dans son dossier).
+- Message d'erreur de l'aperçu : « Impossible d'afficher l'aperçu de ce document. ».
+- Le texte des réglages indique « étape 7 sur 12 ».
+
+### Décisions prises avec Stéphane
+- L'écran de conversion propose **deux boutons** : « Créer la commande » et « Créer la commande et la facture ».
+- L'**acompte** est proposé par une case « Acompte reçu » (montant du devis, mode de paiement au choix) : la commande
+  est alors « partiellement payée », sinon impayée.
+- **Expiration automatique** : un devis brouillon ou envoyé dont la validité est passée est affiché **et enregistré**
+  « expiré » ; il ne peut être accepté ni converti sans repousser la date.
+- Le **PDF du devis** reprend la présentation des factures (numéro, validité, délai, acompte, mention 293 B, « Bon
+  pour accord », Partager et Imprimer).
+
+### Limites connues et hypothèses
+- Le devis est numéroté **à l'enregistrement** (pas de numéro pour un brouillon non enregistré) ; la suite repart à 1
+  chaque année.
+- Validité de **30 jours** proposée par défaut (modifiable) ; l'écran exige toujours une date.
+- Le **client est facultatif** : sans client, le PDF indique « Client non précisé ».
+- Seules les **lignes libres** existent dans un devis (pas de produit du catalogue) ; la conversion ne touche donc pas au
+  stock.
+- Un devis **ne se supprime pas** : on le marque « refusé ».
+- Un devis expiré modifié avec une validité future redevient « brouillon ».
+- Les notes d'un devis sont internes : elles ne s'impriment pas, mais passent dans la note de la commande.
+- Le PDF d'un devis ne dépend pas du profil complet (seule la facture l'exige) ; il est refait quand le contenu imprimé
+  change.
+- Le schéma de la base n'a pas changé : pas de migration.
+
+## [0.6.0] — Étape 6 : factures PDF et « Mon entreprise » (validée)
 
 ### Ajouté
 - **Mon entreprise** (écran 22) : nom de l'entreprise, nom de l'entrepreneuse, adresse, code postal, ville, SIREN,

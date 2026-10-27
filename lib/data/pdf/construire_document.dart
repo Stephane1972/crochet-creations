@@ -1,6 +1,9 @@
+import '../../core/constants/app_constants.dart';
 import '../../core/utils/texte.dart';
+import '../../domain/document_devis.dart';
 import '../../domain/document_facture.dart';
 import '../database/app_database.dart';
+import '../repositories/client_vues.dart';
 
 /// Rassemble ce qui s'imprime sur une facture : l'identité de l'entreprise (profil « Mon entreprise »),
 /// le client et les mentions recopiés à l'émission (ligne de la facture), puis les lignes et les montants
@@ -82,4 +85,46 @@ String? adresseClientPourFacture(Client c) {
     codePostalVille,
   ].whereType<String>().join('\n');
   return nullSiVide(texte);
+}
+
+/// Rassemble ce qui s'imprime sur un devis : l'identité de l'entreprise (profil « Mon entreprise »), le client
+/// (sa fiche actuelle, un devis n'étant pas figé comme une facture), les lignes et les conditions du devis.
+DocumentDevis construireDocumentDevis({
+  required DevisFiche devis,
+  required List<LigneDevis> lignes,
+  Client? client,
+  required Entreprise entreprise,
+}) {
+  return DocumentDevis(
+    numero: devis.numero,
+    dateEmission: devis.dateEmission,
+    dateValidite: devis.dateValidite,
+    delaiRealisation: nullSiVide(devis.delaiRealisation),
+    acompteCentimes: devis.acompteCentimes,
+    emetteur: emetteurDepuis(entreprise),
+    client: client == null
+        ? const DestinataireDocument()
+        : DestinataireDocument(
+            nom: nullSiVide(libelleClient(client)),
+            adresse: lignesDAdresse(adresseClientPourFacture(client)),
+            siret: nullSiVide(client.siret),
+          ),
+    lignes: <LigneDocument>[
+      for (final LigneDevis l in lignes)
+        LigneDocument(
+          designation: l.designation,
+          description: nullSiVide(l.description),
+          quantite: l.quantite,
+          prixUnitaireCentimes: l.prixUnitaireCentimes,
+          totalCentimes: l.totalLigneCentimes,
+        ),
+    ],
+    sousTotalCentimes: devis.sousTotalCentimes,
+    remiseCentimes: devis.remiseCentimes,
+    libelleRemise: libelleRemiseDocument(devis.remiseType, devis.remiseValeur),
+    fraisPortCentimes: devis.fraisPortCentimes,
+    totalCentimes: devis.totalCentimes,
+    mentionTva: AppConstants.mentionTvaFranchise,
+    iban: nullSiVide(entreprise.iban),
+  );
 }

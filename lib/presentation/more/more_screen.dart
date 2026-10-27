@@ -15,7 +15,12 @@ class MoreScreen extends StatelessWidget {
       Icons.receipt_long_outlined,
       'Liste, aperçu, impression et partage des factures PDF.',
     ),
-    _Entree.avenir(AppRoutes.devis, EcransAVenir.devis),
+    const _Entree(
+      AppRoutes.devis,
+      'Devis',
+      Icons.request_quote_outlined,
+      'Création de devis, aperçu PDF et conversion en commande ou en facture.',
+    ),
     _Entree.avenir(AppRoutes.cours, EcransAVenir.cours),
     _Entree.avenir(AppRoutes.depenses, EcransAVenir.depenses),
     _Entree.avenir(AppRoutes.statistiques, EcransAVenir.statistiques),

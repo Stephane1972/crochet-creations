@@ -23,23 +23,49 @@ class SelecteurClient extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final Client? client = ref.watch(venteEnCoursProvider.select((VenteEnCours v) => v.client));
+    return LigneChoixClient(
+      client: client,
+      onChoisi: (Client? choisi) => ref.read(venteEnCoursProvider.notifier).choisirClient(choisi),
+    );
+  }
+}
+
+/// Carte « client » : le client choisi (ou « aucun client »), un appui ouvre la feuille de choix.
+/// Sert à la vente (« Client de passage ») et au devis (« Aucun client »).
+class LigneChoixClient extends StatelessWidget {
+  const LigneChoixClient({
+    super.key,
+    required this.client,
+    required this.onChoisi,
+    this.titreAucun = 'Client de passage',
+    this.sousTitreAucun = 'Vente rapide, sans fiche client',
+  });
+
+  final Client? client;
+  final void Function(Client? client) onChoisi;
+  final String titreAucun;
+  final String sousTitreAucun;
+
+  @override
+  Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
-    final String? coordonnees = client == null ? null : resumeCoordonnees(client);
+    final Client? choisi = client;
+    final String? coordonnees = choisi == null ? null : resumeCoordonnees(choisi);
 
     return Card(
       margin: EdgeInsets.zero,
       child: ListTile(
-        leading: client == null
+        leading: choisi == null
             ? CircleAvatar(
                 backgroundColor: theme.colorScheme.secondaryContainer,
                 foregroundColor: theme.colorScheme.onSecondaryContainer,
                 child: const Icon(Icons.person_outline),
               )
-            : PastilleClient(client: client, taille: 40),
-        title: Text(client == null ? 'Client de passage' : libelleClient(client)),
+            : PastilleClient(client: choisi, taille: 40),
+        title: Text(choisi == null ? titreAucun : libelleClient(choisi)),
         subtitle: Text(
-          client == null
-              ? 'Vente rapide, sans fiche client'
+          choisi == null
+              ? sousTitreAucun
               : (coordonnees == null || coordonnees.isEmpty ? 'Fiche client' : coordonnees),
         ),
         trailing: const Icon(Icons.unfold_more),
@@ -48,22 +74,33 @@ class SelecteurClient extends ConsumerWidget {
             context: context,
             isScrollControlled: true,
             showDragHandle: true,
-            builder: (BuildContext contexteFeuille) => FeuilleChoixClient(clientActuel: client),
+            builder: (BuildContext contexteFeuille) => FeuilleChoixClient(
+              clientActuel: choisi,
+              titreAucun: titreAucun,
+              sousTitreAucun: sousTitreAucun,
+            ),
           );
-          if (choix != null && context.mounted) {
-            ref.read(venteEnCoursProvider.notifier).choisirClient(choix.client);
-          }
+          if (choix != null && context.mounted) onChoisi(choix.client);
         },
       ),
     );
   }
 }
 
-/// Feuille du bas : « Client de passage », puis les clients (recherche par nom, téléphone...).
+/// Feuille du bas : « Client de passage » (ou « Aucun client »), puis les clients (recherche par nom, téléphone...).
 class FeuilleChoixClient extends ConsumerStatefulWidget {
-  const FeuilleChoixClient({super.key, this.clientActuel});
+  const FeuilleChoixClient({
+    super.key,
+    this.clientActuel,
+    this.titreAucun = 'Client de passage',
+    this.sousTitreAucun = 'Vente rapide, sans fiche client',
+  });
 
   final Client? clientActuel;
+
+  /// Première ligne de la liste : choisir « personne » (client de passage, ou devis sans client).
+  final String titreAucun;
+  final String sousTitreAucun;
 
   @override
   ConsumerState<FeuilleChoixClient> createState() => _FeuilleChoixClientState();
@@ -95,8 +132,8 @@ class _FeuilleChoixClientState extends ConsumerState<FeuilleChoixClient> {
             ),
             ListTile(
               leading: const CircleAvatar(child: Icon(Icons.person_outline)),
-              title: const Text('Client de passage'),
-              subtitle: const Text('Vente rapide, sans fiche client'),
+              title: Text(widget.titreAucun),
+              subtitle: Text(widget.sousTitreAucun),
               selected: widget.clientActuel == null,
               trailing: widget.clientActuel == null ? const Icon(Icons.check) : null,
               onTap: () => Navigator.of(context).pop(const ChoixClient(null)),

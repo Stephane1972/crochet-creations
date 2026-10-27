@@ -65,9 +65,9 @@ Future<Uint8List> genererDevisPdf(DocumentDevis d, RessourcesPdf ressources) {
             totalCentimes: d.totalCentimes,
           ),
         ),
-        pw.SizedBox(height: 22),
+        pw.SizedBox(height: 16),
         enBloc(_conditions(d, p)),
-        pw.SizedBox(height: 14),
+        pw.SizedBox(height: 10),
         enBloc(_bonPourAccord(p)),
       ],
     ),
@@ -76,11 +76,21 @@ Future<Uint8List> genererDevisPdf(DocumentDevis d, RessourcesPdf ressources) {
   return document.save();
 }
 
-/// Validité, délai de réalisation, acompte demandé (et IBAN pour le régler) puis mention de franchise de TVA.
+/// Mention de franchise de TVA, puis validité, délai de réalisation, acompte demandé (et IBAN pour le régler)
+/// sur deux colonnes, pour que le devis tienne sur une page.
 pw.Widget _conditions(DocumentDevis d, PolicesPdf p) {
   final DateTime? validite = d.dateValidite;
   final String? delai = rempli(d.delaiRealisation) ? d.delaiRealisation!.trim() : null;
   final bool acompte = d.acompteCentimes > 0;
+
+  final List<pw.Widget> rubriques = <pw.Widget>[
+    if (validite != null)
+      rubriquePdf(p, 'VALIDITÉ DU DEVIS', 'Valable jusqu’au ${formatDateCourte(validite.toLocal())}.'),
+    if (delai != null) rubriquePdf(p, 'DÉLAI DE RÉALISATION', delai),
+    if (acompte)
+      rubriquePdf(p, 'ACOMPTE DEMANDÉ', '${formatEuros(d.acompteCentimes)} à verser à l’acceptation du devis.'),
+    if (acompte && rempli(d.iban)) rubriquePdf(p, 'PAIEMENT PAR VIREMENT', 'IBAN : ${d.iban}'),
+  ];
 
   return pw.Container(
     child: pw.Column(
@@ -88,16 +98,15 @@ pw.Widget _conditions(DocumentDevis d, PolicesPdf p) {
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: <pw.Widget>[
         encadreMentionTva(p, d.mentionTva),
-        if (validite != null)
-          rubriquePdf(p, 'VALIDITÉ DU DEVIS', 'Ce devis est valable jusqu’au ${formatDateCourte(validite.toLocal())}.'),
-        if (delai != null) rubriquePdf(p, 'DÉLAI DE RÉALISATION', delai),
-        if (acompte)
-          rubriquePdf(
-            p,
-            'ACOMPTE DEMANDÉ',
-            '${formatEuros(d.acompteCentimes)} à verser à l’acceptation du devis.',
+        for (int i = 0; i < rubriques.length; i += 2)
+          pw.Row(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: <pw.Widget>[
+              pw.Expanded(child: rubriques[i]),
+              pw.SizedBox(width: 16),
+              pw.Expanded(child: i + 1 < rubriques.length ? rubriques[i + 1] : pw.SizedBox()),
+            ],
           ),
-        if (acompte && rempli(d.iban)) rubriquePdf(p, 'PAIEMENT PAR VIREMENT', 'IBAN : ${d.iban}'),
       ],
     ),
   );
@@ -136,7 +145,7 @@ pw.Widget _bonPourAccord(PolicesPdf p) {
 
 pw.Widget _zoneASigner(PolicesPdf p, String titre) {
   return pw.Container(
-    height: 52,
+    height: 46,
     padding: const pw.EdgeInsets.all(6),
     decoration: pw.BoxDecoration(
       border: pw.Border.all(color: pdfFilet, width: 0.8),

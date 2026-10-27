@@ -645,7 +645,7 @@ void main() {
       ]);
       expect(document.sousTotalCentimes, 11000);
       expect(document.remiseCentimes, 1100);
-      expect(document.libelleRemise, 'Remise (10 %)');
+      expect(document.libelleRemise, 'Remise (10\u00A0%)');
       expect(document.fraisPortCentimes, 490);
       expect(document.totalCentimes, totalType);
 

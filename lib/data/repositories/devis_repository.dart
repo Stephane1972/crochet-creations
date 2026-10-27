@@ -119,10 +119,11 @@ class DevisRepository {
   /// converti, ou si la saisie est impossible ; le devis est alors inchangé.
   ///
   /// Un devis expiré se modifie pour **prolonger sa validité** : il redevient alors un brouillon.
-  Future<DevisFiche> modifier(int id, DevisSaisi saisie, {DateTime? maintenant}) {
+  Future<DevisFiche> modifier(int id, DevisSaisi saisie, {DateTime? maintenant}) async {
+    final DateTime aujourdhui = maintenant ?? DateTime.now();
+    // Avant la transaction : un refus (saisie impossible...) ne doit pas annuler le passage en « Expiré ».
+    await actualiserExpirations(maintenant: aujourdhui);
     return _db.transaction(() async {
-      final DateTime aujourdhui = maintenant ?? DateTime.now();
-      await actualiserExpirations(maintenant: aujourdhui);
       final DevisFiche actuel = await _devis(id);
       final bool converti = actuel.venteId != null;
       if (!peutEtreModifie(actuel.statut, converti: converti)) {
@@ -168,9 +169,10 @@ class DevisRepository {
   /// Change le statut à la main : envoyé, accepté ou refusé (voir `statutsPossibles`). Lance [DonneeInvalide]
   /// si ce changement n'est pas permis depuis le statut actuel (un devis refusé ne revient pas en arrière, un
   /// devis expiré doit d'abord voir sa validité prolongée...).
-  Future<DevisFiche> changerStatut(int id, StatutDevis nouveau, {DateTime? maintenant}) {
+  Future<DevisFiche> changerStatut(int id, StatutDevis nouveau, {DateTime? maintenant}) async {
+    // Avant la transaction : un refus ne doit pas annuler le passage en « Expiré ».
+    await actualiserExpirations(maintenant: maintenant);
     return _db.transaction(() async {
-      await actualiserExpirations(maintenant: maintenant);
       final DevisFiche devis = await _devis(id);
       final bool converti = devis.venteId != null;
       if (!statutsPossibles(devis.statut, converti: converti).contains(nouveau)) {
@@ -218,9 +220,10 @@ class DevisRepository {
     DateTime? date,
   }) async {
     if (avecFacture) await _factures.verifierProfil();
+    // Avant la transaction : un refus (devis expiré...) ne doit pas annuler le passage en « Expiré ».
+    await actualiserExpirations(maintenant: date);
 
     final DevisFiche converti = await _db.transaction(() async {
-      await actualiserExpirations(maintenant: date);
       final DevisFiche devis = await _devis(devisId);
       if (devis.venteId != null) throw const DonneeInvalide('Ce devis a déjà été converti en commande.');
       if (devis.statut == StatutDevis.expire) {

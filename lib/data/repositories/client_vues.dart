@@ -89,6 +89,7 @@ class PaiementClient {
 class InscriptionClient {
   const InscriptionClient({
     required this.inscriptionId,
+    required this.coursId,
     required this.titreCours,
     required this.debutCours,
     required this.statut,
@@ -96,6 +97,7 @@ class InscriptionClient {
   });
 
   final int inscriptionId;
+  final int coursId;
   final String titreCours;
   final DateTime debutCours;
   final StatutInscription statut;

@@ -202,6 +202,7 @@ class ClientRepository {
         for (final TypedResult ligne in lignesInscriptions)
           InscriptionClient(
             inscriptionId: ligne.readTable(_db.inscriptionsCours).id,
+            coursId: ligne.readTable(_db.cours).id,
             titreCours: ligne.readTable(_db.cours).titre,
             debutCours: ligne.readTable(_db.cours).debutLe,
             statut: ligne.readTable(_db.inscriptionsCours).statut,

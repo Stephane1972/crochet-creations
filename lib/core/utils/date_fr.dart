@@ -42,3 +42,8 @@ String formatDateCourte(DateTime date) {
   String deux(int n) => n.toString().padLeft(2, '0');
   return '${deux(date.day)}/${deux(date.month)}/${date.year}';
 }
+
+/// « 14 h 30 », « 9 h 00 ».
+String formatHeure(DateTime date) {
+  return '${date.hour} h ${date.minute.toString().padLeft(2, '0')}';
+}

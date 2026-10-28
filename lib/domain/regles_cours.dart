@@ -94,3 +94,10 @@ String? refusConfirmation({
 
 /// Une inscription déjà annulée ne s'annule pas une seconde fois.
 bool peutAnnulerInscription(StatutInscription statut) => statut != StatutInscription.annulee;
+
+/// Pourquoi on ne peut pas archiver ce cours ; `null` si c'est possible. Seul un cours terminé ou annulé s'archive :
+/// un cours à venir reste visible dans la liste.
+String? refusArchivage({required StatutCours statut, required bool termine}) {
+  if (statut == StatutCours.annule || termine) return null;
+  return 'Seul un cours terminé ou annulé peut être archivé.';
+}

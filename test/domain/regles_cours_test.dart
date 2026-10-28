@@ -153,4 +153,18 @@ void main() {
     expect(peutAnnulerInscription(StatutInscription.listeAttente), isTrue);
     expect(peutAnnulerInscription(StatutInscription.annulee), isFalse);
   });
+
+  group('refusArchivage', () {
+    test('un cours terminé ou annulé peut être archivé', () {
+      expect(refusArchivage(statut: StatutCours.planifie, termine: true), isNull);
+      expect(refusArchivage(statut: StatutCours.annule, termine: false), isNull);
+    });
+
+    test('un cours à venir et maintenu ne s’archive pas', () {
+      expect(
+        refusArchivage(statut: StatutCours.planifie, termine: false),
+        'Seul un cours terminé ou annulé peut être archivé.',
+      );
+    });
+  });
 }

@@ -2,7 +2,7 @@ import '../enums.dart';
 import '../erreurs.dart';
 import 'totaux.dart';
 
-/// Une ligne du panier : un produit (éventuellement une variante) ou une prestation libre.
+/// Une ligne du panier : un produit (éventuellement une variante), une prestation libre ou l'inscription à un cours.
 ///
 /// Désignation et prix sont ceux affichés à l'utilisatrice au moment de l'ajout : ils sont
 /// recopiés dans la vente à la validation (modifier le catalogue ensuite ne change rien).
@@ -14,6 +14,7 @@ class LignePanier {
     required this.quantite,
     this.produitId,
     this.varianteId,
+    this.coursId,
     this.description,
     this.nature = NatureLigne.bien,
     this.stockDisponible,
@@ -23,6 +24,9 @@ class LignePanier {
   final int idLigne;
   final int? produitId;
   final int? varianteId;
+
+  /// Cours auquel cette ligne inscrit quelqu'un (c'est alors une prestation, jamais un produit).
+  final int? coursId;
   final String designation;
   final String? description;
   final NatureLigne nature;
@@ -38,6 +42,8 @@ class LignePanier {
 
   bool get estUnProduit => produitId != null;
 
+  bool get estUnCours => coursId != null;
+
   LignePanier avecQuantite(int nouvelleQuantite) => _copie(nouvelleQuantite, stockDisponible);
 
   /// Même ligne avec un stock disponible à jour (`null` = plus de limite).
@@ -50,6 +56,7 @@ class LignePanier {
     quantite: nouvelleQuantite,
     produitId: produitId,
     varianteId: varianteId,
+    coursId: coursId,
     description: description,
     nature: nature,
     stockDisponible: stock,
@@ -98,6 +105,7 @@ class Panier {
   Panier ajouter({
     int? produitId,
     int? varianteId,
+    int? coursId,
     required String designation,
     String? description,
     NatureLigne nature = NatureLigne.bien,
@@ -114,6 +122,9 @@ class Panier {
     }
     if (produitId == null && varianteId != null) {
       throw const DonneeInvalide('Une variante appartient à un produit.');
+    }
+    if (coursId != null && (produitId != null || nature != NatureLigne.service)) {
+      throw const DonneeInvalide('L’inscription à un cours est toujours une prestation.');
     }
 
     if (produitId != null) {
@@ -139,6 +150,7 @@ class Panier {
         nature: nature,
         produitId: produitId,
         varianteId: varianteId,
+        coursId: coursId,
         prixUnitaireCentimes: prixUnitaireCentimes,
         quantite: quantite,
         stockDisponible: stockDisponible,
@@ -179,6 +191,9 @@ class Panier {
     if (index < 0) throw const DonneeInvalide('Cette ligne n’existe plus.');
     if (lignes[index].estUnProduit) {
       throw const DonneeInvalide('Un produit du catalogue ne se modifie pas ici : changez sa quantité.');
+    }
+    if (lignes[index].estUnCours) {
+      throw const DonneeInvalide('L’inscription à un cours ne se modifie pas ici.');
     }
     final String nom = designation.trim();
     if (nom.isEmpty) throw const DonneeInvalide('Indiquez le nom de l’article.');

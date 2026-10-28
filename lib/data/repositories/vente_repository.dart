@@ -104,6 +104,7 @@ class VenteRepository {
                 nature: Value(ligne.nature),
                 produitId: Value(ligne.produitId),
                 varianteId: Value(ligne.varianteId),
+                coursId: Value(ligne.coursId),
                 description: Value(ligne.description),
                 coutUnitaireCentimes: Value(couts[ligne.idLigne] ?? 0),
               ),

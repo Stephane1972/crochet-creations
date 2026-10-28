@@ -13,17 +13,8 @@ import '../../domain/enums.dart';
 import '../../domain/erreurs.dart';
 import 'panier_provider.dart';
 import 'recap_widgets.dart';
+import 'saisie_paiement.dart';
 import 'selecteur_client.dart';
-
-/// Comment la vente est réglée au moment de la validation.
-enum FormulePaiement {
-  tout('Payée'),
-  acompte('Acompte'),
-  plusTard('Plus tard');
-
-  const FormulePaiement(this.libelle);
-  final String libelle;
-}
 
 /// Panier et récapitulatif (écran 9) : articles et quantités, remise, frais de port, paiement,
 /// puis validation de la vente.
@@ -38,11 +29,9 @@ class _PanierScreenState extends ConsumerState<PanierScreen> {
   final GlobalKey<FormState> _formulaire = GlobalKey<FormState>();
   final TextEditingController _remise = TextEditingController();
   final TextEditingController _frais = TextEditingController();
-  final TextEditingController _acompte = TextEditingController();
   final TextEditingController _notes = TextEditingController();
+  final GlobalKey<SaisiePaiementState> _paiementCle = GlobalKey<SaisiePaiementState>();
 
-  FormulePaiement _formule = FormulePaiement.tout;
-  ModePaiement _mode = ModePaiement.especes;
   bool _enCours = false;
 
   /// La vente est enregistrée et le panier vidé : en attendant que la confirmation s'affiche,
@@ -66,7 +55,6 @@ class _PanierScreenState extends ConsumerState<PanierScreen> {
   void dispose() {
     _remise.dispose();
     _frais.dispose();
-    _acompte.dispose();
     _notes.dispose();
     super.dispose();
   }
@@ -102,28 +90,11 @@ class _PanierScreenState extends ConsumerState<PanierScreen> {
     if (centimes != null) _essayer(() => _actions.definirFraisPort(centimes));
   }
 
-  /// Le paiement à enregistrer ; `null` = vente à payer plus tard. Lance [DonneeInvalide] si l'acompte est incorrect.
-  PaiementSaisi? _paiement(int totalCentimes) {
-    if (totalCentimes <= 0) return null;
-    switch (_formule) {
-      case FormulePaiement.tout:
-        return PaiementSaisi(mode: _mode, montantCentimes: totalCentimes);
-      case FormulePaiement.acompte:
-        final int? montant = parseMontantEuros(_acompte.text);
-        if (montant == null || montant <= 0) {
-          throw const DonneeInvalide('Indiquez le montant de l’acompte.');
-        }
-        return PaiementSaisi(mode: _mode, montantCentimes: montant);
-      case FormulePaiement.plusTard:
-        return null;
-    }
-  }
-
   /// Totaux et paiement de la vente ; `null` (avec un message) si quelque chose est incorrect.
   ({TotauxDocument totaux, PaiementSaisi? paiement})? _preparer(VenteEnCours vente) {
     try {
       final TotauxDocument totaux = vente.panier.totaux;
-      return (totaux: totaux, paiement: _paiement(totaux.totalCentimes));
+      return (totaux: totaux, paiement: _paiementCle.currentState!.paiement(totaux.totalCentimes));
     } on ErreurMetier catch (erreur) {
       afficherMessage(context, erreur.message);
       return null;
@@ -259,56 +230,7 @@ class _PanierScreenState extends ConsumerState<PanierScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          CarteRubrique(
-            titre: 'Paiement',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                SegmentedButton<FormulePaiement>(
-                  segments: <ButtonSegment<FormulePaiement>>[
-                    for (final FormulePaiement f in FormulePaiement.values)
-                      ButtonSegment<FormulePaiement>(value: f, label: Text(f.libelle)),
-                  ],
-                  selected: <FormulePaiement>{_formule},
-                  showSelectedIcon: false,
-                  onSelectionChanged: (Set<FormulePaiement> choix) => setState(() => _formule = choix.first),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  switch (_formule) {
-                    FormulePaiement.tout => 'La vente est réglée en totalité maintenant.',
-                    FormulePaiement.acompte => 'Une partie est réglée maintenant, le solde sera encaissé plus tard.',
-                    FormulePaiement.plusTard => 'Rien n’est encaissé : la vente reste impayée jusqu’au règlement.',
-                  },
-                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                ),
-                if (_formule != FormulePaiement.plusTard) ...<Widget>[
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<ModePaiement>(
-                    initialValue: _mode,
-                    isExpanded: true,
-                    decoration: const InputDecoration(labelText: 'Mode de paiement'),
-                    items: <DropdownMenuItem<ModePaiement>>[
-                      for (final ModePaiement m in ModePaiement.values)
-                        DropdownMenuItem<ModePaiement>(value: m, child: Text(m.libelle)),
-                    ],
-                    onChanged: (ModePaiement? valeur) {
-                      if (valeur != null) setState(() => _mode = valeur);
-                    },
-                  ),
-                ],
-                if (_formule == FormulePaiement.acompte) ...<Widget>[
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _acompte,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(labelText: 'Montant de l’acompte (€)'),
-                    validator: (String? v) => validerMontantObligatoire(v, 'Indiquez le montant de l’acompte.'),
-                  ),
-                ],
-              ],
-            ),
-          ),
+          SaisiePaiement(key: _paiementCle),
           const SizedBox(height: 12),
           TextFormField(
             controller: _notes,

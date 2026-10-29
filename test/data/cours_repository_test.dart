@@ -297,7 +297,8 @@ void main() {
         'Ce cours est annulé : on ne peut plus y inscrire personne.',
       );
       await cours.retablirCours(c.id);
-      await cours.archiver(c.id);
+      // Un cours n'est archivable qu'une fois terminé (ou annulé) : on se place après sa fin.
+      await cours.archiver(c.id, maintenant: c.debutLe.add(const Duration(days: 1)));
       expect(
         await message(() async => cours.inscrire(coursId: c.id, clientId: await unClient())),
         'Ce cours est archivé : restaurez-le pour y inscrire quelqu’un.',

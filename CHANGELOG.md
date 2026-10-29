@@ -6,7 +6,64 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
 
 ## [Non publié]
 
-## [0.7.0] — Étape 7 : devis (en attente de validation)
+## [0.8.0] — Étape 8 : cours et inscriptions (en attente de validation)
+
+### Ajouté
+- **Règles des cours** (`domain/regles_cours.dart`, sans base ni interface) : fin et fin de cours, places restantes,
+  statut d'une nouvelle inscription (confirmée ou liste d'attente), ordre de la liste d'attente, contrôle d'un cours
+  (titre, durée, prix, places), refus d'inscription (cours annulé ou archivé), refus de confirmation (pas en attente,
+  cours complet, pas la première personne), annulation d'une inscription, archivage (cours terminé ou annulé).
+- **`CoursRepository`** : créer, modifier, annuler / rétablir, archiver / restaurer un cours ; **inscrire**
+  (place libre : inscription confirmée **et vente** ; cours complet : liste d'attente sans vente), **confirmer** la
+  première personne en attente, **annuler une inscription** (avec ou sans remboursement), lister (« À venir »,
+  « Passés », « Archivés ») et consulter la fiche d'un cours en direct (`CoursResume`, `CoursDetail`,
+  `InscriptionDetail` : client, vente, net encaissé, facture, rang d'attente).
+- **Ligne de vente « cours »** : `Panier.ajouter(coursId: …)` (toujours une prestation, jamais un produit, non
+  modifiable depuis le panier) ; `VenteRepository.valider` enregistre `lignes_vente.cours_id`.
+- **Écrans** : liste des cours (16), fiche du cours (17), inscription et confirmation (18), formulaire de création /
+  modification (photo, date et heure, durée, lieu, prix, places, niveau, matériel inclus). Menu de la fiche : modifier,
+  annuler / rétablir le cours, archiver / restaurer.
+- `SaisiePaiement` : la rubrique « Paiement » (payée, acompte, plus tard, mode) du panier est devenue un composant
+  réutilisé par l'inscription à un cours.
+- `formatHeure` (« 14 h 30 », « 9 h 05 ») dans `core/utils/date_fr.dart`.
+- Tests : règles (`regles_cours_test`), panier (`panier_test`, lignes de cours), dépôt (`cours_repository_test`) et
+  scénarios d'écran (`cours_ecrans_test`).
+
+### Modifié
+- *Plus → Cours* ouvre la vraie liste ; l'écran « Bientôt disponible » des cours disparaît. L'historique d'un client
+  ouvre la fiche du cours.
+- Le choix du client peut exiger une fiche (`autoriserAucun: false`) : pas de « client de passage » pour une
+  inscription.
+- Le texte des réglages indique « étape 8 sur 12 ».
+
+### Décisions prises avec Stéphane
+- **Une facture par inscrit**, pas de reçu à part : l'inscription crée une vente, et le bouton « Créer la facture » de
+  la vente sert de facture ou de reçu.
+- **Liste d'attente manuelle** : bouton « Confirmer » sur la première personne en attente, aucune promotion
+  automatique.
+- **Annulation d'une inscription payée** : le choix est fait **à chaque fois** entre « Annuler et rembourser » et
+  « Annuler en gardant le paiement ».
+- **Cours annulé** : gestion **inscrit par inscrit** (le cours passe à « Annulé », les inscriptions restent affichées,
+  on les annule et rembourse une à une).
+
+### Limites connues et hypothèses
+- Le **prix d'une inscription** est celui du cours par défaut, modifiable pour une personne ; il est enregistré avec
+  l'inscription (modifier le cours ne le change plus).
+- **Une inscription par client et par cours** (clé unique en base). Après une annulation, la même personne peut se
+  réinscrire : la ligne est réutilisée avec une nouvelle vente.
+- Une personne en **liste d'attente n'a pas de vente** : le mode de paiement se choisit à la confirmation. Seule la
+  première personne peut être confirmée, et seulement si une place est libre.
+- Le cours est vendu comme **prestation** (une ligne « Cours : titre » avec la date, la durée et le lieu), sans effet sur
+  le stock. Un cours à 0 € crée une vente à 0 € considérée comme payée.
+- « **Annuler en gardant le paiement** » ne touche ni à la vente ni aux paiements : le solde éventuel reste dû, et la
+  vente peut être annulée plus tard depuis son écran.
+- Annuler un **cours** ne touche pas aux inscriptions. On peut inscrire des personnes à un cours **déjà passé** (cours
+  rattrapé après coup) ; pas à un cours annulé ou archivé.
+- Un cours **ne se supprime pas** ; seul un cours terminé ou annulé peut être archivé.
+- Le nombre de places ne peut pas descendre sous celui des personnes confirmées.
+- Le schéma de la base n'a pas changé : pas de migration.
+
+## [0.7.0] — Étape 7 : devis (validée)
 
 ### Ajouté
 - **Règles des devis** (`domain/regles_devis.dart`, sans base ni interface) : validité par défaut (30 jours), statut

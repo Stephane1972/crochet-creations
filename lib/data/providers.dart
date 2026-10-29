@@ -8,6 +8,7 @@ import 'pdf/devis_pdf.dart';
 import 'pdf/facture_pdf.dart';
 import 'pdf/ressources_pdf.dart';
 import 'repositories/client_repository.dart';
+import 'repositories/cours_repository.dart';
 import 'repositories/devis_repository.dart';
 import 'repositories/facture_repository.dart';
 import 'repositories/numerotation_repository.dart';
@@ -119,4 +120,8 @@ final devisRepositoryProvider = Provider<DevisRepository>(
     ref.watch(stockageDevisProvider),
     ref.watch(generateurDevisPdfProvider),
   ),
+);
+
+final coursRepositoryProvider = Provider<CoursRepository>(
+  (ref) => CoursRepository(ref.watch(appDatabaseProvider), ref.watch(venteRepositoryProvider)),
 );

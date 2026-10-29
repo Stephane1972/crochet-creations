@@ -4,6 +4,10 @@ import '../../core/router/app_routes.dart';
 import '../clients/client_fiche_screen.dart';
 import '../clients/client_form_screen.dart';
 import '../common/placeholder_screen.dart';
+import '../cours/cours_fiche_screen.dart';
+import '../cours/cours_form_screen.dart';
+import '../cours/cours_inscription_screen.dart';
+import '../cours/cours_screen.dart';
 import '../devis/devis_conversion_screen.dart';
 import '../devis/devis_detail_screen.dart';
 import '../devis/devis_form_screen.dart';
@@ -64,6 +68,33 @@ abstract final class AppRouter {
         return _page(
           settings,
           idDevisConv == null ? const _PageIntrouvable() : DevisConversionScreen(devisId: idDevisConv),
+        );
+      case AppRoutes.cours:
+        return _page(settings, const CoursScreen());
+      case AppRoutes.coursNouveau:
+        return _page(settings, const CoursFormScreen());
+      case AppRoutes.coursFiche:
+        final int? idCours = _identifiant(settings);
+        return _page(
+          settings,
+          idCours == null ? const _PageIntrouvable() : CoursFicheScreen(coursId: idCours),
+        );
+      case AppRoutes.coursModifier:
+        final int? idCoursModif = _identifiant(settings);
+        return _page(
+          settings,
+          idCoursModif == null ? const _PageIntrouvable() : CoursFormScreen(coursId: idCoursModif),
+        );
+      case AppRoutes.coursInscription:
+        final Object? argumentsInscription = settings.arguments;
+        return _page(
+          settings,
+          argumentsInscription is ArgumentsInscription
+              ? CoursInscriptionScreen(
+                  coursId: argumentsInscription.coursId,
+                  inscriptionId: argumentsInscription.inscriptionId,
+                )
+              : const _PageIntrouvable(),
         );
       case AppRoutes.produitNouveau:
         return _page(settings, const ProduitFormScreen());

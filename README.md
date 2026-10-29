@@ -22,12 +22,41 @@ Le développement se fait en 12 étapes validées une par une (détail dans [ROA
 | 4 | Clients | terminée et validée |
 | 5 | Ventes et panier | terminée et validée |
 | 6 | Factures PDF et « Mon entreprise » | terminée et validée |
-| 7 | Devis : lignes libres, validité, acompte, statuts, conversion en facture | **à valider** (PR #7) |
-| 8 | Cours et inscriptions | à venir |
+| 7 | Devis : lignes libres, validité, acompte, statuts, conversion en facture | terminée et validée |
+| 8 | Cours et inscriptions : places, liste d'attente, paiement, facture par inscrit | **à valider** (PR #8) |
 | 9 | Dépenses | à venir |
 | 10 | Statistiques | à venir |
 | 11 | Sauvegarde / export | à venir |
 | 12 | Tests, corrections, optimisation de l'interface | à venir |
+
+### Ce que contient l'étape 8 : cours et inscriptions
+
+- **Liste des cours** (écran 16, *Plus → Cours*) : « À venir » (du plus proche au plus lointain), « Passés » et
+  « Archivés ». Chaque ligne montre la photo, le titre, la date et l'heure, **« 3 / 6 places »** (ou **« Complet »**),
+  le nombre de personnes **en attente**, le prix et l'étiquette « Annulé » le cas échéant.
+- **Créer / modifier un cours** : titre, description, **date et heure**, **durée**, lieu, **prix par personne** (0 = gratuit),
+  **nombre de places**, niveau (débutant, intermédiaire, avancé, tous niveaux), **matériel inclus ou non** et une photo.
+  On ne peut pas descendre le nombre de places sous celui des personnes déjà confirmées ; modifier le prix ne change
+  pas celui des personnes déjà inscrites.
+- **Fiche du cours** (écran 17) : les informations, puis **« Inscrits »** avec l'état du paiement de chacun (Payé,
+  Acompte versé avec le reste à payer, À payer, Remboursé), la **« Liste d'attente »** (numérotée) et les
+  **« Inscriptions annulées »**. Un appui sur une personne ouvre ses actions : **voir la vente et la facture**,
+  **confirmer** (liste d'attente) ou **annuler l'inscription**.
+- **Inscrire quelqu'un** (écran 18) : on choisit le client (une fiche est obligatoire), on peut **changer le prix pour
+  cette personne**, puis on règle comme pour une vente : **payée**, **acompte** ou **plus tard**, avec le mode de paiement.
+  L'inscription crée une **vente** d'une ligne « Cours : titre » (sans effet sur le stock) : la facture se crée ensuite
+  avec le bouton habituel « Créer la facture » de la vente. Un cours gratuit n'encaisse rien.
+- **Liste d'attente manuelle** : quand le cours est complet, la personne passe en liste d'attente, **sans vente ni
+  paiement**. Quand une place se libère, rien n'est automatique : on **confirme la première personne** de la liste
+  (le paiement se règle à ce moment-là). Seule la première peut être confirmée, et seulement si une place est libre.
+- **Annuler une inscription** : si de l'argent a déjà été reçu, l'application demande **à chaque fois** :
+  **« Annuler et rembourser »** (la vente est annulée et le paiement remboursé) ou **« Annuler en gardant le
+  paiement »** (la vente et l'argent restent tels quels ; le solde éventuel reste dû, la vente peut être annulée plus
+  tard depuis son écran). Sans argent reçu, la vente de la personne est simplement annulée.
+- **Annuler un cours** : plus personne ne peut s'y inscrire, mais les **inscriptions restent affichées** : on les
+  annule **une par une** (avec ou sans remboursement). **« Rétablir le cours »** le rouvre. Un cours **ne se
+  supprime pas** : un cours terminé ou annulé peut être **archivé** (et restauré).
+- Dans la fiche d'un client, l'historique des cours ouvre la fiche du cours.
 
 ### Ce que contient l'étape 7 : devis
 

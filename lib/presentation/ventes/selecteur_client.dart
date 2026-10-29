@@ -39,12 +39,16 @@ class LigneChoixClient extends StatelessWidget {
     required this.onChoisi,
     this.titreAucun = 'Client de passage',
     this.sousTitreAucun = 'Vente rapide, sans fiche client',
+    this.autoriserAucun = true,
   });
 
   final Client? client;
   final void Function(Client? client) onChoisi;
   final String titreAucun;
   final String sousTitreAucun;
+
+  /// Faux quand un client est obligatoire (inscription à un cours) : la feuille ne propose alors que des fiches.
+  final bool autoriserAucun;
 
   @override
   Widget build(BuildContext context) {
@@ -78,6 +82,7 @@ class LigneChoixClient extends StatelessWidget {
               clientActuel: choisi,
               titreAucun: titreAucun,
               sousTitreAucun: sousTitreAucun,
+              autoriserAucun: autoriserAucun,
             ),
           );
           if (choix != null && context.mounted) onChoisi(choix.client);
@@ -94,9 +99,13 @@ class FeuilleChoixClient extends ConsumerStatefulWidget {
     this.clientActuel,
     this.titreAucun = 'Client de passage',
     this.sousTitreAucun = 'Vente rapide, sans fiche client',
+    this.autoriserAucun = true,
   });
 
   final Client? clientActuel;
+
+  /// Afficher la première ligne « personne » (client de passage, aucun client) ?
+  final bool autoriserAucun;
 
   /// Première ligne de la liste : choisir « personne » (client de passage, ou devis sans client).
   final String titreAucun;
@@ -130,15 +139,17 @@ class _FeuilleChoixClientState extends ConsumerState<FeuilleChoixClient> {
                 ),
               ),
             ),
-            ListTile(
-              leading: const CircleAvatar(child: Icon(Icons.person_outline)),
-              title: Text(widget.titreAucun),
-              subtitle: Text(widget.sousTitreAucun),
-              selected: widget.clientActuel == null,
-              trailing: widget.clientActuel == null ? const Icon(Icons.check) : null,
-              onTap: () => Navigator.of(context).pop(const ChoixClient(null)),
-            ),
-            const Divider(height: 1),
+            if (widget.autoriserAucun) ...<Widget>[
+              ListTile(
+                leading: const CircleAvatar(child: Icon(Icons.person_outline)),
+                title: Text(widget.titreAucun),
+                subtitle: Text(widget.sousTitreAucun),
+                selected: widget.clientActuel == null,
+                trailing: widget.clientActuel == null ? const Icon(Icons.check) : null,
+                onTap: () => Navigator.of(context).pop(const ChoixClient(null)),
+              ),
+              const Divider(height: 1),
+            ],
             Expanded(
               child: clients.when(
                 loading: () => const Center(child: CircularProgressIndicator()),

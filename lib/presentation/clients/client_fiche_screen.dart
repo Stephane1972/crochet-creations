@@ -421,6 +421,7 @@ class _CarteHistorique extends ConsumerWidget {
                 titre: i.titreCours,
                 detail: '${formatDateCourte(i.debutCours)} · ${i.statut.libelle}',
                 montant: formatEuros(i.prixCentimes),
+                onTap: () => Navigator.of(context).pushNamed(AppRoutes.coursFiche, arguments: i.coursId),
               ),
             ),
           ],

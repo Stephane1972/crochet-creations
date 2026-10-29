@@ -305,6 +305,63 @@ void main() {
     });
   });
 
+  group('ligne de cours', () {
+    Panier inscription() => const Panier().ajouter(
+      coursId: 7,
+      designation: 'Cours : Initiation',
+      nature: NatureLigne.service,
+      prixUnitaireCentimes: 4500,
+    );
+
+    test('une inscription est une prestation liée au cours, sans stock', () {
+      final Panier panier = inscription();
+      final LignePanier ligne = panier.lignes.single;
+      expect(ligne.coursId, 7);
+      expect(ligne.estUnCours, isTrue);
+      expect(ligne.estUnProduit, isFalse);
+      expect(ligne.stockDisponible, isNull);
+      expect(panier.totaux.totalCentimes, 4500);
+    });
+
+    test('le lien avec le cours survit à un changement de quantité', () {
+      final Panier panier = inscription();
+      final Panier change = panier.avecQuantite(panier.lignes.single.idLigne, 2);
+      expect(change.lignes.single.coursId, 7);
+      expect(change.totaux.totalCentimes, 9000);
+    });
+
+    test('refuse un cours qui serait un objet ou un produit du catalogue', () {
+      expect(
+        () => const Panier().ajouter(coursId: 7, designation: 'Cours', prixUnitaireCentimes: 100),
+        throwsA(isA<DonneeInvalide>()),
+      );
+      expect(
+        () => const Panier().ajouter(
+          coursId: 7,
+          produitId: 1,
+          designation: 'Cours',
+          nature: NatureLigne.service,
+          prixUnitaireCentimes: 100,
+        ),
+        throwsA(isA<DonneeInvalide>()),
+      );
+    });
+
+    test('ne se modifie pas comme une ligne libre', () {
+      final Panier panier = inscription();
+      expect(
+        () => panier.avecLigneModifiee(
+          panier.lignes.single.idLigne,
+          designation: 'Autre',
+          nature: NatureLigne.service,
+          prixUnitaireCentimes: 100,
+          quantite: 1,
+        ),
+        throwsA(isA<DonneeInvalide>()),
+      );
+    });
+  });
+
   group('PaiementSaisi', () {
     test('accepte un montant entre 1 centime et le total', () {
       const PaiementSaisi(mode: ModePaiement.carte, montantCentimes: 1).verifier(5000);

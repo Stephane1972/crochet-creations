@@ -156,6 +156,9 @@ class _CoursInscriptionScreenState extends ConsumerState<CoursInscriptionScreen>
       },
       child: Scaffold(
         appBar: AppBar(title: Text(titre)),
+        // La barre est en bas du Scaffold (et non dans le corps) : les messages s'affichent au-dessus d'elle au lieu
+        // de recouvrir le bouton.
+        bottomNavigationBar: _barre(context, fiche.valueOrNull),
         body: fiche.when(
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (Object erreur, StackTrace pile) => const _Message('Impossible de charger ce cours.'),
@@ -163,6 +166,41 @@ class _CoursInscriptionScreenState extends ConsumerState<CoursInscriptionScreen>
             if (detail == null) return const _Message('Ce cours n’existe plus.');
             return _corps(context, detail);
           },
+        ),
+      ),
+    );
+  }
+
+  /// Barre du bas : le bouton qui enregistre l'inscription (ou la confirmation).
+  Widget? _barre(BuildContext context, CoursDetail? detail) {
+    if (detail == null) return null;
+    final InscriptionDetail? attente = _confirmation ? _personneEnAttente(detail) : null;
+    if (_confirmation && attente == null) return null;
+
+    final String? refus = attente != null ? detail.refusConfirmationDe(attente) : detail.refusInscriptionCours;
+    final String libelleBouton = _confirmation
+        ? 'Confirmer l’inscription'
+        : detail.complet
+        ? 'Mettre en liste d’attente'
+        : 'Inscrire';
+
+    return Material(
+      elevation: 6,
+      color: Theme.of(context).colorScheme.surface,
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+          child: SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: (_enCours || refus != null) ? null : () => _enregistrer(detail, attente),
+              icon: _enCours
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.check),
+              label: Text(libelleBouton),
+            ),
+          ),
         ),
       ),
     );
@@ -187,122 +225,90 @@ class _CoursInscriptionScreenState extends ConsumerState<CoursInscriptionScreen>
     final ThemeData theme = Theme.of(context);
     final Color discret = theme.colorScheme.onSurfaceVariant;
 
-    final String libelleBouton = _confirmation
-        ? 'Confirmer l’inscription'
-        : listeAttente
-        ? 'Mettre en liste d’attente'
-        : 'Inscrire';
-
     return Form(
       key: _formulaire,
       onChanged: () {
         if (!_modifie) setState(() => _modifie = true);
       },
       autovalidateMode: AutovalidateMode.onUserInteraction,
-      child: Column(
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: <Widget>[
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-              children: <Widget>[
-                _EnTeteCours(detail: detail),
-                const SizedBox(height: 16),
-                if (refus != null) ...<Widget>[
-                  Text(refus, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.error)),
-                  const SizedBox(height: 12),
-                ],
-                if (attente != null)
-                  Card(
-                    margin: EdgeInsets.zero,
-                    child: ListTile(
-                      leading: PastilleClient(client: attente.client, taille: 40),
-                      title: Text(libelleClient(attente.client)),
-                      subtitle: Text('Sur la liste d’attente · n° ${attente.rangAttente ?? 1}'),
-                    ),
-                  )
-                else
-                  LigneChoixClient(
-                    client: _client,
-                    autoriserAucun: false,
-                    titreAucun: 'Choisir la personne à inscrire',
-                    sousTitreAucun: 'Appuyez pour ouvrir la liste des clients',
-                    onChoisi: (Client? choisi) => setState(() {
-                      _client = choisi;
-                      _modifie = true;
-                    }),
-                  ),
-                const SizedBox(height: 16),
-                if (attente != null)
-                  CarteRubrique(
-                    titre: 'Prix convenu',
-                    child: Text(
-                      attente.inscription.prixCentimes == 0
-                          ? 'Gratuit'
-                          : formatEuros(attente.inscription.prixCentimes),
-                      style: theme.textTheme.titleMedium,
-                    ),
-                  )
-                else
-                  TextFormField(
-                    controller: _prix,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    onChanged: (String _) => setState(() => _modifie = true),
-                    decoration: InputDecoration(
-                      labelText: 'Prix pour cette personne (€)',
-                      helperText: 'Prix du cours : ${formatEuros(detail.cours.prixCentimes)}. Modifiable pour cette personne.',
-                      helperMaxLines: 2,
-                    ),
-                    validator: (String? v) => validerMontantObligatoire(v, 'Indiquez le prix (0 si c’est gratuit).'),
-                  ),
-                const SizedBox(height: 16),
-                if (_paiementAffiche(detail, prix))
-                  SaisiePaiement(
-                    key: _paiementCle,
-                    phraseTout: 'L’inscription est réglée en totalité maintenant.',
-                    phrasePlusTard: 'Rien n’est encaissé : l’inscription reste impayée jusqu’au règlement.',
-                  )
-                else
-                  Text(
-                    listeAttente
-                        ? 'Le cours est complet : la personne passe en liste d’attente, sans paiement pour le moment. '
-                              'Vous la confirmerez quand une place se libérera.'
-                        : 'Ce cours est gratuit pour cette personne : rien à encaisser.',
-                    style: theme.textTheme.bodyMedium?.copyWith(color: discret),
-                  ),
-                if (!_confirmation) ...<Widget>[
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _notes,
-                    minLines: 2,
-                    maxLines: 4,
-                    textCapitalization: TextCapitalization.sentences,
-                    decoration: const InputDecoration(labelText: 'Notes (facultatif)'),
-                    validator: (String? v) => validerLongueurMax(v, 1000, 'La note'),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          Material(
-            elevation: 6,
-            color: theme.colorScheme.surface,
-            child: SafeArea(
-              top: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: (_enCours || refus != null) ? null : () => _enregistrer(detail, attente),
-                    icon: _enCours
-                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Icon(Icons.check),
-                    label: Text(libelleBouton),
-                  ),
-                ),
+          _EnTeteCours(detail: detail),
+          const SizedBox(height: 16),
+          if (refus != null) ...<Widget>[
+            Text(refus, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.error)),
+            const SizedBox(height: 12),
+          ],
+          if (attente != null)
+            Card(
+              margin: EdgeInsets.zero,
+              child: ListTile(
+                leading: PastilleClient(client: attente.client, taille: 40),
+                title: Text(libelleClient(attente.client)),
+                subtitle: Text('Sur la liste d’attente · n° ${attente.rangAttente ?? 1}'),
               ),
+            )
+          else
+            LigneChoixClient(
+              client: _client,
+              autoriserAucun: false,
+              titreAucun: 'Choisir la personne à inscrire',
+              sousTitreAucun: 'Appuyez pour ouvrir la liste des clients',
+              onChoisi: (Client? choisi) => setState(() {
+                _client = choisi;
+                _modifie = true;
+              }),
             ),
-          ),
+          const SizedBox(height: 16),
+          if (attente != null)
+            CarteRubrique(
+              titre: 'Prix convenu',
+              child: Text(
+                attente.inscription.prixCentimes == 0
+                    ? 'Gratuit'
+                    : formatEuros(attente.inscription.prixCentimes),
+                style: theme.textTheme.titleMedium,
+              ),
+            )
+          else
+            TextFormField(
+              controller: _prix,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              onChanged: (String _) => setState(() => _modifie = true),
+              decoration: InputDecoration(
+                labelText: 'Prix pour cette personne (€)',
+                helperText: 'Prix du cours : ${formatEuros(detail.cours.prixCentimes)}. Modifiable pour cette personne.',
+                helperMaxLines: 2,
+              ),
+              validator: (String? v) => validerMontantObligatoire(v, 'Indiquez le prix (0 si c’est gratuit).'),
+            ),
+          const SizedBox(height: 16),
+          if (_paiementAffiche(detail, prix))
+            SaisiePaiement(
+              key: _paiementCle,
+              phraseTout: 'L’inscription est réglée en totalité maintenant.',
+              phrasePlusTard: 'Rien n’est encaissé : l’inscription reste impayée jusqu’au règlement.',
+            )
+          else
+            Text(
+              listeAttente
+                  ? 'Le cours est complet : la personne passe en liste d’attente, sans paiement pour le moment. '
+                        'Vous la confirmerez quand une place se libérera.'
+                  : 'Ce cours est gratuit pour cette personne : rien à encaisser.',
+              style: theme.textTheme.bodyMedium?.copyWith(color: discret),
+            ),
+          if (!_confirmation) ...<Widget>[
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _notes,
+              minLines: 2,
+              maxLines: 4,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: const InputDecoration(labelText: 'Notes (facultatif)'),
+              validator: (String? v) => validerLongueurMax(v, 1000, 'La note'),
+            ),
+          ],
         ],
       ),
     );

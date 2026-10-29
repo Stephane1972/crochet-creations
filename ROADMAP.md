@@ -16,7 +16,7 @@ Objectif : gérer toute l'activité sans connexion ni serveur.
 | 5 | Ventes et panier : choix du client, quantités, remise, frais de port, paiement, décrémentation du stock | 8, 9, 10 |
 | 6 | Factures PDF : numérotation `FACT-AAAA-NNNN`, mention art. 293 B, impression, partage ; profil « Mon entreprise » | 11, 12, 22 |
 | 7 | Devis : lignes libres, validité, acompte, statuts, conversion en facture | 13, 14, 15 |
-| 8 | Cours et inscriptions : places, liste d'attente, paiement, reçu | 16, 17, 18 |
+| 8 | Cours et inscriptions : places, liste d'attente, paiement, facture par inscrit | 16, 17, 18 |
 | 9 | Dépenses : catégories, photo du ticket, produit concerné | 19 |
 | 10 | Statistiques et alertes de franchise de TVA (85 000 € biens / 37 500 € services) | 20 |
 | 11 | Sauvegarde automatique, export CSV et JSON, restauration | 23 |
@@ -33,8 +33,9 @@ Hypothèse à confirmer : le profil « Mon entreprise » (écran 22) est constru
 - [x] Étape 4 : terminée et validée (PR #4)
 - [x] Étape 5 : terminée et validée (PR #5)
 - [x] Étape 6 : terminée et validée (PR #6)
-- [x] Étape 7 : terminée, **en attente de validation** (PR #7)
-- [ ] Étapes 8 à 12
+- [x] Étape 7 : terminée et validée (PR #7)
+- [x] Étape 8 : terminée, **en attente de validation** (PR #8)
+- [ ] Étapes 9 à 12
 
 ## Version 2 : confort et échanges (propositions, non engagées)
 

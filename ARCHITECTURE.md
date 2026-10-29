@@ -25,7 +25,7 @@ Règles :
   modèles à toutes les couches. On n'a pas créé de seconde série de classes « métier » identiques : ce serait du
   code en double à maintenir. La couche `domain` contient les règles et les listes de choix, pas les entités.
 
-## Arborescence (étape 7)
+## Arborescence (étape 8)
 
 ```
 crochet-creations/
@@ -58,6 +58,7 @@ crochet-creations/
 │   │   ├── regles_client.dart                règles de saisie d'une fiche client (e-mail, téléphone, code postal, SIRET)
 │   │   ├── regles_entreprise.dart            SIREN, IBAN, informations manquantes pour facturer, textes par défaut
 │   │   ├── regles_devis.dart                 validité, statut affiché (expiré), transitions de statut, contrôle des dates et de l'acompte
+│   │   ├── regles_cours.dart                 places restantes, liste d'attente, refus d'inscription / de confirmation / d'archivage
 │   │   ├── document_facture.dart             DocumentFacture : tout ce qui s'imprime sur une facture (sans PDF ni base)
 │   │   ├── document_devis.dart               DocumentDevis : tout ce qui s'imprime sur un devis (réutilise les lignes et parties de la facture)
 │   │   └── calculs/
@@ -83,7 +84,9 @@ crochet-creations/
 │   │   │   ├── vente_vues.dart               VenteDetail : vente, lignes, paiements, client, factures, solde dû
 │   │   │   ├── facture_repository.dart       factures : créer (numéro + PDF), annuler, lister, obtenir le PDF
 │   │   │   ├── devis_repository.dart         devis : créer, modifier, statuts, expiration, convertir, PDF
-│   │   │   └── devis_vues.dart               DevisResume, DevisDetail (statut affiché, actions possibles), ResultatConversion
+│   │   │   ├── devis_vues.dart               DevisResume, DevisDetail (statut affiché, actions possibles), ResultatConversion
+│   │   │   ├── cours_repository.dart         cours : créer, modifier, annuler, archiver ; inscrire, confirmer, annuler une inscription
+│   │   │   └── cours_vues.dart               CoursResume, CoursDetail, InscriptionDetail (vente, paiement, facture, rang d'attente)
 │   │   ├── pdf/
 │   │   │   ├── elements_pdf.dart             éléments de mise en page communs aux factures et aux devis (en-tête, totaux, pied de page)
 │   │   │   ├── facture_pdf.dart              mise en page du PDF d'une facture (genererFacturePdf)
@@ -105,6 +108,13 @@ crochet-creations/
 │       │   ├── filtres_clients.dart          recherche + filtres, et fonction de filtrage
 │       │   ├── clients_providers.dart        flux Riverpod (liste, fiche, historique)
 │       │   └── client_widgets.dart           pastille d'initiales, étiquettes, résumé des coordonnées
+│       ├── cours/                            cours (voir « Cours et inscriptions »)
+│       │   ├── cours_screen.dart             liste des cours : à venir, passés, archivés (écran 16)
+│       │   ├── cours_fiche_screen.dart       fiche : inscrits, liste d'attente, actions sur une personne (écran 17)
+│       │   ├── cours_inscription_screen.dart inscription ou confirmation d'une personne en attente (écran 18)
+│       │   ├── cours_form_screen.dart        création / modification d'un cours
+│       │   ├── cours_providers.dart          flux Riverpod (liste par filtre, fiche)
+│       │   └── cours_widgets.dart            photo du cours, créneau, places, étiquettes de statut et de paiement
 │       ├── devis/                            devis (voir « Devis »)
 │       │   ├── devis_screen.dart             liste des devis (écran 13)
 │       │   ├── devis_form_screen.dart        création / modification d'un devis (écran 14)
@@ -138,7 +148,8 @@ crochet-creations/
 │       │   ├── vente_confirmation_screen.dart  confirmation et détail d'une vente : encaisser, annuler (écran 10)
 │       │   ├── panier_provider.dart          vente en cours (panier, client, note), conservée entre les écrans
 │       │   ├── ajout_panier.dart             ajout d'un produit (choix de variante) ou d'une ligne libre (aussi pour les devis)
-│       │   ├── selecteur_client.dart         choix du client ou « client de passage » (aussi pour les devis)
+│       │   ├── selecteur_client.dart         choix du client ou « client de passage » (aussi pour les devis ; fiche obligatoire pour un cours)
+│       │   ├── saisie_paiement.dart          rubrique « Paiement » : payée, acompte, plus tard, mode (panier et inscription)
 │       │   ├── recap_widgets.dart            lignes de montant et cartes de rubrique
 │       │   └── ventes_providers.dart         détail d'une vente en direct
 │       ├── settings/settings_screen.dart     réglages (thème)
@@ -207,7 +218,10 @@ Navigation Flutter standard (`Navigator` + routes nommées), sans bibliothèque 
 - les écrans qui concernent un élément précis reçoivent son identifiant en **argument de route**
   (`Navigator.pushNamed(context, AppRoutes.produitFiche, arguments: produit.id)`) ; `AppRouter` le lit et
   affiche un message d'erreur si l'identifiant manque. Aujourd'hui : `produitFiche`, `produitModifier`,
-  `clientFiche` et `clientModifier` ; `produitNouveau` et `clientNouveau` n'en prennent pas ;
+  `clientFiche`, `clientModifier`, `factureDetail`, `devisDetail`, `devisModifier`, `devisConversion`,
+  `venteConfirmation`, `coursFiche` et `coursModifier` ; `produitNouveau`, `clientNouveau`, `devisNouveau` et
+  `coursNouveau` n'en prennent pas ; `coursInscription` reçoit un `ArgumentsInscription` (cours et, pour confirmer une
+  personne en attente, son inscription) ;
 - « Vendre » et « Ajouter au panier » depuis une fiche produit ramènent à la racine et ouvrent l'onglet Vente
   (`navIndexProvider`) ; cet onglet reste un écran « Bientôt disponible » jusqu'à l'étape 5 ;
 - le bouton « retour » d'Android ramène d'abord à l'accueil avant de quitter l'application ;
@@ -398,7 +412,7 @@ différentes ne se confondent plus (test `test/data/flux_en_direct_test.dart`).
 
 `observerHistorique` relit le tout dès qu'une de ces tables change (même technique que le catalogue :
 `observerTables`, voir « Lecture en direct des tables liées »). La fiche s'ouvre donc déjà à jour quand
-les ventes, factures, devis et cours seront créés dans les étapes suivantes : aucun changement d'écran à prévoir.
+les ventes, factures, devis et cours sont créés : aucun changement d'écran à prévoir.
 
 ## Ventes et panier (étape 5)
 
@@ -540,6 +554,46 @@ statut, partager, imprimer, modifier, convertir), `DevisConversionScreen` (deux 
 fabricant de PDF (`generateurDevisPdfProvider`), l'aperçu et le partage sont remplaçables en test comme pour les
 factures.
 
+## Cours et inscriptions (étape 8)
+
+### Règles (`domain/regles_cours.dart`)
+
+Des fonctions pures, testées sans base : `finDuCours` / `coursTermine`, `placesRestantes` (jamais négatif),
+`statutNouvelleInscription` (place libre → confirmée, sinon liste d'attente), `ordreAttente` / `premierEnAttente`
+(par date d'inscription, puis par identifiant), `verifierCours` (titre, durée d'au moins 1 minute, prix non négatif, au
+moins une place, jamais moins de places que de personnes confirmées), `refusInscription` (cours annulé ou archivé),
+`refusConfirmation` (pas en attente, cours complet, pas la première personne), `peutAnnulerInscription` et
+`refusArchivage` (seul un cours terminé ou annulé s'archive). Chaque refus est une phrase française prête à afficher.
+
+### Le dépôt (`CoursRepository`)
+
+- **Inscrire** : une transaction vérifie le cours et le client, refuse les doublons, puis **s'il reste une place**
+  crée la vente (`_creerVente` : un `Panier` d'une ligne « Cours : titre », nature service, `coursId`, description
+  « Le jj/mm/aaaa à H h MM · durée X · lieu », notes « Inscription au cours « titre » », paiement éventuel, passage par
+  `VenteRepository.valider`) et enregistre l'inscription « confirmée » reliée à la vente. Sinon l'inscription est
+  « liste d'attente », sans vente, et un paiement est refusé. Le prix convenu est enregistré dans l'inscription.
+  Une inscription annulée est réutilisée à la réinscription (clé unique cours + client).
+- **Confirmer** : réservé à la première personne en attente quand une place est libre ; crée la vente au prix convenu
+  et passe l'inscription à « confirmée ».
+- **Annuler une inscription** : `rembourser: true` annule la vente (le net encaissé est remboursé par
+  `VenteRepository.annuler`) ; `rembourser: false` ne touche à rien quand de l'argent a été reçu. Une vente sans
+  encaissement est annulée dans les deux cas. Une place confirmée qui se libère n'est donnée à personne.
+- **Consulter** : `lister` (filtres `FiltreCours`), `detail` (inscrits, liste d'attente numérotée, annulées, avec
+  client, vente, net encaissé et facture), flux en direct par `observerTables`.
+
+### Lien avec les ventes
+
+`lignes_vente.cours_id` (clé étrangère vers `cours`) est renseigné par `Panier`/`VenteRepository.valider` ; la contrainte
+de la base impose qu'une ligne de cours soit une prestation sans produit. Le chiffre d'affaires « prestations » de
+l'étape 10 s'appuiera sur cette nature. La facture d'une inscription se crée depuis sa vente, comme toute facture.
+
+### Écrans
+
+`CoursScreen` (liste, filtres), `CoursFicheScreen` (informations, rubriques de personnes, feuille d'actions, dialogues
+d'annulation à choix), `CoursInscriptionScreen` (inscription ou confirmation, avec `SaisiePaiement`), `CoursFormScreen`
+(création / modification, photo gérée par `PhotosFormulaire`, abandon confirmé). L'écran d'inscription reçoit un
+`ArgumentsInscription` (cours, et inscription à confirmer le cas échéant).
+
 ## Dossier `android/`
 
 Le dossier `android/` n'est pas versionné. `tool/setup_android.sh` le crée avec `flutter create`,
@@ -610,6 +664,12 @@ Devis (étape 7) : `regles_devis_test` (validité, expiration, transitions de st
 numéro, modification, statuts, expiration enregistrée, **conversion devis → facture** avec et sans acompte, profil
 incomplet, PDF), `devis_pdf_test` (une page pour un devis complet, plusieurs pour un long) et `devis_ecrans_test` (liste,
 création, modification, statuts, devis expiré, conversion avec et sans acompte reçu, avec facture, profil incomplet).
+
+Cours (étape 8) : `regles_cours_test` (places, liste d'attente, refus), `panier_test` (lignes de cours),
+`cours_repository_test` (création, modification, inscription avec paiement, prix convenu, cours gratuit, cours complet,
+doublons, tout-ou-rien, confirmation, annulation avec et sans remboursement, réinscription, archivage, liste et fiche
+en direct) et `cours_ecrans_test` (liste et filtres, formulaire, fiche, inscription payée / acompte / plus tard / gratuite,
+liste d'attente, confirmation, annulation avec ou sans remboursement, cours annulé, archivage).
 
 Reste à écrire avec son étape : statistiques (étape 10).
 

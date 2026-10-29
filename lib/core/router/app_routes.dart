@@ -35,8 +35,13 @@ abstract final class AppRoutes {
   static const String devisModifier = '/devis/modifier';
   static const String devisConversion = '/devis/conversion';
 
-  // Cours (étape 8)
+  // Cours (étape 8). La fiche et la modification reçoivent l'identifiant du cours (un entier) dans `arguments` ;
+  // l'inscription et la confirmation reçoivent des `ArgumentsInscription`.
   static const String cours = '/cours';
+  static const String coursNouveau = '/cours/nouveau';
+  static const String coursFiche = '/cours/fiche';
+  static const String coursModifier = '/cours/modifier';
+  static const String coursInscription = '/cours/inscription';
 
   // Dépenses (étape 9)
   static const String depenses = '/depenses';
@@ -48,4 +53,15 @@ abstract final class AppRoutes {
   static const String reglages = '/reglages';
   static const String monEntreprise = '/reglages/entreprise';
   static const String sauvegarde = '/reglages/sauvegarde';
+}
+
+/// Ce que reçoit l'écran d'inscription à un cours : le cours, et (pour confirmer une personne en liste d'attente)
+/// son inscription.
+class ArgumentsInscription {
+  const ArgumentsInscription({required this.coursId, this.inscriptionId});
+
+  final int coursId;
+
+  /// Renseigné : on confirme cette personne en attente. Absent : on inscrit quelqu'un de nouveau.
+  final int? inscriptionId;
 }

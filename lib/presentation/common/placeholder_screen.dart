@@ -21,12 +21,6 @@ class PlaceholderInfo {
 
 /// Écrans prévus mais pas encore développés (voir ROADMAP.md).
 abstract final class EcransAVenir {
-  static const PlaceholderInfo cours = PlaceholderInfo(
-    titre: 'Cours',
-    icone: Icons.school_outlined,
-    etape: 8,
-    description: 'Cours de crochet, inscriptions et liste d’attente.',
-  );
   static const PlaceholderInfo depenses = PlaceholderInfo(
     titre: 'Dépenses',
     icone: Icons.payments_outlined,
@@ -48,7 +42,6 @@ abstract final class EcransAVenir {
 
   /// Écran « Bientôt disponible » à afficher pour chaque route non développée.
   static const Map<String, PlaceholderInfo> parRoute = <String, PlaceholderInfo>{
-    AppRoutes.cours: cours,
     AppRoutes.depenses: depenses,
     AppRoutes.statistiques: statistiques,
     AppRoutes.sauvegarde: sauvegarde,

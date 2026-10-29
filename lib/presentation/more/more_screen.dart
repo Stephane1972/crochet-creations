@@ -21,7 +21,12 @@ class MoreScreen extends StatelessWidget {
       Icons.request_quote_outlined,
       'Création de devis, aperçu PDF et conversion en commande ou en facture.',
     ),
-    _Entree.avenir(AppRoutes.cours, EcransAVenir.cours),
+    const _Entree(
+      AppRoutes.cours,
+      'Cours',
+      Icons.school_outlined,
+      'Cours de crochet, inscriptions, liste d’attente et paiements.',
+    ),
     _Entree.avenir(AppRoutes.depenses, EcransAVenir.depenses),
     _Entree.avenir(AppRoutes.statistiques, EcransAVenir.statistiques),
   ];

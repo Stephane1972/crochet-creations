@@ -7,6 +7,8 @@ import 'package:crochet_creations/app.dart';
 import 'package:crochet_creations/data/database/app_database.dart';
 import 'package:crochet_creations/data/providers.dart';
 import 'package:crochet_creations/data/repositories/client_repository.dart';
+import 'package:crochet_creations/data/repositories/cours_repository.dart';
+import 'package:crochet_creations/data/repositories/cours_vues.dart';
 import 'package:crochet_creations/data/repositories/devis_repository.dart';
 import 'package:crochet_creations/data/repositories/facture_repository.dart';
 import 'package:crochet_creations/data/repositories/numerotation_repository.dart';
@@ -108,6 +110,7 @@ class EnvironnementTest {
   final ProduitRepository produits;
   final ClientRepository clients;
   late final VenteRepository ventes = VenteRepository(db, produits);
+  late final CoursRepository cours = CoursRepository(db, ventes);
   late final ParametresRepository parametres = ParametresRepository(db);
   final FauxSelecteurPhoto selecteur = FauxSelecteurPhoto();
   final FauxGenerateurPdf generateurPdf = FauxGenerateurPdf();
@@ -376,6 +379,54 @@ class EnvironnementTest {
           acompteCentimes: acompte,
         ),
       ),
+      ecranOuvert: ecranOuvert,
+    );
+  }
+
+  /// Crée un cours (hors temps simulé, sauf si [ecranOuvert] : voir [ecrireEcranOuvert]) : 4 places, 45 €,
+  /// 2 h 30, dans quinze jours par défaut. À faire **avant** d'ouvrir l'application.
+  Future<CoursFiche> creerCours(
+    WidgetTester tester, {
+    String titre = 'Initiation au crochet',
+    DateTime? debut,
+    int dureeMinutes = 150,
+    int prix = 4500,
+    int places = 4,
+    String? lieu = 'Atelier de Camille',
+    String? description,
+    bool ecranOuvert = false,
+  }) {
+    return _faire(
+      tester,
+      () => cours.creer(
+        DonneesCours(
+          titre: titre,
+          description: description,
+          debutLe: debut ?? DateTime.now().add(const Duration(days: 15)),
+          dureeMinutes: dureeMinutes,
+          lieu: lieu,
+          prixCentimes: prix,
+          places: places,
+          niveau: NiveauCours.debutant,
+        ),
+      ),
+      ecranOuvert: ecranOuvert,
+    );
+  }
+
+  /// Inscrit ce client au cours (hors temps simulé, sauf si [ecranOuvert] : voir [ecrireEcranOuvert]), avec son
+  /// paiement si [paiement] est donné.
+  Future<ResultatInscription> inscrire(
+    WidgetTester tester, {
+    required int coursId,
+    required int clientId,
+    int? prix,
+    PaiementSaisi? paiement,
+    bool ecranOuvert = false,
+  }) {
+    return _faire(
+      tester,
+      () => cours.inscrire(coursId: coursId, clientId: clientId, prixCentimes: prix, paiement: paiement),
       ecranOuvert: ecranOuvert,
     );
   }

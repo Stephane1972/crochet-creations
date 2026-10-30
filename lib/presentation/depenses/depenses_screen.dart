@@ -11,7 +11,8 @@ import 'depenses_providers.dart';
 import 'depenses_widgets.dart';
 
 /// Liste des dépenses (écran 19) : un mois à la fois, avec son total, filtrable par catégorie.
-/// Un appui sur une dépense l'ouvre pour la modifier (ou l'archiver). Les dépenses archivées ont leur filtre.
+/// Un appui sur une dépense l'ouvre pour la modifier (ou l'archiver). L'icône d'archive de la barre du haut
+/// bascule vers les dépenses archivées.
 class DepensesScreen extends ConsumerStatefulWidget {
   const DepensesScreen({super.key});
 
@@ -53,7 +54,19 @@ class _DepensesScreenState extends ConsumerState<DepensesScreen> {
     final AsyncValue<ListeDepenses> liste = ref.watch(depensesListeProvider(_filtre));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Dépenses')),
+      appBar: AppBar(
+        title: Text(_archivees ? 'Dépenses archivées' : 'Dépenses'),
+        actions: <Widget>[
+          IconButton(
+            tooltip: _archivees ? 'Revenir aux dépenses' : 'Voir les dépenses archivées',
+            icon: Icon(_archivees ? Icons.archive : Icons.archive_outlined),
+            onPressed: () => setState(() {
+              _archivees = !_archivees;
+              _categorie = null;
+            }),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => Navigator.of(context).pushNamed(AppRoutes.depenseNouvelle),
         icon: const Icon(Icons.add),
@@ -68,44 +81,30 @@ class _DepensesScreenState extends ConsumerState<DepensesScreen> {
             onPrecedent: () => _changerMois(-1),
             onSuivant: () => _changerMois(1),
           ),
-          SizedBox(
-            height: 52,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-              children: <Widget>[
-                ChoiceChip(
-                  label: const Text('Toutes'),
-                  selected: !_archivees && _categorie == null,
-                  onSelected: (bool _) => setState(() {
-                    _categorie = null;
-                    _archivees = false;
-                  }),
-                ),
-                for (final CategorieDepense c in CategorieDepense.values) ...<Widget>[
-                  const SizedBox(width: 8),
+          if (!_archivees)
+            SizedBox(
+              height: 52,
+              child: ListView(
+                key: const Key('filtres-depenses'),
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                children: <Widget>[
                   ChoiceChip(
-                    label: Text(c.libelle),
-                    selected: !_archivees && _categorie == c,
-                    onSelected: (bool _) => setState(() {
-                      _categorie = c;
-                      _archivees = false;
-                    }),
+                    label: const Text('Toutes'),
+                    selected: _categorie == null,
+                    onSelected: (bool _) => setState(() => _categorie = null),
                   ),
+                  for (final CategorieDepense c in CategorieDepense.values) ...<Widget>[
+                    const SizedBox(width: 8),
+                    ChoiceChip(
+                      label: Text(c.libelle),
+                      selected: _categorie == c,
+                      onSelected: (bool _) => setState(() => _categorie = c),
+                    ),
+                  ],
                 ],
-                const SizedBox(width: 8),
-                ChoiceChip(
-                  avatar: const Icon(Icons.archive_outlined, size: 18),
-                  label: const Text('Archivées'),
-                  selected: _archivees,
-                  onSelected: (bool _) => setState(() {
-                    _categorie = null;
-                    _archivees = true;
-                  }),
-                ),
-              ],
+              ),
             ),
-          ),
           Expanded(
             child: liste.when(
               loading: () => const Center(child: CircularProgressIndicator()),

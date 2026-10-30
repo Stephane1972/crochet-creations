@@ -34,14 +34,14 @@ Le développement se fait en 12 étapes validées une par une (détail dans [ROA
 - **Liste des dépenses** (écran 19, *Plus → Dépenses*) : **un mois à la fois** (flèches ‹ › pour changer de mois, pas de
   mois à venir), avec en haut le **total du mois** et le nombre de dépenses. Des pastilles filtrent par **catégorie**
   (laine / fil, fournitures, emballage, stand / marché, transport, publicité, matériel, autre) : le total se réduit alors
-  à la catégorie choisie. La pastille **« Archivées »** montre les dépenses mises de côté. La plus récente est en haut.
+  à la catégorie choisie. L'**icône d'archive** de la barre du haut bascule vers les dépenses mises de côté (et revient). La plus récente est en haut.
 - **Nouvelle dépense / modifier** : **date** (aujourd'hui par défaut, jamais dans le futur), **catégorie**, **montant**
   (supérieur à 0), **fournisseur**, **description**, **photo du ticket** (appareil photo ou galerie, copiée dans
   l'application) et **produit concerné** (facultatif). Un appui sur une ligne de la liste ouvre la dépense pour la modifier.
 - **Produit concerné** : simple information (ex. la laine d'un doudou). Il n'est affiché que sur la dépense ; il ne change
   ni le coût matière du produit, ni son stock, ni sa fiche.
 - **Archiver / restaurer** : une dépense **ne se supprime pas**. *Menu ⋮ → « Archiver la dépense »* la retire de la liste
-  et des totaux ; elle reste récupérable dans « Archivées » (*⋮ → « Restaurer la dépense »*).
+  et des totaux ; elle reste récupérable avec l'icône d'archive de la liste (*⋮ → « Restaurer la dépense »*).
 - Les totaux **détaillés par catégorie** et la marge estimée viendront avec les statistiques (étape 10).
 
 ### Ce que contient l'étape 8 : cours et inscriptions

@@ -15,7 +15,7 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
   (avec le **total** des lignes affichées, filtre de catégorie, dépenses archivées à part) et suivre la liste en direct
   (`ListeDepenses`, `DepenseLigne` avec le produit concerné). Un produit inconnu est refusé ; la date est enregistrée
   à minuit, heure locale.
-- **Écrans** : liste des dépenses (19) avec sélecteur de mois, total, pastilles de catégorie et « Archivées » ;
+- **Écrans** : liste des dépenses (19) avec sélecteur de mois, total, pastilles de catégorie et icône d'archive (dépenses archivées) ;
   formulaire de création / modification (date, catégorie, montant, fournisseur, description, **photo du ticket**,
   **produit concerné**) avec abandon confirmé et menu d'archivage.
 - `selecteur_produit.dart` : choix du produit (recherche par nom ou référence, « Aucun produit »).
@@ -35,7 +35,7 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
 
 ### Limites connues et hypothèses
 - Le **total affiché est celui des lignes visibles** : avec une catégorie choisie, c'est le total de cette catégorie.
-- Les dépenses **archivées** n'entrent dans aucun total ; dans le filtre « Archivées », on voit leur nombre, pas de total.
+- Les dépenses **archivées** n'entrent dans aucun total ; dans la vue des archivées (icône d'archive de la barre du haut), on voit leur nombre, pas de total ni de filtre de catégorie.
 - **Une seule photo** de ticket par dépense. Elle s'affiche en entier dans le formulaire (pas de zoom plein écran).
 - Pas de date dans le futur ; on ne peut pas non plus naviguer vers un mois à venir. On remonte mois par mois pour
   retrouver une dépense ancienne (pas de recherche en V1).

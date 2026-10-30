@@ -14,8 +14,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'aide_widget.dart';
 
-// Large : toutes les pastilles de catégorie tiennent sur une ligne, sans faire défiler.
-const Size _grandEcran = Size(1400, 2400);
+// Large : toutes les pastilles de catégorie tiennent sur une ligne (le texte de test est large), sans faire défiler.
+const Size _grandEcran = Size(2000, 2400);
 
 Finder dansListe(Finder cible) => find.descendant(of: find.byType(DepensesScreen), matching: cible);
 Finder dansFormulaire(Finder cible) => find.descendant(of: find.byType(DepenseFormScreen), matching: cible);
@@ -107,7 +107,7 @@ void main() {
     expect(dansListe(find.text(moisCourant())), findsOneWidget);
     expect(dansListe(find.text('Nouvelle dépense')), findsOneWidget);
     expect(dansListe(find.text('Toutes')), findsOneWidget);
-    expect(dansListe(find.text('Archivées')), findsOneWidget);
+    expect(dansListe(find.byTooltip('Voir les dépenses archivées')), findsOneWidget);
     for (final CategorieDepense c in CategorieDepense.values) {
       expect(dansListe(find.text(c.libelle)), findsOneWidget, reason: c.libelle);
     }
@@ -163,7 +163,9 @@ void main() {
     await toucher(tester, dansListe(find.text('Publicité')));
     await attendre(tester, dansListe(find.text('Aucune dépense « Publicité » en ${moisCourant()}.')));
 
-    // Retour à toutes les catégories.
+    // Retour à toutes les catégories (on fait d'abord défiler les pastilles jusqu'à « Toutes »).
+    await tester.drag(find.byKey(const Key('filtres-depenses')), const Offset(3000, 0));
+    await tester.pumpAndSettle();
     await toucher(tester, dansListe(find.text('Toutes')));
     await attendre(tester, dansListe(find.text('Total du mois')));
     expect(dansListe(find.text('3 dépenses')), findsOneWidget);
@@ -225,11 +227,18 @@ void main() {
     expect(dansListe(find.text('Ancienne mercerie')), findsNothing);
     expect(dansListe(find.text('1 dépense')), findsOneWidget);
 
-    await toucher(tester, dansListe(find.text('Archivées')));
+    await toucher(tester, find.byTooltip('Voir les dépenses archivées'));
     await attendre(tester, dansListe(find.text('Ancienne mercerie')));
+    expect(dansListe(find.text('Dépenses archivées')), findsOneWidget);
     expect(dansListe(find.text('Sacs et Cie')), findsNothing);
     expect(dansListe(find.text('1 dépense archivée ce mois-ci')), findsOneWidget);
     expect(dansListe(find.text('Total du mois')), findsNothing);
+    expect(dansListe(find.text('Toutes')), findsNothing); // pas de filtre de catégorie parmi les archivées
+
+    // Retour aux dépenses.
+    await toucher(tester, find.byTooltip('Revenir aux dépenses'));
+    await attendre(tester, dansListe(find.text('Sacs et Cie')));
+    expect(dansListe(find.text('Ancienne mercerie')), findsNothing);
 
     await env.fermer(tester);
   });
@@ -495,8 +504,8 @@ void main() {
     expect(find.byType(DepenseFormScreen), findsNothing);
     expect((await depensesEnBase(tester, env)).single.archiveLe, isNotNull);
 
-    // Elle se retrouve dans « Archivées », où le formulaire l'indique.
-    await toucher(tester, dansListe(find.text('Archivées')));
+    // Elle se retrouve parmi les dépenses archivées, où le formulaire l'indique.
+    await toucher(tester, find.byTooltip('Voir les dépenses archivées'));
     await attendre(tester, dansListe(find.text('Mercerie du Port')));
     await toucher(tester, dansListe(find.text('Mercerie du Port')));
     await attendre(tester, dansFormulaire(find.text('Cette dépense est archivée.')));
@@ -507,7 +516,7 @@ void main() {
     await attendre(tester, dansListe(find.text('Aucune dépense archivée en ${moisCourant()}.')));
     expect((await depensesEnBase(tester, env)).single.archiveLe, isNull);
 
-    await toucher(tester, dansListe(find.text('Toutes')));
+    await toucher(tester, find.byTooltip('Revenir aux dépenses'));
     await attendre(tester, dansListe(find.text('Mercerie du Port')));
 
     await env.fermer(tester);

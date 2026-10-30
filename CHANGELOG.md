@@ -6,7 +6,42 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
 
 ## [Non publié]
 
-## [0.8.0] — Étape 8 : cours et inscriptions (en attente de validation)
+## [0.9.0] — Étape 9 : dépenses (en attente de validation)
+
+### Ajouté
+- **Règles des dépenses** (`domain/regles_depenses.dart`, sans base ni interface) : montant supérieur à 0, date jamais
+  dans le futur (le jour même est permis), longueurs maximales (fournisseur, description), mois et bornes de mois.
+- **`DepenseRepository`** : créer, modifier, **archiver / restaurer** (une dépense ne se supprime pas), lister **par mois**
+  (avec le **total** des lignes affichées, filtre de catégorie, dépenses archivées à part) et suivre la liste en direct
+  (`ListeDepenses`, `DepenseLigne` avec le produit concerné). Un produit inconnu est refusé ; la date est enregistrée
+  à minuit, heure locale.
+- **Écrans** : liste des dépenses (19) avec sélecteur de mois, total, pastilles de catégorie et « Archivées » ;
+  formulaire de création / modification (date, catégorie, montant, fournisseur, description, **photo du ticket**,
+  **produit concerné**) avec abandon confirmé et menu d'archivage.
+- `selecteur_produit.dart` : choix du produit (recherche par nom ou référence, « Aucun produit »).
+  `common/choix_photo.dart` : la feuille « Prendre une photo / Galerie / Retirer », commune aux formulaires.
+- `formatMois` (« octobre 2026 ») dans `core/utils/date_fr.dart`.
+- Tests : règles (`regles_depenses_test`), dépôt (`depense_repository_test`), `formatMois` et scénarios d'écran
+  (`depenses_ecrans_test`).
+
+### Modifié
+- *Plus → Dépenses* ouvre la vraie liste ; l'écran « Bientôt disponible » des dépenses disparaît.
+- Le texte des réglages indique « étape 9 sur 12 ».
+
+### Décisions prises avec Stéphane
+- **Liste** : total du **mois** affiché en haut, avec filtres par catégorie et par mois (les totaux détaillés par
+  catégorie restent pour les statistiques, étape 10).
+- **Produit concerné** : **simple information**, sans effet sur le coût matière, la marge ni la fiche du produit.
+
+### Limites connues et hypothèses
+- Le **total affiché est celui des lignes visibles** : avec une catégorie choisie, c'est le total de cette catégorie.
+- Les dépenses **archivées** n'entrent dans aucun total ; dans le filtre « Archivées », on voit leur nombre, pas de total.
+- **Une seule photo** de ticket par dépense. Elle s'affiche en entier dans le formulaire (pas de zoom plein écran).
+- Pas de date dans le futur ; on ne peut pas non plus naviguer vers un mois à venir. On remonte mois par mois pour
+  retrouver une dépense ancienne (pas de recherche en V1).
+- Le schéma de la base n'a pas changé : pas de migration.
+
+## [0.8.0] — Étape 8 : cours et inscriptions (validée)
 
 ### Ajouté
 - **Règles des cours** (`domain/regles_cours.dart`, sans base ni interface) : fin et fin de cours, places restantes,

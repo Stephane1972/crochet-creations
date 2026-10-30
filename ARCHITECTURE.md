@@ -59,6 +59,7 @@ crochet-creations/
 │   │   ├── regles_entreprise.dart            SIREN, IBAN, informations manquantes pour facturer, textes par défaut
 │   │   ├── regles_devis.dart                 validité, statut affiché (expiré), transitions de statut, contrôle des dates et de l'acompte
 │   │   ├── regles_cours.dart                 places restantes, liste d'attente, refus d'inscription / de confirmation / d'archivage
+│   │   ├── regles_depenses.dart              montant, date non future, mois et bornes de mois
 │   │   ├── document_facture.dart             DocumentFacture : tout ce qui s'imprime sur une facture (sans PDF ni base)
 │   │   ├── document_devis.dart               DocumentDevis : tout ce qui s'imprime sur un devis (réutilise les lignes et parties de la facture)
 │   │   └── calculs/
@@ -86,7 +87,9 @@ crochet-creations/
 │   │   │   ├── devis_repository.dart         devis : créer, modifier, statuts, expiration, convertir, PDF
 │   │   │   ├── devis_vues.dart               DevisResume, DevisDetail (statut affiché, actions possibles), ResultatConversion
 │   │   │   ├── cours_repository.dart         cours : créer, modifier, annuler, archiver ; inscrire, confirmer, annuler une inscription
-│   │   │   └── cours_vues.dart               CoursResume, CoursDetail, InscriptionDetail (vente, paiement, facture, rang d'attente)
+│   │   │   ├── cours_vues.dart               CoursResume, CoursDetail, InscriptionDetail (vente, paiement, facture, rang d'attente)
+│   │   │   ├── depense_repository.dart       dépenses : créer, modifier, archiver, restaurer, lister par mois avec total
+│   │   │   └── depense_vues.dart             FiltreDepenses, DepenseLigne, ListeDepenses
 │   │   ├── pdf/
 │   │   │   ├── elements_pdf.dart             éléments de mise en page communs aux factures et aux devis (en-tête, totaux, pied de page)
 │   │   │   ├── facture_pdf.dart              mise en page du PDF d'une facture (genererFacturePdf)
@@ -115,6 +118,12 @@ crochet-creations/
 │       │   ├── cours_form_screen.dart        création / modification d'un cours
 │       │   ├── cours_providers.dart          flux Riverpod (liste par filtre, fiche)
 │       │   └── cours_widgets.dart            photo du cours, créneau, places, étiquettes de statut et de paiement
+│       ├── depenses/                         dépenses (voir « Dépenses »)
+│       │   ├── depenses_screen.dart          liste du mois : total, catégories, archivées (écran 19)
+│       │   ├── depense_form_screen.dart      création / modification, photo du ticket, produit concerné, archivage
+│       │   ├── selecteur_produit.dart        choix du produit concerné (recherche, « Aucun produit »)
+│       │   ├── depenses_providers.dart       flux Riverpod (liste par filtre)
+│       │   └── depenses_widgets.dart         icônes de catégorie, photo du ticket
 │       ├── devis/                            devis (voir « Devis »)
 │       │   ├── devis_screen.dart             liste des devis (écran 13)
 │       │   ├── devis_form_screen.dart        création / modification d'un devis (écran 14)
@@ -219,8 +228,8 @@ Navigation Flutter standard (`Navigator` + routes nommées), sans bibliothèque 
   (`Navigator.pushNamed(context, AppRoutes.produitFiche, arguments: produit.id)`) ; `AppRouter` le lit et
   affiche un message d'erreur si l'identifiant manque. Aujourd'hui : `produitFiche`, `produitModifier`,
   `clientFiche`, `clientModifier`, `factureDetail`, `devisDetail`, `devisModifier`, `devisConversion`,
-  `venteConfirmation`, `coursFiche` et `coursModifier` ; `produitNouveau`, `clientNouveau`, `devisNouveau` et
-  `coursNouveau` n'en prennent pas ; `coursInscription` reçoit un `ArgumentsInscription` (cours et, pour confirmer une
+  `venteConfirmation`, `coursFiche`, `coursModifier` et `depenseModifier` ; `produitNouveau`, `clientNouveau`,
+  `devisNouveau`, `coursNouveau` et `depenseNouvelle` n'en prennent pas ; `coursInscription` reçoit un `ArgumentsInscription` (cours et, pour confirmer une
   personne en attente, son inscription) ;
 - « Vendre » et « Ajouter au panier » depuis une fiche produit ramènent à la racine et ouvrent l'onglet Vente
   (`navIndexProvider`) ; cet onglet reste un écran « Bientôt disponible » jusqu'à l'étape 5 ;
@@ -594,6 +603,35 @@ d'annulation à choix), `CoursInscriptionScreen` (inscription ou confirmation, a
 (création / modification, photo gérée par `PhotosFormulaire`, abandon confirmé). L'écran d'inscription reçoit un
 `ArgumentsInscription` (cours, et inscription à confirmer le cas échéant).
 
+## Dépenses (étape 9)
+
+### Règles (`domain/regles_depenses.dart`)
+
+Des fonctions pures, testées sans base : `verifierDepense` (montant supérieur à 0, date jamais dans le futur, longueur du
+fournisseur et de la description), `dateDansLeFutur` (comparaison par **jour** : la date du jour est permise), `jourDe`,
+`debutDuMois` / `debutDuMoisSuivant`, `estDansLeMois` et `totalCentimes`. Chaque refus est une phrase française prête à
+afficher.
+
+### Le dépôt (`DepenseRepository`)
+
+- **Créer / modifier** : valide les règles, vérifie que le produit concerné existe encore, enregistre la date à minuit
+  (heure locale) et nettoie les textes (champ vide = rien). Le produit concerné est une **information** : le dépôt ne
+  touche ni au coût matière ni au stock.
+- **Archiver / restaurer** : colonne `archive_le` (suppression douce, comme les produits et les cours) ; une dépense
+  archivée quitte la liste et les totaux mais peut encore être modifiée et restaurée.
+- **Lister** : `lister(annee, mois, categorie?, archivees)` joint les produits (jointure externe) et retourne une
+  `ListeDepenses` : les lignes, la plus récente d'abord, et le **total des lignes retournées** (donc celui de la catégorie
+  quand on filtre). `observerListe` suit les tables `depenses` et `produits` en direct (`observerTables`).
+- `FiltreDepenses` est un *record* Dart (année, mois, catégorie, archivées) : deux filtres identiques sont égaux, ce qui
+  sert de clé à `depensesListeProvider`.
+
+### Écrans
+
+`DepensesScreen` (sélecteur de mois sans mois à venir, carte de total, pastilles de catégorie et « Archivées »),
+`DepenseFormScreen` (création / modification, photo gérée par `PhotosFormulaire` comme pour les cours, abandon confirmé,
+menu d'archivage / restauration) et `LigneChoixProduit` / `FeuilleChoixProduit` (catalogue en feuille du bas).
+La feuille « Prendre une photo / Galerie / Retirer » est devenue commune (`presentation/common/choix_photo.dart`).
+
 ## Dossier `android/`
 
 Le dossier `android/` n'est pas versionné. `tool/setup_android.sh` le crée avec `flutter create`,
@@ -670,6 +708,12 @@ Cours (étape 8) : `regles_cours_test` (places, liste d'attente, refus), `panier
 doublons, tout-ou-rien, confirmation, annulation avec et sans remboursement, réinscription, archivage, liste et fiche
 en direct) et `cours_ecrans_test` (liste et filtres, formulaire, fiche, inscription payée / acompte / plus tard / gratuite,
 liste d'attente, confirmation, annulation avec ou sans remboursement, cours annulé, archivage).
+
+Dépenses (étape 9) : `regles_depenses_test` (montant, date non future, mois), `depense_repository_test` (création et
+nettoyage, catégories, refus sans rien enregistrer, produit lié et inconnu, aucun effet sur le produit, modification,
+liste par mois et total, filtre de catégorie, archivage et restauration, flux en direct) et `depenses_ecrans_test` (liste
+et « Plus », total du mois, filtre, mois précédent, archivées, saisie, montant obligatoire, produit concerné, photo du
+ticket, abandon, modification, archivage et restauration).
 
 Reste à écrire avec son étape : statistiques (étape 10).
 

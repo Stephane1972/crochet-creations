@@ -15,6 +15,7 @@ import 'repositories/facture_repository.dart';
 import 'repositories/numerotation_repository.dart';
 import 'repositories/parametres_repository.dart';
 import 'repositories/produit_repository.dart';
+import 'repositories/statistiques_repository.dart';
 import 'repositories/vente_repository.dart';
 import 'stockage/selecteur_photo.dart';
 import 'stockage/stockage_pdf.dart';
@@ -129,4 +130,8 @@ final coursRepositoryProvider = Provider<CoursRepository>(
 
 final depenseRepositoryProvider = Provider<DepenseRepository>(
   (ref) => DepenseRepository(ref.watch(appDatabaseProvider)),
+);
+
+final statistiquesRepositoryProvider = Provider<StatistiquesRepository>(
+  (ref) => StatistiquesRepository(ref.watch(appDatabaseProvider)),
 );

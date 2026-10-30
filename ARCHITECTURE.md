@@ -630,7 +630,8 @@ afficher.
 `DepensesScreen` (sélecteur de mois sans mois à venir, carte de total, pastilles de catégorie, icône d'archive pour passer aux dépenses archivées),
 `DepenseFormScreen` (création / modification, photo gérée par `PhotosFormulaire` comme pour les cours, abandon confirmé,
 menu d'archivage / restauration) et `LigneChoixProduit` / `FeuilleChoixProduit` (catalogue en feuille du bas).
-La feuille « Prendre une photo / Galerie / Retirer » est devenue commune (`presentation/common/choix_photo.dart`).
+La feuille « Prendre une photo / Galerie / Retirer » est dans `presentation/common/choix_photo.dart` (le formulaire des
+cours en a encore sa propre copie, à regrouper à l'étape 12).
 
 ## Dossier `android/`
 

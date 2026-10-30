@@ -19,7 +19,8 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
   formulaire de création / modification (date, catégorie, montant, fournisseur, description, **photo du ticket**,
   **produit concerné**) avec abandon confirmé et menu d'archivage.
 - `selecteur_produit.dart` : choix du produit (recherche par nom ou référence, « Aucun produit »).
-  `common/choix_photo.dart` : la feuille « Prendre une photo / Galerie / Retirer », commune aux formulaires.
+  `common/choix_photo.dart` : la feuille « Prendre une photo / Galerie / Retirer », réutilisable (le formulaire des cours garde pour
+  l'instant sa propre copie : à regrouper à l'étape 12).
 - `formatMois` (« octobre 2026 ») dans `core/utils/date_fr.dart`.
 - Tests : règles (`regles_depenses_test`), dépôt (`depense_repository_test`), `formatMois` et scénarios d'écran
   (`depenses_ecrans_test`).

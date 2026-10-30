@@ -27,7 +27,12 @@ class MoreScreen extends StatelessWidget {
       Icons.school_outlined,
       'Cours de crochet, inscriptions, liste d’attente et paiements.',
     ),
-    _Entree.avenir(AppRoutes.depenses, EcransAVenir.depenses),
+    const _Entree(
+      AppRoutes.depenses,
+      'Dépenses',
+      Icons.payments_outlined,
+      'Achats de laine, fournitures, frais de marché, avec photo du ticket.',
+    ),
     _Entree.avenir(AppRoutes.statistiques, EcransAVenir.statistiques),
   ];
 

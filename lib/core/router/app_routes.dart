@@ -43,8 +43,10 @@ abstract final class AppRoutes {
   static const String coursModifier = '/cours/modifier';
   static const String coursInscription = '/cours/inscription';
 
-  // Dépenses (étape 9)
+  // Dépenses (étape 9). La modification reçoit l'identifiant de la dépense (un entier) dans `arguments`.
   static const String depenses = '/depenses';
+  static const String depenseNouvelle = '/depenses/nouvelle';
+  static const String depenseModifier = '/depenses/modifier';
 
   // Statistiques (étape 10)
   static const String statistiques = '/statistiques';

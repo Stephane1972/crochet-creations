@@ -43,6 +43,9 @@ String formatDateCourte(DateTime date) {
   return '${deux(date.day)}/${deux(date.month)}/${date.year}';
 }
 
+/// « octobre 2026 » : le mois [mois] (1 à 12) de l'année [annee].
+String formatMois(int annee, int mois) => '${_mois[mois - 1]} $annee';
+
 /// « 14 h 30 », « 9 h 00 ».
 String formatHeure(DateTime date) {
   return '${date.hour} h ${date.minute.toString().padLeft(2, '0')}';

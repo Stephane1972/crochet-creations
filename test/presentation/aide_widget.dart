@@ -9,6 +9,7 @@ import 'package:crochet_creations/data/providers.dart';
 import 'package:crochet_creations/data/repositories/client_repository.dart';
 import 'package:crochet_creations/data/repositories/cours_repository.dart';
 import 'package:crochet_creations/data/repositories/cours_vues.dart';
+import 'package:crochet_creations/data/repositories/depense_repository.dart';
 import 'package:crochet_creations/data/repositories/devis_repository.dart';
 import 'package:crochet_creations/data/repositories/facture_repository.dart';
 import 'package:crochet_creations/data/repositories/numerotation_repository.dart';
@@ -111,6 +112,7 @@ class EnvironnementTest {
   final ClientRepository clients;
   late final VenteRepository ventes = VenteRepository(db, produits);
   late final CoursRepository cours = CoursRepository(db, ventes);
+  late final DepenseRepository depenses = DepenseRepository(db);
   late final ParametresRepository parametres = ParametresRepository(db);
   final FauxSelecteurPhoto selecteur = FauxSelecteurPhoto();
   final FauxGenerateurPdf generateurPdf = FauxGenerateurPdf();
@@ -427,6 +429,38 @@ class EnvironnementTest {
     return _faire(
       tester,
       () => cours.inscrire(coursId: coursId, clientId: clientId, prixCentimes: prix, paiement: paiement),
+      ecranOuvert: ecranOuvert,
+    );
+  }
+
+  /// Enregistre une dépense (hors temps simulé, sauf si [ecranOuvert] : voir [ecrireEcranOuvert]) : de la laine à
+  /// 24,90 €, le premier jour du mois en cours par défaut (jamais dans le futur). À faire **avant** d'ouvrir
+  /// l'application.
+  Future<Depense> creerDepense(
+    WidgetTester tester, {
+    DateTime? date,
+    CategorieDepense categorie = CategorieDepense.laineFil,
+    int montant = 2490,
+    String? fournisseur = 'Mercerie du Port',
+    String? description,
+    String? photo,
+    int? produitId,
+    bool ecranOuvert = false,
+  }) {
+    final DateTime maintenant = DateTime.now();
+    return _faire(
+      tester,
+      () => depenses.creer(
+        DonneesDepense(
+          date: date ?? DateTime(maintenant.year, maintenant.month, 1),
+          categorie: categorie,
+          montantCentimes: montant,
+          fournisseur: fournisseur,
+          description: description,
+          photoTicketChemin: photo,
+          produitId: produitId,
+        ),
+      ),
       ecranOuvert: ecranOuvert,
     );
   }

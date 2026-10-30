@@ -8,6 +8,8 @@ import '../cours/cours_fiche_screen.dart';
 import '../cours/cours_form_screen.dart';
 import '../cours/cours_inscription_screen.dart';
 import '../cours/cours_screen.dart';
+import '../depenses/depense_form_screen.dart';
+import '../depenses/depenses_screen.dart';
 import '../devis/devis_conversion_screen.dart';
 import '../devis/devis_detail_screen.dart';
 import '../devis/devis_form_screen.dart';
@@ -95,6 +97,16 @@ abstract final class AppRouter {
                   inscriptionId: argumentsInscription.inscriptionId,
                 )
               : const _PageIntrouvable(),
+        );
+      case AppRoutes.depenses:
+        return _page(settings, const DepensesScreen());
+      case AppRoutes.depenseNouvelle:
+        return _page(settings, const DepenseFormScreen());
+      case AppRoutes.depenseModifier:
+        final int? idDepense = _identifiant(settings);
+        return _page(
+          settings,
+          idDepense == null ? const _PageIntrouvable() : DepenseFormScreen(depenseId: idDepense),
         );
       case AppRoutes.produitNouveau:
         return _page(settings, const ProduitFormScreen());

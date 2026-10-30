@@ -30,6 +30,12 @@ void main() {
     expect(formatDateCourte(DateTime(2026, 12, 25, 18, 30)), '25/12/2026');
   });
 
+  test('formatMois : mois en lettres et année', () {
+    expect(formatMois(2026, 10), 'octobre 2026');
+    expect(formatMois(2027, 1), 'janvier 2027');
+    expect(formatMois(2026, 8), 'août 2026');
+  });
+
   test('formatHeure : heure sans zéro devant, minutes sur deux chiffres', () {
     expect(formatHeure(DateTime(2026, 10, 17, 14, 30)), '14 h 30');
     expect(formatHeure(DateTime(2026, 10, 17, 9, 5)), '9 h 05');

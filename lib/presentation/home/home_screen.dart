@@ -1,19 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/constants/app_constants.dart';
 import '../../core/router/app_routes.dart';
 import '../../core/utils/date_fr.dart';
 import '../../core/utils/money.dart';
 import '../../core/widgets/app_logo.dart';
+import '../../data/repositories/statistiques_vues.dart';
+import '../../domain/calculs/statistiques.dart';
 import '../produits/filtres_produits.dart';
 import '../produits/produits_providers.dart';
 import '../shell/nav_provider.dart';
+import '../statistiques/franchise_tva_carte.dart';
+import '../statistiques/statistiques_providers.dart';
 
-/// Accueil / tableau de bord.
-///
-/// Étape 1 : la mise en page est en place, mais aucun chiffre n'est encore
-/// calculé (la base de données arrive à l'étape 2, les statistiques à l'étape 10).
+/// Accueil / tableau de bord : actions rapides, chiffres du mois et suivi de la franchise de TVA.
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
@@ -34,7 +34,7 @@ class HomeScreen extends StatelessWidget {
             const _TitreSection('En un coup d’œil'),
             const _Chiffres(),
             const SizedBox(height: 28),
-            const _FranchiseTvaCarte(),
+            const FranchiseTvaCarte(),
           ],
         ),
       ),
@@ -199,7 +199,7 @@ class _ActionTuile extends StatelessWidget {
 }
 
 // -----------------------------------------------------------------------------
-// Chiffres clés (« Stock faible » branché à l'étape 3, les autres à l'étape 10)
+// Chiffres clés du mois (argent encaissé), stock faible et factures impayées
 // -----------------------------------------------------------------------------
 
 class _Chiffres extends ConsumerWidget {
@@ -209,20 +209,27 @@ class _Chiffres extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final ThemeData theme = Theme.of(context);
     final int? aReapprovisionner = ref.watch(nombreAReapprovisionnerProvider);
+    final Statistiques? stats = ref.watch(statistiquesProvider).valueOrNull;
+    final StatsPeriode? mois = stats?.periode(PeriodeStats.mois);
+    final int impayees = stats?.facturesImpayeesNombre ?? 0;
+
+    void ouvrirStatistiques() => Navigator.of(context).pushNamed(AppRoutes.statistiques);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        const _RangeeDeuxCartes(
+        _RangeeDeuxCartes(
           gauche: _ChiffreTuile(
             icone: Icons.shopping_bag_outlined,
             libelle: 'Ventes du mois',
-            valeur: '—',
+            valeur: mois == null ? '—' : formatEuros(mois.ventesHorsCoursCentimes),
+            onTap: ouvrirStatistiques,
           ),
           droite: _ChiffreTuile(
             icone: Icons.school_outlined,
             libelle: 'Cours du mois',
-            valeur: '—',
+            valeur: mois == null ? '—' : formatEuros(mois.encaisseCoursCentimes),
+            onTap: ouvrirStatistiques,
           ),
         ),
         const SizedBox(height: 12),
@@ -237,17 +244,19 @@ class _Chiffres extends ConsumerWidget {
               ref.read(navIndexProvider.notifier).aller(OngletsNav.produits);
             },
           ),
-          droite: const _ChiffreTuile(
+          droite: _ChiffreTuile(
             icone: Icons.hourglass_empty,
             libelle: 'Factures impayées',
-            valeur: '—',
+            valeur: stats == null ? '—' : '$impayees',
+            detail: impayees > 0 ? '${formatEuros(stats!.facturesImpayeesCentimes)} à encaisser' : null,
+            onTap: () => Navigator.of(context).pushNamed(AppRoutes.factures),
           ),
         ),
         const SizedBox(height: 10),
         Padding(
           padding: const EdgeInsets.only(left: 4),
           child: Text(
-            'Les chiffres des ventes apparaîtront dès les premières ventes.',
+            'Ventes et cours du mois : argent encaissé, remboursements déduits.',
             style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
           ),
         ),
@@ -261,12 +270,16 @@ class _ChiffreTuile extends StatelessWidget {
     required this.icone,
     required this.libelle,
     required this.valeur,
+    this.detail,
     this.onTap,
   });
 
   final IconData icone;
   final String libelle;
   final String valeur;
+
+  /// Précision discrète sous le chiffre (« 75,00 € à encaisser »).
+  final String? detail;
   final VoidCallback? onTap;
 
   @override
@@ -297,105 +310,17 @@ class _ChiffreTuile extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               Text(valeur, style: theme.textTheme.headlineSmall),
+              if (detail != null) ...<Widget>[
+                const SizedBox(height: 2),
+                Text(
+                  detail!,
+                  style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+                ),
+              ],
             ],
           ),
         ),
       ),
-    );
-  }
-}
-
-// -----------------------------------------------------------------------------
-// Franchise de TVA : suivi des seuils (alertes branchées à l'étape 10)
-// -----------------------------------------------------------------------------
-
-class _FranchiseTvaCarte extends StatelessWidget {
-  const _FranchiseTvaCarte();
-
-  @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    final ColorScheme scheme = theme.colorScheme;
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Row(
-              children: <Widget>[
-                Icon(Icons.verified_outlined, color: scheme.primary),
-                const SizedBox(width: 10),
-                Expanded(child: Text('Franchise de TVA', style: theme.textTheme.titleMedium)),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Une alerte s’affichera ici quand votre chiffre d’affaires '
-              'approchera des seuils.',
-              style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
-            ),
-            const SizedBox(height: 18),
-            const _Seuil(
-              libelle: 'Ventes d’objets',
-              atteintCentimes: 0,
-              seuilCentimes: AppConstants.seuilTvaVentesCentimes,
-            ),
-            const SizedBox(height: 18),
-            const _Seuil(
-              libelle: 'Cours et prestations',
-              atteintCentimes: 0,
-              seuilCentimes: AppConstants.seuilTvaServicesCentimes,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _Seuil extends StatelessWidget {
-  const _Seuil({
-    required this.libelle,
-    required this.atteintCentimes,
-    required this.seuilCentimes,
-  });
-
-  final String libelle;
-  final int atteintCentimes;
-  final int seuilCentimes;
-
-  @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    final ColorScheme scheme = theme.colorScheme;
-    final double part = (atteintCentimes / seuilCentimes).clamp(0.0, 1.0).toDouble();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Row(
-          children: <Widget>[
-            Expanded(child: Text(libelle, style: theme.textTheme.bodyLarge)),
-            Text(
-              '${formatEuros(atteintCentimes, avecCentimes: false)} / '
-              '${formatEuros(seuilCentimes, avecCentimes: false)}',
-              style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        LinearProgressIndicator(
-          value: part,
-          minHeight: 10,
-          borderRadius: BorderRadius.circular(8),
-          color: scheme.primary,
-          backgroundColor: scheme.surfaceContainerHighest,
-          // Pas de semanticsValue : Flutter annonce déjà le pourcentage (et exige un nombre).
-          semanticsLabel: libelle,
-        ),
-      ],
     );
   }
 }

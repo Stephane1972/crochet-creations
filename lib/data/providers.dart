@@ -135,3 +135,7 @@ final depenseRepositoryProvider = Provider<DepenseRepository>(
 final statistiquesRepositoryProvider = Provider<StatistiquesRepository>(
   (ref) => StatistiquesRepository(ref.watch(appDatabaseProvider)),
 );
+
+/// L'heure « maintenant », dont dépendent les périodes des statistiques (aujourd'hui, cette semaine, ce mois-ci...).
+/// Les tests la remplacent par une heure fixe.
+final horlogeProvider = Provider<DateTime Function()>((ref) => DateTime.now);

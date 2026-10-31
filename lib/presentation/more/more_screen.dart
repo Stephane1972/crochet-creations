@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../core/router/app_routes.dart';
 import '../common/menu_tile.dart';
-import '../common/placeholder_screen.dart';
 
 /// Onglet « Plus » : accès aux écrans qui n'ont pas leur propre onglet.
 class MoreScreen extends StatelessWidget {
@@ -33,7 +32,12 @@ class MoreScreen extends StatelessWidget {
       Icons.payments_outlined,
       'Achats de laine, fournitures, frais de marché, avec photo du ticket.',
     ),
-    _Entree.avenir(AppRoutes.statistiques, EcransAVenir.statistiques),
+    const _Entree(
+      AppRoutes.statistiques,
+      'Statistiques',
+      Icons.insights_outlined,
+      'Chiffre d’affaires, meilleures ventes, marge estimée, alerte de franchise de TVA.',
+    ),
   ];
 
   @override
@@ -75,12 +79,6 @@ class MoreScreen extends StatelessWidget {
 
 class _Entree {
   const _Entree(this.route, this.titre, this.icone, this.description);
-
-  /// Une entrée dont l'écran n'est pas encore développé : titre, icône et description de l'écran « Bientôt ».
-  _Entree.avenir(this.route, PlaceholderInfo info)
-    : titre = info.titre,
-      icone = info.icone,
-      description = info.description;
 
   final String route;
   final String titre;

@@ -6,7 +6,54 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
 
 ## [Non publié]
 
-## [0.9.0] — Étape 9 : dépenses (en attente de validation)
+## [0.10.0] — Étape 10 : statistiques (en attente de validation)
+
+### Ajouté
+- **Calculs des statistiques** (`domain/calculs/statistiques.dart`, sans base ni interface) : périodes (jour, semaine du lundi,
+  mois, année), **argent encaissé** réparti entre les lignes d'une vente au prorata de leur valeur après remise (méthode du
+  plus fort reste : aucun centime perdu, remboursements compris), objets / prestations / cours, **coût de matière** imputé de
+  la même façon, marge, panier moyen, meilleures ventes (5), catégories rentables, dépenses par catégorie, niveaux d'alerte
+  de la franchise de TVA (`ok`, `approche` dès 80 %, `depasse` au-delà du seuil).
+- **`StatistiquesRepository`** (lecture seule) : lit ventes, lignes, paiements, dépenses actives et factures émises, calcule
+  les quatre périodes en une passe, compte les **factures impayées** (nombre et reste à encaisser) et fournit un flux mis à
+  jour à chaque écriture (`Statistiques`, `statistiques_vues.dart`).
+- **Écran Statistiques** (20, *Plus → Statistiques*) : sélecteur de période, chiffre d'affaires (objets, cours et prestations,
+  dont cours), marge estimée, panier moyen, revenus des cours, meilleures ventes, catégories les plus rentables, dépenses par
+  catégorie, stock faible, factures impayées (un appui ouvre la liste des factures) et carte de franchise de TVA.
+- **Carte de franchise de TVA** partagée (`FranchiseTvaCarte`) : barres par seuil (85 000 € objets, 37 500 € cours et
+  prestations), pourcentage atteint, étiquettes « Seuil approché » / « Seuil dépassé » et message.
+- `horlogeProvider` (heure « maintenant » remplaçable) pour des tests d'écran à date fixe.
+- Tests : calculs (`statistiques_test`), dépôt sur base en mémoire (`statistiques_repository_test`) et scénarios d'écran
+  (`statistiques_ecrans_test`).
+
+### Modifié
+- **Accueil** : « Ventes du mois », « Cours du mois » et « Factures impayées » affichent de vrais chiffres (les deux premières
+  tuiles ouvrent les statistiques, la troisième la liste des factures) ; la carte de franchise est celle des statistiques.
+- *Plus → Statistiques* ouvre le vrai écran ; l'écran « Bientôt disponible » des statistiques disparaît.
+- Le texte des réglages indique « étape 10 sur 12 ».
+
+### Décisions prises avec Stéphane
+- **Chiffre d'affaires = argent encaissé** (paiements reçus, remboursements déduits), et non les ventes validées.
+- **Marge estimée = marge sur coût matière** (argent encaissé − coût de la matière des articles vendus) ; les dépenses sont
+  affichées séparément, par catégorie.
+
+### Limites connues et hypothèses (à confirmer)
+- On ne voit que la période **en cours** (aujourd'hui, cette semaine, ce mois-ci, cette année) : pas de navigation vers les
+  périodes passées. La semaine commence le **lundi**.
+- Les **frais de port** comptent avec les objets ; une **remise** est répartie au prorata des lignes de la vente.
+- **Meilleures ventes** et **panier moyen** se calculent sur les ventes **validées et faites** pendant la période (pas sur
+  l'argent encaissé) ; les cours n'entrent pas dans les meilleures ventes.
+- Les cours et les prestations libres sont comptés **sans coût de matière** dans la marge ; les **catégories rentables** ne
+  regardent que les lignes liées à un produit du catalogue.
+- « Ventes du mois » de l'accueil = argent encaissé ce mois-ci **hors cours** ; « Cours du mois » = argent encaissé sur les
+  cours ; « Factures impayées » = factures **émises** dont la vente n'est pas entièrement payée.
+- **Franchise de TVA** : calculée sur l'argent encaissé depuis le **1er janvier**, objets d'un côté, cours et prestations de
+  l'autre ; alerte « approche » à partir de **80 %** du seuil, « dépassé » **strictement** au-dessus. Les règles exactes de la
+  franchise en base (ce qui entre dans chaque seuil, tolérances de dépassement) ne sont pas vérifiées par l'application :
+  à confirmer avec un comptable ou l'URSSAF.
+- Un écran laissé ouvert **au-delà de minuit** ne change de période qu'à la prochaine modification de données.
+
+## [0.9.0] — Étape 9 : dépenses (validée)
 
 ### Ajouté
 - **Règles des dépenses** (`domain/regles_depenses.dart`, sans base ni interface) : montant supérieur à 0, date jamais

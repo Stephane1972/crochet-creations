@@ -21,12 +21,6 @@ class PlaceholderInfo {
 
 /// Écrans prévus mais pas encore développés (voir ROADMAP.md).
 abstract final class EcransAVenir {
-  static const PlaceholderInfo statistiques = PlaceholderInfo(
-    titre: 'Statistiques',
-    icone: Icons.insights_outlined,
-    etape: 10,
-    description: 'Chiffre d’affaires, meilleures ventes, marge estimée.',
-  );
   static const PlaceholderInfo sauvegarde = PlaceholderInfo(
     titre: 'Sauvegarde et export',
     icone: Icons.backup_outlined,
@@ -36,7 +30,6 @@ abstract final class EcransAVenir {
 
   /// Écran « Bientôt disponible » à afficher pour chaque route non développée.
   static const Map<String, PlaceholderInfo> parRoute = <String, PlaceholderInfo>{
-    AppRoutes.statistiques: statistiques,
     AppRoutes.sauvegarde: sauvegarde,
   };
 }

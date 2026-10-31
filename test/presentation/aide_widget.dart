@@ -114,6 +114,10 @@ class EnvironnementTest {
   late final CoursRepository cours = CoursRepository(db, ventes);
   late final DepenseRepository depenses = DepenseRepository(db);
   late final ParametresRepository parametres = ParametresRepository(db);
+  /// Heure « maintenant » de l'application (statistiques) ; `null` = l'heure réelle. À régler **avant** d'ouvrir
+  /// l'application.
+  DateTime? maintenant;
+
   final FauxSelecteurPhoto selecteur = FauxSelecteurPhoto();
   final FauxGenerateurPdf generateurPdf = FauxGenerateurPdf();
   final FauxServiceDocuments documents = FauxServiceDocuments();
@@ -160,6 +164,7 @@ class EnvironnementTest {
     generateurFacturePdfProvider.overrideWithValue(generateurPdf.call),
     generateurDevisPdfProvider.overrideWithValue(generateurDevisPdf.call),
     serviceDocumentsProvider.overrideWithValue(documents),
+    horlogeProvider.overrideWithValue(() => maintenant ?? DateTime.now()),
     // L'aperçu réel rasterise le PDF avec le moteur d'impression d'Android : ici, on en affiche le texte.
     constructeurApercuPdfProvider.overrideWithValue(
       (BuildContext context, Uint8List pdf, String nomFichier) => Center(child: Text('Aperçu : ${utf8.decode(pdf)}')),

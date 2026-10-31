@@ -24,10 +24,33 @@ Le développement se fait en 12 étapes validées une par une (détail dans [ROA
 | 6 | Factures PDF et « Mon entreprise » | terminée et validée |
 | 7 | Devis : lignes libres, validité, acompte, statuts, conversion en facture | terminée et validée |
 | 8 | Cours et inscriptions : places, liste d'attente, paiement, facture par inscrit | terminée et validée |
-| 9 | Dépenses : catégories, photo du ticket, produit concerné | **à valider** (PR #9) |
-| 10 | Statistiques | à venir |
+| 9 | Dépenses : catégories, photo du ticket, produit concerné | terminée et validée |
+| 10 | Statistiques et alertes de franchise de TVA | **à valider** (PR #10) |
 | 11 | Sauvegarde / export | à venir |
 | 12 | Tests, corrections, optimisation de l'interface | à venir |
+
+### Ce que contient l'étape 10 : statistiques
+
+- **Écran Statistiques** (écran 20, *Plus → Statistiques*, ou un appui sur « Ventes du mois » / « Cours du mois » de
+  l'accueil) : un sélecteur **Jour / Semaine / Mois / Année** choisit la période **en cours** (la semaine va du lundi au
+  dimanche). Les chiffres se mettent à jour tout seuls dès qu'une vente, un paiement, une dépense ou une facture change.
+- **Chiffre d'affaires = argent encaissé** : un paiement compte à la date où il est reçu, un remboursement se déduit à la
+  date où il est fait. Il est séparé en **objets** (frais de port compris) et **cours et prestations** (avec la part des
+  **cours** à part, aussi affichée dans « Revenus des cours »). Un acompte compte pour sa part de chaque ligne de la
+  vente ; une remise est répartie au prorata des lignes.
+- **Marge estimée** = argent encaissé − **coût de la matière** des articles correspondants (le coût relevé au catalogue au
+  moment de la vente). Les cours et prestations n'ont pas de coût de matière. Les **dépenses ne sont pas déduites** de la
+  marge : elles sont présentées à part, **par catégorie**, avec leur total.
+- **Panier moyen** (total moyen des ventes validées faites sur la période), **meilleures ventes** (les 5 articles les plus
+  vendus, hors cours), **catégories les plus rentables** (marge par catégorie de produit), **stock faible**
+  (produits à réapprovisionner) et **factures impayées** (nombre et reste à encaisser ; un appui ouvre la liste des factures).
+- **Franchise de TVA** (écran Statistiques et accueil) : l'argent encaissé **depuis le 1er janvier** face aux seuils de
+  **85 000 €** (objets) et **37 500 €** (cours et prestations). Dès **80 %** d'un seuil, la barre change de couleur
+  avec l'étiquette « Seuil approché » et un message ; au-delà du seuil, elle devient rouge avec « Seuil dépassé ».
+  L'application ne remplace pas un comptable : en cas d'alerte, elle invite à en parler à son comptable ou au service
+  des impôts.
+- **Accueil** : « Ventes du mois » (argent encaissé ce mois-ci, hors cours), « Cours du mois », « Factures impayées »
+  (nombre et reste à encaisser) et la carte de franchise sont désormais branchés.
 
 ### Ce que contient l'étape 9 : dépenses
 
@@ -42,7 +65,7 @@ Le développement se fait en 12 étapes validées une par une (détail dans [ROA
   ni le coût matière du produit, ni son stock, ni sa fiche.
 - **Archiver / restaurer** : une dépense **ne se supprime pas**. *Menu ⋮ → « Archiver la dépense »* la retire de la liste
   et des totaux ; elle reste récupérable avec l'icône d'archive de la liste (*⋮ → « Restaurer la dépense »*).
-- Les totaux **détaillés par catégorie** et la marge estimée viendront avec les statistiques (étape 10).
+- Les totaux **par catégorie** et la marge estimée sont dans les statistiques (étape 10).
 
 ### Ce que contient l'étape 8 : cours et inscriptions
 

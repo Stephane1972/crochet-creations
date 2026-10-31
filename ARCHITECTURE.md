@@ -13,7 +13,7 @@ presentation  →  domain  →  data
 | Couche | Rôle | Dépend de |
 |--------|------|-----------|
 | `presentation` | Écrans, widgets, navigation, états Riverpod propres à l'interface | `domain`, `core` |
-| `domain` | Règles métier pures en Dart : listes de choix, totaux d'une vente, statut de paiement, règles de stock, format des numéros ; plus tard conversion devis → facture, statistiques. Aucune dépendance à Flutter ni à la base | rien |
+| `domain` | Règles métier pures en Dart : listes de choix, totaux d'une vente, statut de paiement, règles de stock, format des numéros, règles des devis, des cours et des dépenses, calculs des statistiques. Aucune dépendance à Flutter ni à la base | rien |
 | `data` | Base SQLite (Drift), migrations, repositories, fichiers (photos, PDF, sauvegardes) | `domain`, `core` |
 
 Règles :
@@ -67,6 +67,7 @@ crochet-creations/
 │   │       ├── statut_paiement.dart          payée / partielle / impayée / remboursée
 │   │       ├── panier.dart                   panier d'une vente : lignes, stock, remise, frais de port, paiement saisi
 │   │       ├── stock.dart                    alerte de stock, produit « sur commande »
+│   │       ├── statistiques.dart             argent encaissé par période, parts, marge, classements, niveaux de franchise de TVA
 │   │       └── numero_document.dart          FACT-2026-0001, DEVIS-2026-0001, PRD-0001
 │   ├── data/
 │   │   ├── database/
@@ -89,7 +90,9 @@ crochet-creations/
 │   │   │   ├── cours_repository.dart         cours : créer, modifier, annuler, archiver ; inscrire, confirmer, annuler une inscription
 │   │   │   ├── cours_vues.dart               CoursResume, CoursDetail, InscriptionDetail (vente, paiement, facture, rang d'attente)
 │   │   │   ├── depense_repository.dart       dépenses : créer, modifier, archiver, restaurer, lister par mois avec total
-│   │   │   └── depense_vues.dart             FiltreDepenses, DepenseLigne, ListeDepenses
+│   │   │   ├── depense_vues.dart             FiltreDepenses, DepenseLigne, ListeDepenses
+│   │   │   ├── statistiques_repository.dart  statistiques : lecture des ventes, paiements, dépenses, factures impayées (lecture seule)
+│   │   │   └── statistiques_vues.dart        Statistiques : les quatre périodes, factures impayées, chiffres de franchise
 │   │   ├── pdf/
 │   │   │   ├── elements_pdf.dart             éléments de mise en page communs aux factures et aux devis (en-tête, totaux, pied de page)
 │   │   │   ├── facture_pdf.dart              mise en page du PDF d'une facture (genererFacturePdf)
@@ -101,7 +104,7 @@ crochet-creations/
 │   │   │   ├── stockage_photos.dart          copie les photos dans le dossier privé de l'application
 │   │   │   ├── stockage_pdf.dart             range les PDF (factures, devis) : un fichier par numéro
 │   │   │   └── selecteur_photo.dart          choix d'une photo (galerie / appareil), remplaçable en test
-│   │   └── providers.dart                    accès Riverpod à la base, aux repositories et aux photos
+│   │   └── providers.dart                    accès Riverpod à la base, aux repositories, aux photos et à l'horloge
 │   └── presentation/
 │       ├── common/                   placeholder_screen.dart, menu_tile.dart
 │       ├── clients/                          onglet Clients et ses écrans (voir « Clients »)
@@ -118,6 +121,10 @@ crochet-creations/
 │       │   ├── cours_form_screen.dart        création / modification d'un cours
 │       │   ├── cours_providers.dart          flux Riverpod (liste par filtre, fiche)
 │       │   └── cours_widgets.dart            photo du cours, créneau, places, étiquettes de statut et de paiement
+│       ├── statistiques/                     statistiques (voir « Statistiques »)
+│       │   ├── statistiques_screen.dart      écran Statistiques : période, chiffres, classements (écran 20)
+│       │   ├── franchise_tva_carte.dart      carte de franchise de TVA (accueil et statistiques)
+│       │   └── statistiques_providers.dart   flux Riverpod des statistiques
 │       ├── depenses/                         dépenses (voir « Dépenses »)
 │       │   ├── depenses_screen.dart          liste du mois : total, catégories, archivées (écran 19)
 │       │   ├── depense_form_screen.dart      création / modification, photo du ticket, produit concerné, archivage
@@ -633,6 +640,37 @@ menu d'archivage / restauration) et `LigneChoixProduit` / `FeuilleChoixProduit` 
 La feuille « Prendre une photo / Galerie / Retirer » est dans `presentation/common/choix_photo.dart` (le formulaire des
 cours en a encore sa propre copie, à regrouper à l'étape 12).
 
+## Statistiques (étape 10)
+
+### Calculs (`domain/calculs/statistiques.dart`)
+
+Des fonctions pures, testées sans base. Le chiffre d'affaires est l'**argent encaissé** : `calculerStatsPeriode` parcourt les
+ventes (annulées comprises : un remboursement compte) et ne retient que les paiements dont la date est dans la période
+`[début, fin[`. Chaque encaissement est partagé entre les **éléments de la vente** (`composantsDeVente` : les lignes, avec
+leur part de remise, et les frais de port comptés comme un objet) **au prorata de leur valeur** par
+`repartirProportionnellement` (méthode du plus fort reste : la somme des parts est exactement le montant, aussi pour un
+remboursement). La part de chaque élément alimente les compteurs objets / prestations / cours et sa catégorie de produit ;
+le **coût de matière** (coût unitaire relevé à la vente × quantité) est imputé dans la même proportion
+(`diviserArrondi`). Le panier moyen et les meilleures ventes, eux, se calculent sur les ventes **validées dont la date est
+dans la période**. `bornesPeriode` donne le début et la fin de la période qui contient « maintenant » (semaine du lundi) ;
+`niveauFranchise` donne `ok`, `approche` (≥ 80 % du seuil) ou `depasse` (strictement au-dessus).
+
+### Le dépôt (`StatistiquesRepository`)
+
+Lecture seule. `calculer` charge les paiements depuis la plus ancienne date utile (le 1er janvier, ou le lundi de la semaine
+en cours s'il tombe en décembre), les ventes faites depuis ou payées depuis, leurs lignes (avec la catégorie du produit), les
+dépenses **non archivées**, puis calcule **les quatre périodes en une passe**. Les **factures impayées** sont les factures
+`emise` dont la vente (non annulée) a un solde dû > 0 (une vente comptée une fois). `observer` suit les tables `ventes`,
+`lignes_vente`, `paiements`, `depenses`, `factures` et `produits` en direct (`observerTables`) ; l'heure vient de
+`horlogeProvider` (remplaçable en test).
+
+### Écrans
+
+`statistiquesProvider` (un flux partagé par l'accueil et l'écran Statistiques). `StatistiquesScreen` : sélecteur de
+période (`SegmentedButton`, état local), puis des cartes ; le stock faible lit `produitsResumesProvider` et les factures
+impayées ouvrent la liste des factures. `FranchiseTvaCarte` (barres, pourcentage, étiquettes, message) sert à l'accueil et
+aux statistiques. Les chiffres clés portent des `Key` (`stat-ca`, `stat-marge`…) pour les tests.
+
 ## Dossier `android/`
 
 Le dossier `android/` n'est pas versionné. `tool/setup_android.sh` le crée avec `flutter create`,
@@ -716,6 +754,13 @@ liste par mois et total, filtre de catégorie, archivage et restauration, flux e
 et « Plus », total du mois, filtre, mois précédent, archivées, saisie, montant obligatoire, produit concerné, photo du
 ticket, abandon, modification, archivage et restauration).
 
-Reste à écrire avec son étape : statistiques (étape 10).
+Statistiques (étape 10) : `statistiques_test` (arithmétique en centimes, répartition sans perte, périodes dont la semaine du
+lundi, argent encaissé : acompte et solde, remboursement, remise, frais de port, cours, marge, panier moyen, meilleures
+ventes, catégories, dépenses, niveaux de franchise), `statistiques_repository_test` (les quatre périodes sur une base en
+mémoire, vente annulée réellement remboursée, semaine à cheval sur deux années, dépenses archivées, factures impayées,
+flux en direct) et `statistiques_ecrans_test` (écran vide, changement de période, stock faible et factures impayées,
+alerte de franchise en direct, tuiles de l'accueil).
+
+Reste à écrire avec son étape : sauvegarde et export (étape 11).
 
 Commandes : `dart run build_runner build --delete-conflicting-outputs`, puis `flutter analyze` et `flutter test`.

@@ -218,7 +218,7 @@ class _MonEntrepriseScreenState extends ConsumerState<MonEntrepriseScreen> {
             textInputAction: TextInputAction.next,
             decoration: const InputDecoration(
               labelText: 'Nom de l’entreprise',
-              helperText: 'Le nom commercial, par exemple « Crochet & Créations ».',
+              helperText: 'Le nom commercial, par exemple « Un p’tit crochet dans les stocks ».',
             ),
             validator: (String? v) => validerLongueurMax(v, 100, 'Le nom de l’entreprise'),
           ),

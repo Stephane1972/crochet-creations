@@ -568,7 +568,7 @@ Future<void> ouvrirAccueil(
   addTearDown(tester.view.resetDevicePixelRatio);
 
   await tester.pumpWidget(ProviderScope(overrides: env.overrides, child: const CrochetApp()));
-  expect(find.text('Crochet & Créations'), findsOneWidget); // splash
+  expect(find.text('Un p’tit crochet dans les stocks'), findsOneWidget); // splash
 
   await tester.pump(SplashScreen.duree + const Duration(milliseconds: 100));
   await tester.pumpAndSettle();

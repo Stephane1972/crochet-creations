@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Prépare la plateforme Android de l'application :
 #   1. crée le dossier android/ s'il n'existe pas (via `flutter create`) ;
-#   2. règle le nom affiché sous l'icône : « Crochet & Créations » ;
-#   3. génère les icônes de l'application à partir de assets/icon/.
+#   2. règle le nom affiché sous l'icône : « Un p’tit crochet dans les stocks » ;
+#   3. génère les icônes de l'application à partir de assets/icon/ (logo fourni, voir tool/generate_icons.py).
 #
 # Utilisation (à la racine du dépôt, après `flutter pub get`) :
 #   bash tool/setup_android.sh
@@ -15,6 +15,9 @@ cd "$(dirname "$0")/.."
 ORG="fr.crochetcreations"   # identifiant de l'application : fr.crochetcreations.crochet_creations
 PROJET="crochet_creations"
 MANIFEST="android/app/src/main/AndroidManifest.xml"
+# Nom affiché sous l'icône : à garder identique à AppConstants.nomApplication (lib/core/constants/app_constants.dart).
+# L'apostrophe est typographique (’) : pas besoin de la protéger dans le XML.
+NOM_AFFICHE="Un p’tit crochet dans les stocks"
 
 if [ ! -d android ]; then
   echo "→ Création du dossier android/"
@@ -43,9 +46,8 @@ else
   echo "→ Le dossier android/ existe déjà : création ignorée"
 fi
 
-echo "→ Nom affiché sous l'icône : Crochet & Créations"
-# « \&amp; » : le « & » doit être écrit « &amp; » en XML, et protégé pour sed.
-sed -i 's|android:label="[^"]*"|android:label="Crochet \&amp; Créations"|' "$MANIFEST"
+echo "→ Nom affiché sous l'icône : $NOM_AFFICHE"
+sed -i "s|android:label=\"[^\"]*\"|android:label=\"$NOM_AFFICHE\"|" "$MANIFEST"
 
 echo "→ Génération des icônes"
 dart run flutter_launcher_icons

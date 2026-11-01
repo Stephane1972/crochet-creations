@@ -164,7 +164,7 @@ void main() {
     await attendreJusqua(tester, () => env.partageFichiers.partages.isNotEmpty);
 
     expect(env.partageFichiers.partages, <String>[
-      '$_nomManuelle | application/zip | Sauvegarde Crochet & Créations du 31/10/2026',
+      '$_nomManuelle | application/zip | Sauvegarde du 31/10/2026 – Un p’tit crochet dans les stocks',
     ]);
     expect(env.partageFichiers.cheminsPartages.single, endsWith(_nomManuelle));
 
@@ -302,7 +302,7 @@ void main() {
     await attendreJusqua(tester, () => env.partageFichiers.partages.isNotEmpty, essais: 400);
 
     expect(env.partageFichiers.partages, <String>[
-      'crochet-creations-export-csv-2026-10-31.zip | application/zip | Export CSV – Crochet & Créations',
+      'crochet-creations-export-csv-2026-10-31.zip | application/zip | Export CSV – Un p’tit crochet dans les stocks',
     ]);
     final String chemin = env.partageFichiers.cheminsPartages.single;
     final Uint8List octets = await env.travailler(tester, () => File(chemin).readAsBytes());
@@ -321,7 +321,7 @@ void main() {
     await attendreJusqua(tester, () => env.partageFichiers.partages.isNotEmpty, essais: 400);
 
     expect(env.partageFichiers.partages, <String>[
-      'crochet-creations-donnees-2026-10-31.json | application/json | Export JSON – Crochet & Créations',
+      'crochet-creations-donnees-2026-10-31.json | application/json | Export JSON – Un p’tit crochet dans les stocks',
     ]);
     final String contenu = await env.travailler(
       tester,

@@ -1,6 +1,8 @@
 /// Constantes générales de l'application.
 abstract final class AppConstants {
-  static const String nomApplication = 'Crochet & Créations';
+  /// Nom affiché partout (écran de démarrage, réglages, sujets de partage) et sous l'icône Android
+  /// (réglé par `tool/setup_android.sh`, qui doit rester d'accord avec cette ligne).
+  static const String nomApplication = 'Un p’tit crochet dans les stocks';
   static const String accroche = 'Votre atelier, bien rangé';
 
   /// À garder synchronisée avec la ligne `version:` de pubspec.yaml.

@@ -67,7 +67,7 @@ class ServiceSauvegarde {
   /// Où sont écrits les fichiers d'export (CSV, JSON) avant d'être partagés.
   final Directory dossierExports;
 
-  static const String _messageNonReconnu = 'Ce fichier n’est pas une sauvegarde de Crochet & Créations.';
+  static const String _messageNonReconnu = 'Ce fichier n’est pas une sauvegarde de l’application.';
   static const String _messageTropRecente =
       'Cette sauvegarde a été faite avec une version plus récente de l’application. '
       'Mettez l’application à jour avant de la restaurer.';

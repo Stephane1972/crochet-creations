@@ -6,7 +6,39 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
 
 ## [Non publié]
 
-## [0.11.0] — Étape 11 : sauvegarde et export (en attente de validation)
+## [0.12.0] — Étape 12 : finitions (en attente de validation)
+
+### Ajouté
+- **Photo retrouvée après une fermeture d'Android** : `SelecteurPhoto.retrouverPhotoPerdue()` (`image_picker` :
+  `retrieveLostData`) est appelée **une fois au démarrage**, dans `main()`, avant l'affichage du premier écran ; le chemin
+  retrouvé est conservé en mémoire par `photoRetrouveeProvider` (`presentation/common/photo_retrouvee.dart`). La feuille de
+  choix de photo propose alors **« Utiliser la photo retrouvée »** en premier choix. Elle disparaît dès qu'on l'utilise,
+  qu'on choisit une autre photo, ou si le fichier n'existe plus ; refermer la feuille sans rien choisir la garde pour la
+  prochaine fois. Le formulaire lui-même n'est pas restauré.
+- Tests : `photo_retrouvee_test` (offerte, utilisée, consommée ; autre photo choisie ; feuille refermée ; fichier disparu ;
+  sans photo retrouvée ; formulaires produit, cours et dépense). Le faux sélecteur de photo et `EnvironnementTest`
+  (`photoRetrouvee`) connaissent la nouvelle option.
+
+### Modifié
+- **Feuille « choix de photo » regroupée** : le formulaire des cours n'a plus sa propre copie ; les trois formulaires
+  (produit, cours, ticket de dépense) utilisent `demanderChoixPhoto` et `choisirFichierPhoto`
+  (`presentation/common/choix_photo.dart`), avec les mêmes textes et le même message d'erreur.
+- Le texte des réglages indique « étape 12 sur 12 ».
+
+### Décisions prises avec Stéphane
+- Périmètre de l'étape 12 : **les points déjà repérés** (feuille de photo à regrouper, photo perdue à retrouver).
+- Photo perdue : **la garder et la proposer** au prochain choix de photo (le formulaire n'est pas restauré).
+
+### Limites connues et hypothèses (à confirmer)
+- `retrieveLostData` ne fonctionne que sous Android et ne peut être appelée qu'**une fois** : si l'application est
+  rouverte sans qu'on choisisse de photo, la photo retrouvée reste proposée jusqu'à la fermeture de l'application, mais
+  n'est plus retrouvée au démarrage suivant.
+- La photo retrouvée reste dans le dossier temporaire du téléphone tant qu'elle n'est pas utilisée ; une fois choisie, elle
+  est copiée dans l'application comme n'importe quelle photo.
+- Le numéro de version reste en `0.x` : le passage à **1.0.0** est à décider par Stéphane à la validation.
+- Le schéma de la base n'a pas changé : pas de migration. Aucune nouvelle dépendance.
+
+## [0.11.0] — Étape 11 : sauvegarde et export
 
 ### Ajouté
 - **Sauvegarde** (`data/sauvegarde/service_sauvegarde.dart`, `format_sauvegarde.dart`) : une archive `.zip` avec `donnees.json`
@@ -124,8 +156,8 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
   formulaire de création / modification (date, catégorie, montant, fournisseur, description, **photo du ticket**,
   **produit concerné**) avec abandon confirmé et menu d'archivage.
 - `selecteur_produit.dart` : choix du produit (recherche par nom ou référence, « Aucun produit »).
-  `common/choix_photo.dart` : la feuille « Prendre une photo / Galerie / Retirer », réutilisable (le formulaire des cours garde pour
-  l'instant sa propre copie : à regrouper à l'étape 12).
+  `common/choix_photo.dart` : la feuille « Prendre une photo / Galerie / Retirer », réutilisable (le formulaire des cours
+  gardait sa propre copie ; regroupée à l'étape 12).
 - `formatMois` (« octobre 2026 ») dans `core/utils/date_fr.dart`.
 - Tests : règles (`regles_depenses_test`), dépôt (`depense_repository_test`), `formatMois` et scénarios d'écran
   (`depenses_ecrans_test`).
@@ -426,7 +458,7 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
 - « Vendre » et « Ajouter au panier » ouvrent l'onglet Vente, encore provisoire, jusqu'à l'étape 5.
 - L'historique des ventes reste vide tant qu'aucune vente ne peut être enregistrée (étape 5).
 - Dupliquer ne copie pas les photos et remet le stock à zéro (la copie est ouverte pour être complétée).
-- Si Android ferme l'application pendant la prise d'une photo, celle-ci n'est pas récupérée (à traiter à l'étape 12).
+- Si Android ferme l'application pendant la prise d'une photo, celle-ci n'était pas récupérée (traité à l'étape 12).
 - Le schéma de la base n'a pas changé : pas de migration.
 
 ## [0.2.0] — Étape 2 : base de données

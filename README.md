@@ -1,4 +1,4 @@
-# Crochet & Créations
+# Un p’tit crochet dans les stocks
 
 Application Android de gestion pour une créatrice auto-entrepreneuse qui vend des objets en crochet,
 des doudous, des boucles d'oreilles, des accessoires faits main, des créations personnalisées et des
@@ -8,7 +8,8 @@ Elle permet de gérer le **catalogue et le stock**, les **clients**, les **vente
 les **devis**, les **cours et inscriptions**, les **dépenses**, des **statistiques simples**
 et les **sauvegardes**. Elle fonctionne **entièrement hors ligne**, sans serveur.
 
-> Nom provisoire : « Crochet & Créations ».
+> Nom de l'application : « Un p’tit crochet dans les stocks » (elle s'appelait « Crochet & Créations » : le nom du dépôt GitHub
+> et le nom technique `crochet_creations` n'ont pas changé).
 
 ## État d'avancement
 
@@ -27,7 +28,17 @@ Le développement se fait en 12 étapes validées une par une (détail dans [ROA
 | 9 | Dépenses : catégories, photo du ticket, produit concerné | terminée et validée |
 | 10 | Statistiques et alertes de franchise de TVA | terminée et validée |
 | 11 | Sauvegarde, export CSV / JSON et restauration | terminée et validée |
-| 12 | Tests, corrections, optimisation de l'interface | **à valider** (PR #12) |
+| 12 | Tests, corrections, optimisation de l'interface | terminée et validée |
+
+### Nom et logo de l'application (après l'étape 12)
+
+- **Nouveau nom** : « Un p’tit crochet dans les stocks », affiché partout : sous l'icône Android, écran de démarrage, réglages,
+  sujets des partages (sauvegardes, exports).
+- **Nouveau logo** (la fillette aux pelotes) : **icône de lancement Android** (icône adaptative, sur fond rose) et **logo dans
+  l'application** (écran de démarrage, accueil, réglages). L'image de départ est `assets/icon/logo_source.png` ; la commande
+  `python3 tool/generate_icons.py` en refait les images dérivées.
+- Les **factures et devis** gardent pour l'instant l'ancien logo monochrome et le nom saisi dans *Mon entreprise* : le logo de
+  l'entreprise sera remplacé plus tard par un autre fichier.
 
 ### Ce que contient l'étape 12 : finitions
 
@@ -54,7 +65,7 @@ Le développement se fait en 12 étapes validées une par une (détail dans [ROA
   permet de la **partager** (e-mail, messagerie, Drive… pour en garder une copie *hors* du téléphone), de la **restaurer** ou
   de la **supprimer**.
 - **Restaurer** (depuis la liste, ou **depuis un fichier** `.zip` choisi dans le téléphone, par exemple reçu par e-mail) :
-  l'application vérifie d'abord que c'est bien une sauvegarde de Crochet & Créations, dit ce qu'elle contient et demande
+  l'application vérifie d'abord que c'est bien une sauvegarde de l'application, dit ce qu'elle contient et demande
   confirmation. La restauration **remplace tout** (données, photos, PDF). Juste avant, une **copie de sécurité** de l'état
   actuel est faite (les 3 dernières sont conservées, dans la même liste). Si la restauration échoue en route, **rien n'est
   modifié**.
@@ -289,7 +300,7 @@ Flutter doit être récent (canal *stable*, Flutter 3.38 / Dart 3.10 au minimum)
 
 ```
 lib/            code de l'application : presentation, domain, data (voir ARCHITECTURE.md)
-assets/         logo SVG, icônes, police Poppins
+assets/         logo, icônes, police Poppins
 test/           tests automatiques
 tool/           scripts : génération des icônes et du dossier android/, annotations de la CI
 .github/        construction automatique de l'APK

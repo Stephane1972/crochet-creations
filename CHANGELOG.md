@@ -6,7 +6,39 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
 
 ## [Non publié]
 
-## [0.12.0] — Étape 12 : finitions (en attente de validation)
+## [0.12.1] — Nouveau nom et nouveau logo (en attente de validation)
+
+### Modifié
+- **Nom de l'application : « Un p’tit crochet dans les stocks »** (au lieu de « Crochet & Créations »), à chaque endroit où
+  le nom de l'application est affiché : nom sous l'icône Android (`tool/setup_android.sh`), écran de démarrage, réglages,
+  titre de l'application, sujets des partages de sauvegardes et d'exports, texte d'aide de *Mon entreprise*, métadonnées des
+  PDF (`creator`), description du paquet. Le message d'une archive refusée dit simplement « l'application ».
+- **Logo** : la fillette aux pelotes (image fournie) devient l'**icône de lancement Android** (icône adaptative, fond `#FCE5E6`,
+  logo entier réduit à 62 % pour rester visible avec tous les masques d'Android ; icône classique = le logo lui-même) et le
+  **logo dans l'application** (`AppLogo` : écran de démarrage, accueil, réglages), en carré aux coins arrondis.
+- `tool/generate_icons.py` part maintenant du logo fourni (`assets/icon/logo_source.png`) et produit le premier plan de
+  l'icône et `assets/images/logo_application.png`.
+- Documentation : l'étape 12 est marquée comme validée.
+
+### Supprimé
+- L'ancien logo vectoriel en couleur (`logo.svg`), les anciennes icônes (`app_icon.png`, `app_icon_monochrome.png`) et la
+  dépendance `flutter_svg`, qui ne servaient plus qu'à l'afficher.
+
+### Inchangé volontairement
+- Identifiants techniques : nom du paquet `crochet_creations`, identifiant Android `fr.crochetcreations.crochet_creations`,
+  dépôt GitHub, préfixe `crochet-creations-` des fichiers de sauvegarde et d'export, identifiant `crochet-creations` du
+  manifeste des sauvegardes. Les changer casserait la mise à jour de l'application installée et la restauration des
+  anciennes sauvegardes.
+- Les **factures et devis** gardent l'ancien logo monochrome (`logo_mono.png`) et le nom saisi dans *Mon entreprise* : un autre
+  logo, celui de l'entreprise, doit être fourni.
+
+### Limites connues et hypothèses (à confirmer)
+- Le nom est long : sous l'icône, Android l'affiche sur deux lignes et le **coupe** probablement (« Un p’tit crochet… »).
+- Le logo contient du texte (« Un p'tit crochet par ici ») : à la taille d'une icône, ce texte est trop petit pour être lu. Une
+  variante recadrée sur la fillette (sans texte) donnerait une icône plus lisible.
+- Plus de version monochrome pour les icônes thématiques d'Android 13 : l'icône reste en couleurs.
+
+## [0.12.0] — Étape 12 : finitions
 
 ### Ajouté
 - **Photo retrouvée après une fermeture d'Android** : `SelecteurPhoto.retrouverPhotoPerdue()` (`image_picker` :

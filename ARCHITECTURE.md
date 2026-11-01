@@ -32,8 +32,8 @@ crochet-creations/
 ├── .github/workflows/android.yml     construction automatique : code généré, analyse, tests, APK
 ├── assets/
 │   ├── fonts/                        Poppins (titres) + licence OFL
-│   ├── icon/                         PNG d'icône générés (voir tool/generate_icons.py)
-│   └── images/                       logo.svg (couleur), logo_mono.svg et logo_mono.png (monochrome, pour les PDF)
+│   ├── icon/                         logo_source.png (logo fourni) et app_icon_foreground.png (généré, voir tool/generate_icons.py)
+│   └── images/                       logo_application.png (logo de l'application), logo_mono.svg et logo_mono.png (monochrome, pour les PDF)
 ├── lib/
 │   ├── main.dart                     ouvre la base, lit le mode jour/nuit, lance l'application
 │   ├── app.dart                      MaterialApp : thèmes, langue française, routes
@@ -51,7 +51,7 @@ crochet-creations/
 │   │   │   ├── recherche.dart                recherche sans majuscules ni accents
 │   │   │   ├── validateurs.dart              règles des champs de formulaire (obligatoire, montant, entier…)
 │   │   │   └── texte.dart                    nettoyage des saisies facultatives
-│   │   └── widgets/                          logo SVG, icônes de barre d'état, dialogues de confirmation, étiquette
+│   │   └── widgets/                          logo de l'application, icônes de barre d'état, dialogues de confirmation, étiquette
 │   ├── domain/
 │   │   ├── enums.dart                        listes de choix (catégories, statuts, modes de paiement…)
 │   │   ├── erreurs.dart                      erreurs métier à message clair
@@ -186,7 +186,7 @@ crochet-creations/
 │   ├── core/ domain/ data/ presentation/     tests (voir plus bas)
 │   └── widget_test.dart                      parcours splash → accueil → réglages
 ├── tool/
-│   ├── generate_icons.py             logo SVG → PNG d'icône
+│   ├── generate_icons.py             logo fourni → premier plan d'icône adaptative et logo de l'application
 │   ├── setup_android.sh              crée android/, règle le nom, génère les icônes
 │   └── ci_annoter.sh                 publie les erreurs de la CI en annotations lisibles
 ├── pubspec.yaml
@@ -268,9 +268,15 @@ Navigation Flutter standard (`Navigator` + routes nommées), sans bibliothèque 
   Les boutons principaux utilisent donc un texte vert très sombre (`encreSurSauge`, 4,9:1), et les liens sur
   fond clair un vert plus profond (`saugeTexte`, 5,1:1). Un test (`app_theme_test.dart`) vérifie tous les
   couples texte/fond dans les deux modes.
-- **Logo** : `assets/images/logo.svg` (couleur) et `logo_mono.svg` (une couleur, pour les factures). Le même
-  fichier s'affiche dans l'application (`flutter_svg`) et pourra être intégré aux PDF (`pw.SvgImage`).
-  Le logo ne contient pas de texte : le nom est composé en Flutter / dans le PDF avec la police du projet.
+- **Nom et logo** : le nom affiché est `AppConstants.nomApplication` (« Un p’tit crochet dans les stocks ») ; le script
+  `tool/setup_android.sh` écrit le même nom dans le manifeste Android (nom sous l'icône) et doit rester d'accord avec lui.
+  Le logo est une image PNG fournie (`assets/icon/logo_source.png`, 1024 px) : `tool/generate_icons.py` en tire le
+  premier plan de l'icône adaptative (logo réduit à 62 % pour rester dans la zone visible d'Android, bords estompés, fond
+  `#FCE5E6` = couleur du pourtour du logo) et `assets/images/logo_application.png` (640 px), que le widget `AppLogo`
+  affiche dans un carré aux coins arrondis. L'icône classique (Android avant 8) est le logo lui-même. Il n'y a plus de
+  version monochrome de l'icône (thème d'icônes d'Android 13) ni de dépendance `flutter_svg`.
+  Les factures et devis gardent `logo_mono.png` (ancien logo monochrome, lu par `ressources_pdf.dart`) en attendant le
+  logo de l'entreprise ; le nom qu'ils portent est celui saisi dans *Mon entreprise*.
 
 ## Base de données (Drift / SQLite)
 
@@ -755,12 +761,12 @@ progression) ; une erreur métier s'affiche telle quelle, sinon une phrase gén�
 ## Dossier `android/`
 
 Le dossier `android/` n'est pas versionné. `tool/setup_android.sh` le crée avec `flutter create`,
-règle le nom affiché (« Crochet & Créations ») et génère les icônes. La CI exécute ce script à chaque fois.
+règle le nom affiché (« Un p’tit crochet dans les stocks ») et génère les icônes. La CI exécute ce script à chaque fois.
 
 Conséquence à garder en tête pour les étapes suivantes : toute modification de configuration Android
 devra être ajoutée à ce script. `image_picker` (étape 3) n'en demande aucune : la galerie passe par le sélecteur
 de photos du système, sans permission. L'appareil photo, lui, ouvre l'application photo du téléphone ; si
-Android ferme Crochet & Créations pendant la prise de vue, la photo est retrouvée au démarrage suivant (voir *Photos*).
+Android ferme l'application pendant la prise de vue, la photo est retrouvée au démarrage suivant (voir *Photos*).
 Si cette contrainte gêne, on pourra versionner `android/` à la place (il suffit de retirer `/android/` du `.gitignore`).
 
 ## Choix techniques

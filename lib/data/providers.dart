@@ -4,6 +4,7 @@ import '../domain/document_devis.dart';
 import '../domain/document_facture.dart';
 import 'database/app_database.dart';
 import 'partage/service_documents.dart';
+import 'partage/service_partage_fichiers.dart';
 import 'pdf/devis_pdf.dart';
 import 'pdf/facture_pdf.dart';
 import 'pdf/ressources_pdf.dart';
@@ -17,6 +18,9 @@ import 'repositories/parametres_repository.dart';
 import 'repositories/produit_repository.dart';
 import 'repositories/statistiques_repository.dart';
 import 'repositories/vente_repository.dart';
+import 'sauvegarde/export_csv.dart';
+import 'sauvegarde/selecteur_fichier.dart';
+import 'sauvegarde/service_sauvegarde.dart';
 import 'stockage/selecteur_photo.dart';
 import 'stockage/stockage_pdf.dart';
 import 'stockage/stockage_photos.dart';
@@ -139,3 +143,27 @@ final statistiquesRepositoryProvider = Provider<StatistiquesRepository>(
 /// L'heure « maintenant », dont dépendent les périodes des statistiques (aujourd'hui, cette semaine, ce mois-ci...).
 /// Les tests la remplacent par une heure fixe.
 final horlogeProvider = Provider<DateTime Function()>((ref) => DateTime.now);
+
+/// Sauvegarde et restauration, fournies au démarrage (voir `lib/main.dart`).
+/// Les tests les remplacent par un service qui travaille dans un dossier temporaire.
+final serviceSauvegardeProvider = Provider<ServiceSauvegarde>((ref) {
+  throw UnimplementedError(
+    'serviceSauvegardeProvider doit être fourni au démarrage (overrides du ProviderScope).',
+  );
+});
+
+/// Export des données en CSV (un .zip, un fichier par type de données).
+final exportCsvProvider = Provider<ExportCsv>(
+  (ref) => ExportCsv(ref.watch(appDatabaseProvider), horloge: ref.watch(horlogeProvider)),
+);
+
+/// Sélecteur de fichiers d'Android, pour restaurer une sauvegarde. Les tests le remplacent par un faux sélecteur.
+final selecteurFichierSauvegardeProvider = Provider<SelecteurFichierSauvegarde>(
+  (ref) => SelecteurFichierSysteme(),
+);
+
+/// Partage d'un fichier (sauvegarde, export) par la feuille de partage d'Android. Les tests le remplacent par
+/// un faux service.
+final servicePartageFichiersProvider = Provider<ServicePartageFichiers>(
+  (ref) => ServicePartageFichiersSysteme(),
+);

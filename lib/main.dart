@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -10,6 +11,7 @@ import 'core/theme/theme_mode_provider.dart';
 import 'data/database/app_database.dart';
 import 'data/providers.dart';
 import 'data/repositories/parametres_repository.dart';
+import 'data/sauvegarde/service_sauvegarde.dart';
 import 'data/stockage/stockage_pdf.dart';
 import 'data/stockage/stockage_photos.dart';
 import 'presentation/startup/erreur_demarrage_app.dart';
@@ -38,6 +40,16 @@ Future<void> main() async {
       Directory('${documents.path}${Platform.pathSeparator}devis'),
     );
 
+    // Sauvegardes : un dossier à part, et un dossier pour les fichiers d'export avant partage.
+    final ServiceSauvegarde sauvegarde = ServiceSauvegarde(
+      base: base,
+      dossierSauvegardes: Directory('${documents.path}${Platform.pathSeparator}sauvegardes'),
+      dossierExports: Directory('${documents.path}${Platform.pathSeparator}exports'),
+      dossierPhotos: photos.dossier,
+      dossierFactures: factures.dossier,
+      dossierDevis: devis.dossier,
+    );
+
     runApp(
       ProviderScope(
         overrides: [
@@ -45,14 +57,27 @@ Future<void> main() async {
           stockagePhotosProvider.overrideWithValue(photos),
           stockageFacturesProvider.overrideWithValue(factures),
           stockageDevisProvider.overrideWithValue(devis),
+          serviceSauvegardeProvider.overrideWithValue(sauvegarde),
           modeThemeInitialProvider.overrideWithValue(modeInitial),
           modeThemeStoreProvider.overrideWithValue(parametres),
         ],
         child: const CrochetApp(),
       ),
     );
+
+    // Sauvegarde automatique : si la dernière date d'un jour ou plus. En arrière-plan, après l'affichage du
+    // premier écran : elle ne retarde pas le démarrage, et un échec ne gêne jamais l'utilisation.
+    unawaited(_sauvegardeAutomatique(sauvegarde));
   } catch (erreur, pile) {
     debugPrint('Ouverture de la base impossible : $erreur\n$pile');
     runApp(ErreurDemarrageApp(erreur: erreur));
+  }
+}
+
+Future<void> _sauvegardeAutomatique(ServiceSauvegarde sauvegarde) async {
+  try {
+    await sauvegarde.sauvegarderAutomatiquementSiBesoin();
+  } catch (erreur, pile) {
+    debugPrint('Sauvegarde automatique impossible : $erreur\n$pile');
   }
 }

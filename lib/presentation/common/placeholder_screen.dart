@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../core/router/app_routes.dart';
-
 /// Description d'un écran qui sera développé dans une étape ultérieure.
 class PlaceholderInfo {
   const PlaceholderInfo({
@@ -19,19 +17,11 @@ class PlaceholderInfo {
   final String description;
 }
 
-/// Écrans prévus mais pas encore développés (voir ROADMAP.md).
+/// Écrans prévus mais pas encore développés (voir ROADMAP.md). Plus aucun depuis l'étape 11 : toutes les routes
+/// ont leur écran ; la liste est gardée vide pour les prochaines routes que l'on voudrait annoncer à l'avance.
 abstract final class EcransAVenir {
-  static const PlaceholderInfo sauvegarde = PlaceholderInfo(
-    titre: 'Sauvegarde et export',
-    icone: Icons.backup_outlined,
-    etape: 11,
-    description: 'Sauvegarde, export CSV/JSON et restauration.',
-  );
-
   /// Écran « Bientôt disponible » à afficher pour chaque route non développée.
-  static const Map<String, PlaceholderInfo> parRoute = <String, PlaceholderInfo>{
-    AppRoutes.sauvegarde: sauvegarde,
-  };
+  static const Map<String, PlaceholderInfo> parRoute = <String, PlaceholderInfo>{};
 }
 
 /// Écran provisoire « Bientôt disponible ».

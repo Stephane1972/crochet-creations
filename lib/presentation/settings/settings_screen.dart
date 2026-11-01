@@ -7,8 +7,8 @@ import '../../core/theme/theme_mode_provider.dart';
 import '../../core/widgets/app_logo.dart';
 import '../common/menu_tile.dart';
 
-/// Réglages. À l'étape 1 : choix du thème (automatique / jour / nuit) et accès
-/// aux écrans « Mon entreprise » et « Sauvegarde » (qui arriveront plus tard).
+/// Réglages : choix du thème (automatique / jour / nuit) et accès aux écrans « Mon entreprise » et
+/// « Sauvegarde et export ».
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
@@ -104,7 +104,7 @@ class SettingsScreen extends ConsumerWidget {
                       children: <Widget>[
                         Text(AppConstants.nomApplication, style: theme.textTheme.titleSmall),
                         Text(
-                          'Version ${AppConstants.version} · étape 10 sur 12 · '
+                          'Version ${AppConstants.version} · étape 11 sur 12 · '
                           'fonctionne sans connexion',
                           style: theme.textTheme.bodyMedium?.copyWith(
                             color: scheme.onSurfaceVariant,

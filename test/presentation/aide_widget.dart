@@ -17,6 +17,9 @@ import 'package:crochet_creations/data/repositories/parametres_repository.dart';
 import 'package:crochet_creations/data/repositories/produit_repository.dart';
 import 'package:crochet_creations/data/repositories/vente_repository.dart';
 import 'package:crochet_creations/data/partage/service_documents.dart';
+import 'package:crochet_creations/data/partage/service_partage_fichiers.dart';
+import 'package:crochet_creations/data/sauvegarde/selecteur_fichier.dart';
+import 'package:crochet_creations/data/sauvegarde/service_sauvegarde.dart';
 import 'package:crochet_creations/data/stockage/selecteur_photo.dart';
 import 'package:crochet_creations/data/stockage/stockage_pdf.dart';
 import 'package:crochet_creations/data/stockage/stockage_photos.dart';
@@ -99,6 +102,36 @@ class FauxServiceDocuments implements ServiceDocuments {
   }
 }
 
+/// Faux partage de fichiers (sauvegarde, export) : garde ce qui serait envoyé à la feuille de partage d'Android.
+class FauxServicePartageFichiers implements ServicePartageFichiers {
+  /// « nom du fichier | type | sujet » de chaque partage.
+  final List<String> partages = <String>[];
+  final List<String> cheminsPartages = <String>[];
+
+  @override
+  Future<void> partager({
+    required String cheminFichier,
+    required String nomFichier,
+    required String typeMime,
+    required String sujet,
+  }) async {
+    cheminsPartages.add(cheminFichier);
+    partages.add('$nomFichier | $typeMime | $sujet');
+  }
+}
+
+/// Faux sélecteur de fichier : « choisit » toujours [contenu] (ou annule si `null`).
+class FauxSelecteurFichier implements SelecteurFichierSauvegarde {
+  Uint8List? contenu;
+  int appels = 0;
+
+  @override
+  Future<Uint8List?> choisir() async {
+    appels++;
+    return contenu;
+  }
+}
+
 /// Tout ce qu'il faut pour tester des écrans : base en mémoire, dossiers de photos et de factures
 /// temporaires, faux sélecteur de photo, faux fabricant de PDF.
 class EnvironnementTest {
@@ -122,6 +155,17 @@ class EnvironnementTest {
   final FauxGenerateurPdf generateurPdf = FauxGenerateurPdf();
   final FauxServiceDocuments documents = FauxServiceDocuments();
   final FauxGenerateurDevisPdf generateurDevisPdf = FauxGenerateurDevisPdf();
+  final FauxServicePartageFichiers partageFichiers = FauxServicePartageFichiers();
+  final FauxSelecteurFichier selecteurFichier = FauxSelecteurFichier();
+  late final ServiceSauvegarde sauvegarde = ServiceSauvegarde(
+    base: db,
+    dossierSauvegardes: Directory('${dossier.path}/sauvegardes'),
+    dossierExports: Directory('${dossier.path}/exports'),
+    dossierPhotos: dossierPhotos,
+    dossierFactures: dossierFactures,
+    dossierDevis: dossierDevis,
+    horloge: () => maintenant ?? DateTime.now(),
+  );
   late final StockagePdf stockageFactures = StockagePdf(dossierFactures);
   late final StockagePdf stockageDevis = StockagePdf(dossierDevis);
   late final FactureRepository factures = FactureRepository(
@@ -164,6 +208,9 @@ class EnvironnementTest {
     generateurFacturePdfProvider.overrideWithValue(generateurPdf.call),
     generateurDevisPdfProvider.overrideWithValue(generateurDevisPdf.call),
     serviceDocumentsProvider.overrideWithValue(documents),
+    serviceSauvegardeProvider.overrideWithValue(sauvegarde),
+    servicePartageFichiersProvider.overrideWithValue(partageFichiers),
+    selecteurFichierSauvegardeProvider.overrideWithValue(selecteurFichier),
     horlogeProvider.overrideWithValue(() => maintenant ?? DateTime.now()),
     // L'aperçu réel rasterise le PDF avec le moteur d'impression d'Android : ici, on en affiche le texte.
     constructeurApercuPdfProvider.overrideWithValue(

@@ -100,6 +100,13 @@ crochet-creations/
 │   │   │   ├── construire_document.dart      facture ou devis + profil → DocumentFacture / DocumentDevis
 │   │   │   └── ressources_pdf.dart           polices Poppins et logo lus dans les ressources
 │   │   ├── partage/service_documents.dart    partage (share_plus) et impression (printing), remplaçables en test
+│   │   ├── sauvegarde/
+│   │   │   ├── format_sauvegarde.dart        contenu d'une archive, liste des tables dans l'ordre, nommage, types de sauvegarde
+│   │   │   ├── service_sauvegarde.dart       sauvegarder, lister, sauvegarde automatique, restaurer, export JSON
+│   │   │   ├── export_csv.dart               export CSV : un .zip, un fichier par type de données
+│   │   │   └── selecteur_fichier.dart        choix du fichier à restaurer (interface + sélecteur Android)
+│   │   ├── partage/
+│   │   │   └── service_partage_fichiers.dart partage d'un fichier quelconque (sauvegarde, export) par la feuille de partage
 │   │   ├── stockage/
 │   │   │   ├── stockage_photos.dart          copie les photos dans le dossier privé de l'application
 │   │   │   ├── stockage_pdf.dart             range les PDF (factures, devis) : un fichier par numéro
@@ -121,6 +128,9 @@ crochet-creations/
 │       │   ├── cours_form_screen.dart        création / modification d'un cours
 │       │   ├── cours_providers.dart          flux Riverpod (liste par filtre, fiche)
 │       │   └── cours_widgets.dart            photo du cours, créneau, places, étiquettes de statut et de paiement
+│       ├── sauvegarde/                       sauvegarde et export (voir « Sauvegarde et export »)
+│       │   ├── sauvegarde_screen.dart        écran Sauvegarde et export : sauvegarder, restaurer, exporter (écran 23)
+│       │   └── sauvegarde_providers.dart     liste des sauvegardes du téléphone
 │       ├── statistiques/                     statistiques (voir « Statistiques »)
 │       │   ├── statistiques_screen.dart      écran Statistiques : période, chiffres, classements (écran 20)
 │       │   ├── franchise_tva_carte.dart      carte de franchise de TVA (accueil et statistiques)
@@ -218,7 +228,11 @@ les produits : `domain/produits/`, `data/produits/`, `presentation/produits/`.
 - clients (`presentation/clients/clients_providers.dart`) : `clientsProvider` (tous les clients, archivés compris, en
   direct), `clientProvider(id)` (fiche) et `historiqueClientProvider(id)` (devis, ventes, factures, paiements, cours) ;
 - `filtresClientsProvider` : recherche, type (particulier / professionnel), « Archivés ». Le filtrage et le tri
-  se font côté écran (`filtrerClients`), sur la liste complète : un client archivé apparaît ou disparaît sans relecture.
+  se font côté écran (`filtrerClients`), sur la liste complète : un client archivé apparaît ou disparaît sans relecture ;
+- sauvegarde (étape 11) : `serviceSauvegardeProvider` (fourni par `main()`, lève une erreur explicite sinon),
+  `exportCsvProvider`, `selecteurFichierSauvegardeProvider` et `servicePartageFichiersProvider` (les tests remplacent
+  les deux derniers par des faux), `sauvegardesLocalesProvider` (liste des sauvegardes du téléphone, relue par
+  `ref.invalidate` après chaque sauvegarde, suppression ou restauration).
 
 Les flux « en direct » sont des `StreamProvider.autoDispose` : l'écran se met à jour tout seul après chaque
 enregistrement, sans rechargement manuel.
@@ -671,6 +685,63 @@ période (`SegmentedButton`, état local), puis des cartes ; le stock faible lit
 impayées ouvrent la liste des factures. `FranchiseTvaCarte` (barres, pourcentage, étiquettes, message) sert à l'accueil et
 aux statistiques. Les chiffres clés portent des `Key` (`stat-ca`, `stat-marge`…) pour les tests.
 
+## Sauvegarde et export (étape 11)
+
+### L'archive (`ServiceSauvegarde`, `FormatSauvegarde`)
+
+Un `.zip` avec `donnees.json` et les fichiers. `donnees.json` contient un **manifeste** (`application`, `format` = version de
+l'organisation du fichier, `versionSchema` = `AppDatabase.versionSchema`, `versionApplication`, `creeLe`, `nombreFichiers`,
+`lignes` par table) puis `tables` : pour chacune des 15 tables, ses lignes lues par `SELECT * … ORDER BY id`, **telles que
+SQLite les stocke** (dates en secondes, booléens 0/1, énumérations en texte). Rien n'est recalculé : une sauvegarde restaurée
+redonne exactement les mêmes lignes (un test le vérifie table par table). Les 15 lectures se font dans **une transaction** :
+l'instantané est cohérent même si l'application écrit en même temps. Les fichiers sont rangés sous
+`fichiers/<dossier>/<nom>` (`photos_produits`, `factures`, `devis`) ; la base ne garde que des noms relatifs, ils retrouvent
+donc leur place.
+
+`FormatSauvegarde.tables` donne les tables **dans l'ordre où on peut les remplir** (une table après celles qu'elle
+référence) ; on les vide dans l'ordre inverse. Un test compare cette liste à `allTables` de la base **et** vérifie l'ordre avec
+`PRAGMA foreign_key_list` : une nouvelle table oubliée ou mal placée fait échouer la CI.
+
+### Où et quand
+
+Les sauvegardes sont dans `<documents>/sauvegardes/`, nommées `crochet-creations-<type>-AAAA-MM-JJ-HHMMSS.zip`
+(`auto`, `manuelle`, `avant-restauration`, suffixe `-2`, `-3`… si deux tombent dans la même seconde). La date vient du nom,
+sans changement de schéma ; les fichiers qui ne suivent pas ce modèle (provisoires `.tmp`, fichiers étrangers) sont ignorés.
+Les écritures passent par un fichier provisoire renommé ensuite (`ecrireAtomiquement`) : jamais d'archive à moitié écrite.
+`main()` lance `sauvegarderAutomatiquementSiBesoin()` **après** `runApp`, sans l'attendre : une sauvegarde automatique est
+faite si la dernière (automatique ou manuelle, pas une copie de sécurité) date d'un jour ou plus. Rotation : 7 automatiques, 3
+copies de sécurité ; les manuelles ne sont supprimées que par la personne.
+
+### Restaurer
+
+1. `examiner` (sans effet) : décode le zip, vérifie le manifeste (`application`, `format` et `versionSchema` pas plus récents que
+   ceux de l'application), le type des valeurs et les noms de fichiers (**uniquement** `fichiers/<dossier connu>/<nom>`, sans
+   `..`, `\` ni `:`). Une archive refusée n'a produit aucune copie de sécurité ni aucun fichier.
+2. Copie de sécurité (`avant-restauration`) de l'état actuel.
+3. Les fichiers de l'archive sont écrits dans des dossiers provisoires `….restauration`.
+4. **Une transaction** vide les tables (ordre inverse) puis les remplit (ordre direct) avec des `INSERT` paramétrés ; chaque
+   colonne de l'archive est vérifiée contre `PRAGMA table_info`. Les contraintes `CHECK` et les clés étrangères de la base
+   jouent leur rôle : une archive incohérente fait échouer la transaction, qui est annulée (`DonneeInvalide`, dossiers
+   provisoires supprimés, fichiers intacts).
+5. `markTablesUpdated` prévient Drift (les écrans qui lisent en direct se rafraîchissent), puis chaque dossier de fichiers est
+   échangé avec son dossier provisoire (renommages).
+L'écran relit ensuite le mode jour / nuit restauré, remet à zéro la vente en cours et renvoie à l'accueil.
+
+### Export CSV (`ExportCsv`, `domain/csv.dart`)
+
+`fabriquerTextes()` lit les tables dans une transaction et produit un texte par fichier (`produits.csv`, `clients.csv`,
+`ventes.csv`, `factures.csv`, `devis.csv`, `cours.csv`, `inscriptions.csv`, `depenses.csv`) ; `fabriquerArchive()` les range
+dans un `.zip` (UTF-8 avec BOM). Les libellés viennent des énumérations, les noms de client sont résolus (« Client de
+passage » sans fiche), les montants passent par `montantCsv` (`12,50`). `construireCsv` vérifie (assertion) que chaque ligne a
+autant de cellules que d'en-têtes ; `echapperCsv` protège les cellules qui contiennent `;`, `"` ou un retour à la ligne.
+
+### Écran et services
+
+`SauvegardeScreen` n'a pas de logique propre : il appelle `ServiceSauvegarde`, `ExportCsv`, `ServicePartageFichiers` (partage
+d'un fichier par `share_plus`) et `SelecteurFichierSauvegarde` (`file_picker`), tous fournis par des providers que les tests
+remplacent (faux partage, faux sélecteur, dossiers temporaires). Une opération en cours désactive les boutons (barre de
+progression) ; une erreur métier s'affiche telle quelle, sinon une phrase générale.
+
 ## Dossier `android/`
 
 Le dossier `android/` n'est pas versionné. `tool/setup_android.sh` le crée avec `flutter create`,
@@ -695,6 +766,7 @@ Si cette contrainte gêne, on pourra versionner `android/` à la place (il suffi
 | Photos des produits | `image_picker` (galerie et appareil photo, aucune permission à déclarer), copie dans le dossier privé de l'application ; chemin relatif en base | étape 3 |
 | Variantes dans l'étape 3 | L'interface des variantes (couleur / taille, stock propre) fait partie de l'étape 3 : c'est la réalisation du champ « couleur / variante » de la fiche produit | étape 3, à confirmer |
 | Factures PDF | `pdf` (mise en page), `printing` (aperçu et impression), `share_plus` (partage) ; PDF rangés dans le dossier privé, nom du fichier en base | étape 6 |
+| Sauvegarde et export | `archive` (fabriquer et lire les `.zip`, en mémoire) et `file_picker` (choisir un fichier à restaurer, sélecteur du système sans permission) ; partage par `share_plus` | étape 11 |
 | Dépendances des étapes suivantes | arriveront avec les étapes qui s'en servent | à venir |
 
 ### Hypothèses du schéma, à confirmer
@@ -761,6 +833,13 @@ mémoire, vente annulée réellement remboursée, semaine à cheval sur deux ann
 flux en direct) et `statistiques_ecrans_test` (écran vide, changement de période, stock faible et factures impayées,
 alerte de franchise en direct, tuiles de l'accueil).
 
-Reste à écrire avec son étape : sauvegarde et export (étape 11).
+Sauvegarde et export (étape 11) : `csv_test` (protection des cellules, montants), `service_sauvegarde_test` (liste des tables
+= celles de la base et dans l'ordre des clés étrangères, contenu de l'archive, nommage, **aller-retour complet** sur un autre
+téléphone et sur le même, copie de sécurité qui permet de revenir en arrière, archives refusées sans rien changer, restauration
+annulée en cas de colonne inconnue / contrainte / liaison cassée, écrans prévenus, sauvegarde automatique et rotation, export
+JSON), `export_csv_test` (contenu de chaque fichier, archive, BOM) et `sauvegarde_ecran_test` (parcours de l'écran).
+`test/data/aide_donnees.dart` remplit **les 15 tables** et compare deux états de la base ligne à ligne.
+
+Reste à écrire avec son étape : tests de bout en bout et corrections de l'étape 12.
 
 Commandes : `dart run build_runner build --delete-conflicting-outputs`, puis `flutter analyze` et `flutter test`.

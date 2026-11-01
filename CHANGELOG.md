@@ -6,7 +6,65 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
 
 ## [Non publié]
 
-## [0.10.0] — Étape 10 : statistiques (en attente de validation)
+## [0.11.0] — Étape 11 : sauvegarde et export (en attente de validation)
+
+### Ajouté
+- **Sauvegarde** (`data/sauvegarde/service_sauvegarde.dart`, `format_sauvegarde.dart`) : une archive `.zip` avec `donnees.json`
+  (manifeste : application, version du format et du schéma, date, nombre de lignes par table ; puis les lignes des 15 tables
+  **telles qu'elles sont en base**, lues d'un seul tenant dans une transaction) et les fichiers (`fichiers/photos_produits/`,
+  `fichiers/factures/`, `fichiers/devis/`). Rangée dans le dossier `sauvegardes/` de l'application, nommée d'après son type et
+  son heure (`crochet-creations-manuelle-2026-10-31-134912.zip`).
+- **Sauvegarde automatique** à l'ouverture de l'application : si la dernière sauvegarde (automatique ou manuelle) date d'un
+  jour ou plus ; **7 automatiques** conservées. Lancée en arrière-plan après l'affichage du premier écran ; un échec est
+  seulement noté dans le journal, il ne gêne jamais l'utilisation.
+- **Restauration** : vérification de l'archive sans rien toucher (c'est bien une sauvegarde de cette application, format et
+  schéma pas plus récents, aucun fichier rangé hors des dossiers prévus), **copie de sécurité** de l'état actuel (3
+  conservées), fichiers préparés dans un dossier provisoire, remplacement de la base en **une seule transaction** (tout ou
+  rien : tables vidées des dernières aux premières, remplies des premières aux dernières, colonnes vérifiées, contraintes
+  et clés étrangères de la base appliquées), puis échange des dossiers de fichiers. Les écrans ouverts sont prévenus.
+- **Export CSV** (`data/sauvegarde/export_csv.dart`, `domain/csv.dart`) : un `.zip` avec `produits`, `clients`, `ventes`,
+  `factures`, `devis`, `cours`, `inscriptions` et `depenses` ; point-virgule, fins de ligne `\r\n`, UTF-8 avec marque
+  d'ordre des octets, montants `12,50`, dates `05/03/2026`, listes de choix en toutes lettres, éléments archivés inclus.
+- **Export JSON** complet (les mêmes données que la sauvegarde, sans fichiers).
+- **Écran « Sauvegarde et export »** (23) : sauvegarder maintenant, liste des sauvegardes du téléphone (partager, restaurer,
+  supprimer), restaurer depuis un fichier choisi dans le téléphone, exporter en CSV ou en JSON ; confirmations, messages
+  clairs et barre de progression.
+- Dépendances : `archive` (fabriquer et lire les `.zip`) et `file_picker` (choisir le fichier à restaurer). Le partage passe
+  par `share_plus`, déjà présent (`ServicePartageFichiers`).
+- Tests : `csv_test`, `service_sauvegarde_test` (aller-retour complet sur un autre téléphone et sur le même, archives
+  refusées, restauration annulée en cas d'erreur, sauvegarde automatique et rotation, export JSON), `export_csv_test` et
+  `sauvegarde_ecran_test` (parcours de l'écran avec faux sélecteur de fichier et faux partage).
+
+### Modifié
+- *Réglages → Sauvegarde et export* ouvre le vrai écran ; l'écran « Bientôt disponible » n'existe plus (la liste
+  `EcransAVenir.parRoute` est vide).
+- Le texte des réglages indique « étape 11 sur 12 ».
+
+### Décisions prises avec Stéphane
+- Sauvegarde = **archive `.zip` complète** (données et photos).
+- Sauvegarde **automatique à l'ouverture** si la dernière date de plus d'un jour ; **7 conservées**.
+- Restauration qui **remplace tout**, avec **copie de sécurité préalable**.
+- Export CSV en **un `.zip`, un CSV par type**.
+
+### Limites connues et hypothèses (à confirmer)
+- Les **PDF des factures et des devis** sont inclus dans la sauvegarde (on les retrouve tels qu'émis) ; pas seulement les
+  données.
+- **CSV** : séparateur point-virgule, UTF-8 avec marque d'ordre des octets, montants à virgule : pensé pour Excel et
+  LibreOffice en français.
+- La date de la « dernière sauvegarde » est lue dans le **nom du fichier** (aucun changement de schéma) : renommer un fichier
+  du dossier `sauvegardes/` le fait ignorer.
+- Restaurer **depuis un fichier** demande le sélecteur de fichiers d'Android (`file_picker`) ; tous les fichiers sont
+  proposés, car certaines applications enregistrent un `.zip` sous un type que le filtre ne reconnaît pas.
+- Les **sauvegardes manuelles** ne sont jamais supprimées automatiquement (bouton « Supprimer » dans la liste) ; les copies
+  de sécurité d'avant restauration sont limitées aux 3 dernières.
+- La sauvegarde est **entièrement construite en mémoire** (données + photos) : très à l'aise pour quelques centaines de
+  photos réduites (1 600 px), mais une très grosse photothèque pourrait être lourde sur un vieux téléphone.
+- Les sauvegardes restent **sur le téléphone** : si le téléphone est perdu ou réinitialisé, elles le sont aussi. Il faut en
+  **partager** une de temps en temps (e-mail, Drive…). Pas de cloud automatique en version 1.
+- Une sauvegarde faite avec une version **plus récente** de l'application est refusée ; une plus ancienne est acceptée tant
+  que ses colonnes existent encore (les migrations de schéma futures devront en tenir compte).
+
+## [0.10.0] — Étape 10 : statistiques (validée)
 
 ### Ajouté
 - **Calculs des statistiques** (`domain/calculs/statistiques.dart`, sans base ni interface) : périodes (jour, semaine du lundi,

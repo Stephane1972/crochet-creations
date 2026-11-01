@@ -17,9 +17,6 @@ dependencies:
   # Gestion d'état (imposée par le cahier des charges)
   flutter_riverpod: ^2.6.1
 
-  # Affichage du logo SVG dans l'application (le même fichier servira aux PDF)
-  flutter_svg: ^2.0.10+1
-
   # Base de données SQLite (étape 2). Drift génère du code : voir ARCHITECTURE.md.
   drift: ^2.35.0
   drift_flutter: ^0.3.0
@@ -72,12 +69,12 @@ flutter:
           weight: 700
 
 # Génération des icônes Android : dart run flutter_launcher_icons
-# (les PNG viennent de tool/generate_icons.py)
+# (logo_source.png est le logo fourni ; app_icon_foreground.png vient de tool/generate_icons.py).
+# Le fond de l'icône adaptative est la couleur du pourtour du logo (FOND dans tool/generate_icons.py).
 flutter_launcher_icons:
   android: true
   ios: false
-  image_path: "assets/icon/app_icon.png"
+  image_path: "assets/icon/logo_source.png"
   min_sdk_android: 21
-  adaptive_icon_background: "#FBF7F4"
+  adaptive_icon_background: "#FCE5E6"
   adaptive_icon_foreground: "assets/icon/app_icon_foreground.png"
-  adaptive_icon_monochrome: "assets/icon/app_icon_monochrome.png"

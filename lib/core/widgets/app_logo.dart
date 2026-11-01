@@ -1,26 +1,35 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
-/// Logo de l'application (pelote rose + crochet vert), dessiné à partir du SVG.
+import '../constants/app_constants.dart';
+
+/// Logo de l'application (la fillette aux pelotes), affiché dans un carré aux coins arrondis.
 ///
-/// `monochrome: true` affiche la version une couleur, prévue pour les factures
-/// et les impressions en noir et blanc.
+/// L'image vient de `assets/images/logo_application.png` ; c'est aussi elle qui sert d'icône de lancement
+/// (voir `tool/generate_icons.py`). Le logo des factures et des devis est un autre fichier, voir `ressources_pdf.dart`.
 class AppLogo extends StatelessWidget {
-  const AppLogo({super.key, this.taille = 96, this.monochrome = false});
+  const AppLogo({super.key, this.taille = 96});
 
   final double taille;
-  final bool monochrome;
 
-  static const String cheminCouleur = 'assets/images/logo.svg';
-  static const String cheminMonochrome = 'assets/images/logo_mono.svg';
+  static const String chemin = 'assets/images/logo_application.png';
 
   @override
   Widget build(BuildContext context) {
-    return SvgPicture.asset(
-      monochrome ? cheminMonochrome : cheminCouleur,
-      width: taille,
-      height: taille,
-      semanticsLabel: 'Logo Crochet & Créations',
+    return Semantics(
+      image: true,
+      label: 'Logo ${AppConstants.nomApplication}',
+      child: ExcludeSemantics(
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(taille * 0.22),
+          child: Image.asset(
+            chemin,
+            width: taille,
+            height: taille,
+            fit: BoxFit.cover,
+            filterQuality: FilterQuality.medium,
+          ),
+        ),
+      ),
     );
   }
 }

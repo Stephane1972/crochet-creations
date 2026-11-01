@@ -10,12 +10,10 @@ import '../../core/widgets/dialogues.dart';
 import '../../data/database/app_database.dart';
 import '../../data/providers.dart';
 import '../../data/repositories/produit_repository.dart';
-import '../../data/stockage/selecteur_photo.dart';
 import '../../domain/enums.dart';
+import '../common/choix_photo.dart';
 import 'photos_formulaire.dart';
 import 'produit_widgets.dart';
-
-enum _ChoixPhoto { appareil, galerie, retirer }
 
 /// Ajout et modification d'un produit (écran 5). Sans [produitId] : nouveau produit.
 class ProduitFormScreen extends ConsumerStatefulWidget {
@@ -148,56 +146,6 @@ class _ProduitFormScreenState extends ConsumerState<ProduitFormScreen> {
 
   // --- Photos ---------------------------------------------------------------
 
-  Future<_ChoixPhoto?> _demanderChoixPhoto({required bool retirable}) {
-    return showModalBottomSheet<_ChoixPhoto>(
-      context: context,
-      showDragHandle: true,
-      builder: (BuildContext contexteFeuille) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            ListTile(
-              leading: const Icon(Icons.photo_camera_outlined),
-              title: const Text('Prendre une photo'),
-              onTap: () => Navigator.of(contexteFeuille).pop(_ChoixPhoto.appareil),
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library_outlined),
-              title: const Text('Choisir dans la galerie'),
-              onTap: () => Navigator.of(contexteFeuille).pop(_ChoixPhoto.galerie),
-            ),
-            if (retirable)
-              ListTile(
-                leading: const Icon(Icons.delete_outline),
-                title: const Text('Retirer la photo'),
-                onTap: () => Navigator.of(contexteFeuille).pop(_ChoixPhoto.retirer),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Prend ou choisit une photo ; retourne le chemin du fichier choisi, `null` si elle annule
-  /// ou si la photo n'est pas utilisable (un message l'explique).
-  Future<String?> _choisirFichier(_ChoixPhoto choix) async {
-    try {
-      return await ref
-          .read(selecteurPhotoProvider)
-          .choisir(choix == _ChoixPhoto.appareil ? SourcePhoto.appareil : SourcePhoto.galerie);
-    } catch (erreur, pile) {
-      debugPrint('Photo impossible : $erreur\n$pile');
-      if (mounted) {
-        afficherMessage(
-          context,
-          'Impossible d’utiliser cette photo. Vérifiez que l’application a le droit '
-          'd’accéder à l’appareil photo et aux photos.',
-        );
-      }
-      return null;
-    }
-  }
-
   /// Exécute une opération sur les photos (copie de fichier...) en affichant l'erreur éventuelle.
   Future<void> _modifierPhotos(Future<void> Function() operation) async {
     try {
@@ -214,21 +162,21 @@ class _ProduitFormScreenState extends ConsumerState<ProduitFormScreen> {
   }
 
   Future<void> _changerPrincipale() async {
-    final _ChoixPhoto? choix = await _demanderChoixPhoto(retirable: _photos.principale != null);
+    final ChoixPhoto? choix = await demanderChoixPhoto(context, ref, retirable: _photos.principale != null);
     if (choix == null || !mounted) return;
-    if (choix == _ChoixPhoto.retirer) {
+    if (choix == ChoixPhoto.retirer) {
       await _modifierPhotos(() => _photos.remplacerPrincipale(null));
       return;
     }
-    final String? source = await _choisirFichier(choix);
+    final String? source = await choisirFichierPhoto(context, ref, choix);
     if (source == null || !mounted) return;
     await _modifierPhotos(() => _photos.remplacerPrincipale(source));
   }
 
   Future<void> _ajouterSecondaire() async {
-    final _ChoixPhoto? choix = await _demanderChoixPhoto(retirable: false);
+    final ChoixPhoto? choix = await demanderChoixPhoto(context, ref, retirable: false);
     if (choix == null || !mounted) return;
-    final String? source = await _choisirFichier(choix);
+    final String? source = await choisirFichierPhoto(context, ref, choix);
     if (source == null || !mounted) return;
     await _modifierPhotos(() => _photos.ajouterSecondaire(source));
   }

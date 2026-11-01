@@ -26,8 +26,19 @@ Le développement se fait en 12 étapes validées une par une (détail dans [ROA
 | 8 | Cours et inscriptions : places, liste d'attente, paiement, facture par inscrit | terminée et validée |
 | 9 | Dépenses : catégories, photo du ticket, produit concerné | terminée et validée |
 | 10 | Statistiques et alertes de franchise de TVA | terminée et validée |
-| 11 | Sauvegarde, export CSV / JSON et restauration | **à valider** (PR #11) |
-| 12 | Tests, corrections, optimisation de l'interface | à venir |
+| 11 | Sauvegarde, export CSV / JSON et restauration | terminée et validée |
+| 12 | Tests, corrections, optimisation de l'interface | **à valider** (PR #12) |
+
+### Ce que contient l'étape 12 : finitions
+
+- **Photo perdue retrouvée** : si Android ferme l'application pendant la prise d'une photo (cela arrive quand le téléphone
+  manque de mémoire), la photo n'est plus perdue. Au prochain démarrage, l'application la récupère ; la **prochaine fois
+  qu'on choisit une photo** (produit, cours ou ticket de dépense), la feuille propose en premier **« Utiliser la photo
+  retrouvée »**. Le formulaire, lui, n'est pas restauré : il faut le ressaisir. On peut ignorer la proposition et
+  choisir une autre photo ; la photo retrouvée est alors oubliée.
+- **Une seule feuille « choix de photo »** pour les trois formulaires (produit, cours, ticket de dépense) : les textes et le
+  comportement sont identiques partout.
+- Aucun changement de schéma de la base, aucune nouvelle dépendance.
 
 ### Ce que contient l'étape 11 : sauvegarde et export
 

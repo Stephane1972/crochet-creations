@@ -113,7 +113,7 @@ crochet-creations/
 │   │   │   └── selecteur_photo.dart          choix d'une photo (galerie / appareil), remplaçable en test
 │   │   └── providers.dart                    accès Riverpod à la base, aux repositories, aux photos et à l'horloge
 │   └── presentation/
-│       ├── common/                   placeholder_screen.dart, menu_tile.dart
+│       ├── common/                   placeholder_screen.dart, menu_tile.dart, choix_photo.dart (feuille de choix de photo), photo_retrouvee.dart
 │       ├── clients/                          onglet Clients et ses écrans (voir « Clients »)
 │       │   ├── clients_screen.dart           liste, recherche, filtres (écran 6)
 │       │   ├── client_fiche_screen.dart      fiche et historique d'un client (écran 7)
@@ -395,6 +395,16 @@ différentes ne se confondent plus (test `test/data/flux_en_direct_test.dart`).
 - `PhotosFormulaire` suit les fichiers pendant l'édition : une photo ajoutée puis remplacée ou abandonnée est
   effacée aussitôt ; une photo déjà enregistrée n'est effacée **qu'après** l'enregistrement réussi.
 - `creer` et `modifier` enregistrent produit, variantes et photos dans **une seule transaction** : tout ou rien.
+- **Feuille « choix de photo » commune** (`presentation/common/choix_photo.dart`) : `demanderChoixPhoto` affiche la feuille
+  du bas, `choisirFichierPhoto` va chercher le fichier (appareil, galerie ou photo retrouvée). Les formulaires des
+  produits, des cours et des dépenses n'ont plus de code de choix de photo propre ; la copie dans l'application et le
+  nettoyage restent faits par `PhotosFormulaire`.
+- **Photo perdue** : quand Android ferme l'application pendant la prise de vue, `image_picker` garde la photo de côté.
+  `main()` appelle **une seule fois** `SelecteurPhoto.retrouverPhotoPerdue()` (`retrieveLostData`, Android seulement ; toute
+  erreur est notée dans le journal et ignorée) avant `runApp`, et passe le chemin retrouvé à `photoRetrouveeInitialeProvider`.
+  `photoRetrouveeProvider` (`presentation/common/photo_retrouvee.dart`) le tient en mémoire : la feuille propose
+  « Utiliser la photo retrouvée » tant que le fichier existe, puis l'oublie (`oublier()`) dès qu'on l'a utilisé ou qu'une
+  autre photo est choisie. Le formulaire n'est pas restauré. Les tests règlent `EnvironnementTest.photoRetrouvee`.
 
 ### Règles de gestion retenues
 
@@ -651,8 +661,8 @@ afficher.
 `DepensesScreen` (sélecteur de mois sans mois à venir, carte de total, pastilles de catégorie, icône d'archive pour passer aux dépenses archivées),
 `DepenseFormScreen` (création / modification, photo gérée par `PhotosFormulaire` comme pour les cours, abandon confirmé,
 menu d'archivage / restauration) et `LigneChoixProduit` / `FeuilleChoixProduit` (catalogue en feuille du bas).
-La feuille « Prendre une photo / Galerie / Retirer » est dans `presentation/common/choix_photo.dart` (le formulaire des
-cours en a encore sa propre copie, à regrouper à l'étape 12).
+La feuille « Prendre une photo / Galerie / Retirer » est dans `presentation/common/choix_photo.dart`, commune aux
+formulaires des produits, des cours et des dépenses (voir *Photos*).
 
 ## Statistiques (étape 10)
 
@@ -750,8 +760,7 @@ règle le nom affiché (« Crochet & Créations ») et génère les icônes. La 
 Conséquence à garder en tête pour les étapes suivantes : toute modification de configuration Android
 devra être ajoutée à ce script. `image_picker` (étape 3) n'en demande aucune : la galerie passe par le sélecteur
 de photos du système, sans permission. L'appareil photo, lui, ouvre l'application photo du téléphone ; si
-Android ferme Crochet & Créations pendant la prise de vue, la photo n'est pas retrouvée au retour (cas rare,
-traité à l'étape 12).
+Android ferme Crochet & Créations pendant la prise de vue, la photo est retrouvée au démarrage suivant (voir *Photos*).
 Si cette contrainte gêne, on pourra versionner `android/` à la place (il suffit de retirer `/android/` du `.gitignore`).
 
 ## Choix techniques
@@ -840,6 +849,7 @@ annulée en cas de colonne inconnue / contrainte / liaison cassée, écrans pré
 JSON), `export_csv_test` (contenu de chaque fichier, archive, BOM) et `sauvegarde_ecran_test` (parcours de l'écran).
 `test/data/aide_donnees.dart` remplit **les 15 tables** et compare deux états de la base ligne à ligne.
 
-Reste à écrire avec son étape : tests de bout en bout et corrections de l'étape 12.
+Finitions (étape 12) : `photo_retrouvee_test` (la photo retrouvée est proposée par les formulaires des produits, des cours et
+des dépenses, utilisée une seule fois, oubliée quand une autre photo est choisie, ignorée si son fichier a disparu).
 
 Commandes : `dart run build_runner build --delete-conflicting-outputs`, puis `flutter analyze` et `flutter test`.

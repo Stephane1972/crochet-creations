@@ -12,8 +12,10 @@ import 'data/database/app_database.dart';
 import 'data/providers.dart';
 import 'data/repositories/parametres_repository.dart';
 import 'data/sauvegarde/service_sauvegarde.dart';
+import 'data/stockage/selecteur_photo.dart';
 import 'data/stockage/stockage_pdf.dart';
 import 'data/stockage/stockage_photos.dart';
+import 'presentation/common/photo_retrouvee.dart';
 import 'presentation/startup/erreur_demarrage_app.dart';
 
 Future<void> main() async {
@@ -50,9 +52,14 @@ Future<void> main() async {
       dossierDevis: devis.dossier,
     );
 
+    // Photo prise juste avant qu'Android ferme l'application (rare) : retrouvée une seule fois, ici, puis proposée
+    // dans la feuille de choix de photo.
+    final String? photoRetrouvee = await SelecteurPhotoSysteme().retrouverPhotoPerdue();
+
     runApp(
       ProviderScope(
         overrides: [
+          photoRetrouveeInitialeProvider.overrideWithValue(photoRetrouvee),
           appDatabaseProvider.overrideWithValue(base),
           stockagePhotosProvider.overrideWithValue(photos),
           stockageFacturesProvider.overrideWithValue(factures),

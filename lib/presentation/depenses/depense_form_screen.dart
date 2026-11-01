@@ -8,7 +8,6 @@ import '../../core/widgets/dialogues.dart';
 import '../../data/database/app_database.dart';
 import '../../data/providers.dart';
 import '../../data/repositories/depense_repository.dart';
-import '../../data/stockage/selecteur_photo.dart';
 import '../../domain/enums.dart';
 import '../common/choix_photo.dart';
 import '../produits/photos_formulaire.dart';
@@ -140,28 +139,10 @@ class _DepenseFormScreenState extends ConsumerState<DepenseFormScreen> {
 
   // --- Photo du ticket --------------------------------------------------------
 
-  Future<String?> _choisirFichier(ChoixPhoto choix) async {
-    try {
-      return await ref
-          .read(selecteurPhotoProvider)
-          .choisir(choix == ChoixPhoto.appareil ? SourcePhoto.appareil : SourcePhoto.galerie);
-    } catch (erreur, pile) {
-      debugPrint('Photo impossible : $erreur\n$pile');
-      if (mounted) {
-        afficherMessage(
-          context,
-          'Impossible d’utiliser cette photo. Vérifiez que l’application a le droit '
-          'd’accéder à l’appareil photo et aux photos.',
-        );
-      }
-      return null;
-    }
-  }
-
   Future<void> _changerPhoto() async {
-    final ChoixPhoto? choix = await demanderChoixPhoto(context, retirable: _photos.principale != null);
+    final ChoixPhoto? choix = await demanderChoixPhoto(context, ref, retirable: _photos.principale != null);
     if (choix == null || !mounted) return;
-    final String? source = choix == ChoixPhoto.retirer ? null : await _choisirFichier(choix);
+    final String? source = choix == ChoixPhoto.retirer ? null : await choisirFichierPhoto(context, ref, choix);
     if (choix != ChoixPhoto.retirer && (source == null || !mounted)) return;
     try {
       await _photos.remplacerPrincipale(source);

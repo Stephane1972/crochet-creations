@@ -27,6 +27,7 @@ import 'package:crochet_creations/domain/calculs/panier.dart';
 import 'package:crochet_creations/domain/document_devis.dart';
 import 'package:crochet_creations/domain/document_facture.dart';
 import 'package:crochet_creations/domain/enums.dart';
+import 'package:crochet_creations/presentation/common/photo_retrouvee.dart';
 import 'package:crochet_creations/presentation/factures/factures_providers.dart';
 import 'package:crochet_creations/presentation/splash/splash_screen.dart';
 import 'package:drift/drift.dart' show DatabaseConnection, Value, driftRuntimeOptions;
@@ -45,6 +46,9 @@ class FauxSelecteurPhoto implements SelecteurPhoto {
     appels++;
     return chemin;
   }
+
+  @override
+  Future<String?> retrouverPhotoPerdue() async => null;
 }
 
 /// Faux fabricant de PDF : rapide, sans polices ni logo. Garde les documents reçus pour que les tests
@@ -151,6 +155,10 @@ class EnvironnementTest {
   /// l'application.
   DateTime? maintenant;
 
+  /// Photo « retrouvée au démarrage » (Android avait fermé l'application pendant la prise de vue) ; `null` = aucune.
+  /// À régler **avant** d'ouvrir l'application.
+  String? photoRetrouvee;
+
   final FauxSelecteurPhoto selecteur = FauxSelecteurPhoto();
   final FauxGenerateurPdf generateurPdf = FauxGenerateurPdf();
   final FauxServiceDocuments documents = FauxServiceDocuments();
@@ -203,6 +211,7 @@ class EnvironnementTest {
     appDatabaseProvider.overrideWithValue(db),
     stockagePhotosProvider.overrideWithValue(StockagePhotos(dossierPhotos)),
     selecteurPhotoProvider.overrideWithValue(selecteur),
+    photoRetrouveeInitialeProvider.overrideWithValue(photoRetrouvee),
     stockageFacturesProvider.overrideWithValue(stockageFactures),
     stockageDevisProvider.overrideWithValue(stockageDevis),
     generateurFacturePdfProvider.overrideWithValue(generateurPdf.call),

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 
 /// D'où vient la photo.
@@ -7,6 +8,11 @@ enum SourcePhoto { appareil, galerie }
 abstract interface class SelecteurPhoto {
   /// Chemin du fichier choisi, ou `null` si elle a annulé.
   Future<String?> choisir(SourcePhoto source);
+
+  /// Photo prise juste avant qu'Android ferme l'application (rare, quand la mémoire du téléphone est pleine) : au
+  /// redémarrage, le système la garde de côté. Chemin du fichier, ou `null` s'il n'y en a pas. **À appeler une
+  /// seule fois, au démarrage** : le système ne la rend qu'une fois.
+  Future<String?> retrouverPhotoPerdue();
 }
 
 /// Appareil photo et galerie du téléphone (paquet `image_picker`).
@@ -26,5 +32,17 @@ class SelecteurPhotoSysteme implements SelecteurPhoto {
       imageQuality: 85,
     );
     return fichier?.path;
+  }
+
+  @override
+  Future<String?> retrouverPhotoPerdue() async {
+    try {
+      final response = await _picker.retrieveLostData();
+      return response.file?.path;
+    } catch (erreur, pile) {
+      // Pas de photo à retrouver (ou téléphone qui ne sait pas le faire) : on démarre normalement.
+      debugPrint('Photo perdue non récupérable : $erreur\n$pile');
+      return null;
+    }
   }
 }

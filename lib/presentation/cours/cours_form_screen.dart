@@ -10,12 +10,10 @@ import '../../core/widgets/dialogues.dart';
 import '../../data/database/app_database.dart';
 import '../../data/providers.dart';
 import '../../data/repositories/cours_repository.dart';
-import '../../data/stockage/selecteur_photo.dart';
 import '../../domain/enums.dart';
+import '../common/choix_photo.dart';
 import '../produits/photos_formulaire.dart';
 import 'cours_widgets.dart';
-
-enum _ChoixPhoto { appareil, galerie, retirer }
 
 /// Création et modification d'un cours. Sans [coursId] : nouveau cours.
 ///
@@ -162,59 +160,11 @@ class _CoursFormScreenState extends ConsumerState<CoursFormScreen> {
 
   // --- Photo ------------------------------------------------------------------
 
-  Future<_ChoixPhoto?> _demanderChoixPhoto({required bool retirable}) {
-    return showModalBottomSheet<_ChoixPhoto>(
-      context: context,
-      showDragHandle: true,
-      builder: (BuildContext contexteFeuille) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            ListTile(
-              leading: const Icon(Icons.photo_camera_outlined),
-              title: const Text('Prendre une photo'),
-              onTap: () => Navigator.of(contexteFeuille).pop(_ChoixPhoto.appareil),
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library_outlined),
-              title: const Text('Choisir dans la galerie'),
-              onTap: () => Navigator.of(contexteFeuille).pop(_ChoixPhoto.galerie),
-            ),
-            if (retirable)
-              ListTile(
-                leading: const Icon(Icons.delete_outline),
-                title: const Text('Retirer la photo'),
-                onTap: () => Navigator.of(contexteFeuille).pop(_ChoixPhoto.retirer),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<String?> _choisirFichier(_ChoixPhoto choix) async {
-    try {
-      return await ref
-          .read(selecteurPhotoProvider)
-          .choisir(choix == _ChoixPhoto.appareil ? SourcePhoto.appareil : SourcePhoto.galerie);
-    } catch (erreur, pile) {
-      debugPrint('Photo impossible : $erreur\n$pile');
-      if (mounted) {
-        afficherMessage(
-          context,
-          'Impossible d’utiliser cette photo. Vérifiez que l’application a le droit '
-          'd’accéder à l’appareil photo et aux photos.',
-        );
-      }
-      return null;
-    }
-  }
-
   Future<void> _changerPhoto() async {
-    final _ChoixPhoto? choix = await _demanderChoixPhoto(retirable: _photos.principale != null);
+    final ChoixPhoto? choix = await demanderChoixPhoto(context, ref, retirable: _photos.principale != null);
     if (choix == null || !mounted) return;
-    final String? source = choix == _ChoixPhoto.retirer ? null : await _choisirFichier(choix);
-    if (choix != _ChoixPhoto.retirer && (source == null || !mounted)) return;
+    final String? source = choix == ChoixPhoto.retirer ? null : await choisirFichierPhoto(context, ref, choix);
+    if (choix != ChoixPhoto.retirer && (source == null || !mounted)) return;
     try {
       await _photos.remplacerPrincipale(source);
       if (mounted) setState(() => _modifie = true);

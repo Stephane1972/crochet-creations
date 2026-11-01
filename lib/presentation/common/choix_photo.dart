@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../core/widgets/dialogues.dart';
+import '../../data/providers.dart';
+import '../../data/stockage/selecteur_photo.dart';
 
 /// Ce que l'utilisatrice veut faire d'une photo.
 enum ChoixPhoto { appareil, galerie, retirer }
 
 /// Feuille du bas « Prendre une photo / Choisir dans la galerie / Retirer la photo ».
 /// [retirable] : proposer « Retirer la photo » (il y a déjà une photo). Retourne `null` si on referme la feuille.
-Future<ChoixPhoto?> demanderChoixPhoto(BuildContext context, {required bool retirable}) {
+Future<ChoixPhoto?> demanderChoixPhoto(BuildContext context, WidgetRef ref, {required bool retirable}) {
   return showModalBottomSheet<ChoixPhoto>(
     context: context,
     showDragHandle: true,
@@ -33,4 +38,23 @@ Future<ChoixPhoto?> demanderChoixPhoto(BuildContext context, {required bool reti
       ),
     ),
   );
+}
+
+/// Prend ou choisit la photo demandée ([ChoixPhoto.appareil] ou [ChoixPhoto.galerie], pas « retirer »). Retourne le
+/// chemin du fichier, ou `null` si la personne annule ou si la photo n'est pas utilisable (un message l'explique alors).
+Future<String?> choisirFichierPhoto(BuildContext context, WidgetRef ref, ChoixPhoto choix) async {
+  final SelecteurPhoto selecteur = ref.read(selecteurPhotoProvider);
+  try {
+    return await selecteur.choisir(choix == ChoixPhoto.appareil ? SourcePhoto.appareil : SourcePhoto.galerie);
+  } catch (erreur, pile) {
+    debugPrint('Photo impossible : $erreur\n$pile');
+    if (context.mounted) {
+      afficherMessage(
+        context,
+        'Impossible d’utiliser cette photo. Vérifiez que l’application a le droit '
+        'd’accéder à l’appareil photo et aux photos.',
+      );
+    }
+    return null;
+  }
 }

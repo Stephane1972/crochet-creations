@@ -30,6 +30,28 @@ Future<bool> confirmer(
   return resultat ?? false;
 }
 
+/// Boîte de dialogue d'information, avec un seul bouton pour la fermer.
+Future<void> informer(
+  BuildContext context, {
+  required String titre,
+  required String message,
+  String libelleFermer = 'Fermer',
+}) {
+  return showDialog<void>(
+    context: context,
+    builder: (BuildContext contexteDialogue) => AlertDialog(
+      title: Text(titre),
+      content: Text(message),
+      actions: <Widget>[
+        FilledButton(
+          onPressed: () => Navigator.of(contexteDialogue).pop(),
+          child: Text(libelleFermer),
+        ),
+      ],
+    ),
+  );
+}
+
 /// Affiche un court message en bas de l'écran.
 ///
 /// [margeBas] relève le message au-dessus d'une barre posée en bas du contenu d'un onglet (la barre du

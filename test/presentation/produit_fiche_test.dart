@@ -1,8 +1,11 @@
+import 'dart:io';
+
 import 'package:crochet_creations/core/utils/date_fr.dart';
 import 'package:crochet_creations/core/utils/money.dart';
 import 'package:crochet_creations/data/database/app_database.dart';
 import 'package:crochet_creations/data/repositories/produit_repository.dart';
 import 'package:crochet_creations/domain/enums.dart';
+import 'package:crochet_creations/presentation/produits/produit_fiche_screen.dart';
 import 'package:crochet_creations/presentation/produits/produits_screen.dart';
 import 'package:crochet_creations/presentation/ventes/panier_screen.dart';
 import 'package:crochet_creations/presentation/ventes/vente_confirmation_screen.dart';
@@ -344,6 +347,107 @@ void main() {
     expect(find.text('Doudou lapin'), findsOneWidget); // champ « Nom »
     expect(find.text('Coton bio'), findsOneWidget);
     expect(find.text('25'), findsOneWidget); // prix : 25 €
+
+    await env.fermer(tester);
+  });
+
+  testWidgets('supprimer un produit sans historique : confirmation, puis la fiche se ferme et la photo est effacée', (
+    WidgetTester tester,
+  ) async {
+    final EnvironnementTest env = await EnvironnementTest.creer(tester);
+    final File photo = File('${env.dossierPhotos.path}/doudou_test.jpg');
+    await env.travailler(tester, () async {
+      await env.dossierPhotos.create(recursive: true);
+      await photo.writeAsString('image');
+    });
+    final Produit p = await env.creerProduit(tester, photo: 'doudou_test.jpg');
+    await ouvrirFiche(tester, env, 'Doudou lapin');
+
+    // On annule : rien ne change.
+    await ouvrirMenuProduit(tester);
+    await tester.tap(find.text('Supprimer'));
+    await tester.pumpAndSettle();
+    await laisserFinir(tester);
+    expect(find.text('Supprimer ce produit ?'), findsOneWidget);
+    expect(find.textContaining('irréversible'), findsOneWidget);
+    expect(find.textContaining('apparaît dans'), findsNothing);
+    await tester.tap(find.widgetWithText(TextButton, 'Annuler'));
+    await tester.pumpAndSettle();
+    expect(await env.travailler(tester, () => env.produits.obtenir(p.id)), isNotNull);
+    expect(await env.travailler(tester, () => photo.exists()), isTrue);
+
+    // On confirme.
+    await ouvrirMenuProduit(tester);
+    await tester.tap(find.text('Supprimer'));
+    await tester.pumpAndSettle();
+    await laisserFinir(tester);
+    await tester.tap(find.widgetWithText(FilledButton, 'Supprimer'));
+    await tester.pumpAndSettle();
+    await laisserFinir(tester);
+
+    expect(find.byType(ProduitFicheScreen), findsNothing);
+    expect(find.text('Produit supprimé.'), findsOneWidget);
+    expect(await env.travailler(tester, () => env.produits.obtenir(p.id)), isNull);
+    expect(await env.travailler(tester, () => photo.exists()), isFalse);
+
+    await env.fermer(tester);
+  });
+
+  testWidgets('supprimer un produit déjà vendu : la confirmation le dit, la vente est conservée', (
+    WidgetTester tester,
+  ) async {
+    final EnvironnementTest env = await EnvironnementTest.creer(tester);
+    final Produit p = await env.creerProduit(tester);
+    await env.validerVente(tester, produit: p, quantite: 2);
+    await ouvrirFiche(tester, env, 'Doudou lapin');
+
+    await ouvrirMenuProduit(tester);
+    await tester.tap(find.text('Supprimer'));
+    await tester.pumpAndSettle();
+    await laisserFinir(tester);
+
+    expect(find.text('Supprimer ce produit ?'), findsOneWidget);
+    expect(find.textContaining('apparaît dans 1 vente'), findsOneWidget);
+    expect(find.textContaining('archivez-le plutôt'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Supprimer définitivement'));
+    await tester.pumpAndSettle();
+    await laisserFinir(tester);
+
+    expect(find.byType(ProduitFicheScreen), findsNothing);
+    expect(find.text('Produit supprimé.'), findsOneWidget);
+    expect(await env.travailler(tester, () => env.produits.obtenir(p.id)), isNull);
+    final List<LigneVente> lignes = await env.travailler(tester, () => env.db.select(env.db.lignesVente).get());
+    expect(lignes, hasLength(1));
+    expect(lignes.single.produitId, isNull);
+    expect(lignes.single.designation, 'Doudou lapin');
+    expect(lignes.single.quantite, 2);
+    expect(lignes.single.totalLigneCentimes, 5000);
+
+    await env.fermer(tester);
+  });
+
+  testWidgets('la confirmation signale les dépenses qui désignent le produit', (WidgetTester tester) async {
+    final EnvironnementTest env = await EnvironnementTest.creer(tester);
+    final Produit p = await env.creerProduit(tester);
+    await env.creerDepense(tester, produitId: p.id);
+    await ouvrirFiche(tester, env, 'Doudou lapin');
+
+    await ouvrirMenuProduit(tester);
+    await tester.tap(find.text('Supprimer'));
+    await tester.pumpAndSettle();
+    await laisserFinir(tester);
+
+    expect(find.textContaining('1 dépense désigne ce produit'), findsOneWidget);
+    expect(find.textContaining('apparaît dans'), findsNothing);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Supprimer'));
+    await tester.pumpAndSettle();
+    await laisserFinir(tester);
+
+    final List<Depense> depenses = await env.travailler(tester, () => env.db.select(env.db.depenses).get());
+    expect(depenses, hasLength(1));
+    expect(depenses.single.produitId, isNull);
 
     await env.fermer(tester);
   });

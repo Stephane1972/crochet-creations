@@ -10,15 +10,17 @@ import '../../data/database/app_database.dart';
 import '../../data/providers.dart';
 import '../../data/repositories/produit_repository.dart';
 import '../../data/repositories/produit_vues.dart';
+import '../../data/stockage/stockage_photos.dart';
 import '../../domain/calculs/stock.dart';
 import '../../domain/enums.dart';
+import '../../domain/usage_historique.dart';
 import '../ventes/ajout_panier.dart';
 import 'produit_widgets.dart';
 import 'produits_providers.dart';
 import 'stock_dialog.dart';
 import 'variante_form_sheet.dart';
 
-enum _ActionMenu { dupliquer, archiver, restaurer }
+enum _ActionMenu { dupliquer, archiver, restaurer, supprimer }
 
 /// Fiche d'un produit : photos, informations, stock, variantes et historique des ventes (écran 4).
 class ProduitFicheScreen extends ConsumerStatefulWidget {
@@ -73,6 +75,43 @@ class _ProduitFicheScreenState extends ConsumerState<ProduitFicheScreen> {
   Future<void> _restaurer(Produit produit) => _executer(() async {
     await _repo.restaurer(produit.id);
     if (mounted) afficherMessage(context, 'Produit restauré dans le catalogue.');
+  });
+
+  /// Supprime le produit, même s'il a servi : ses ventes et ses devis restent (désignation, quantité, prix) mais ne
+  /// sont plus liés au produit.
+  Future<void> _supprimer(Produit produit) => _executer(() async {
+    final UsageHistorique usage = await _repo.usage(produit.id);
+    final int depenses = await _repo.nombreDepensesLiees(produit.id);
+    if (!mounted) return;
+
+    final String precisionHistorique = usage.estUtilise
+        ? '\n\nIl apparaît dans ${usage.enumeration}. Cet historique est conservé avec la désignation, la quantité '
+              'et le prix d’origine, mais n’est plus lié à ce produit. Pour seulement le retirer du catalogue en '
+              'gardant son historique, archivez-le plutôt.'
+        : '';
+    final String precisionDepenses = depenses == 0
+        ? ''
+        : '\n\n${depenses > 1 ? '$depenses dépenses désignent' : '1 dépense désigne'} ce produit : '
+              '${depenses > 1 ? 'elles seront conservées' : 'elle sera conservée'}, sans lien avec lui.';
+    final bool ok = await confirmer(
+      context,
+      titre: 'Supprimer ce produit ?',
+      message:
+          '« ${produit.nom} » sera supprimé définitivement, avec ses variantes et ses photos. '
+          'Cette action est irréversible.$precisionHistorique$precisionDepenses',
+      libelleConfirmer: usage.estUtilise ? 'Supprimer définitivement' : 'Supprimer',
+    );
+    if (!ok || !mounted) return;
+
+    final StockagePhotos photos = ref.read(stockagePhotosProvider);
+    final List<String> fichiers = await _repo.supprimer(produit.id);
+    // Les fichiers ne sont effacés qu'une fois le produit supprimé : un échec plus haut ne perd aucune photo.
+    for (final String fichier in fichiers) {
+      await photos.supprimer(fichier);
+    }
+    if (!mounted) return;
+    afficherMessage(context, 'Produit supprimé.');
+    Navigator.of(context).pop();
   });
 
   Future<void> _ajusterStock(Produit produit, {VarianteProduit? variante}) async {
@@ -175,6 +214,8 @@ class _ProduitFicheScreenState extends ConsumerState<ProduitFicheScreen> {
                     _archiver(donnees.produit);
                   case _ActionMenu.restaurer:
                     _restaurer(donnees.produit);
+                  case _ActionMenu.supprimer:
+                    _supprimer(donnees.produit);
                 }
               },
               itemBuilder: (BuildContext context) => <PopupMenuEntry<_ActionMenu>>[
@@ -204,6 +245,14 @@ class _ProduitFicheScreenState extends ConsumerState<ProduitFicheScreen> {
                       contentPadding: EdgeInsets.zero,
                     ),
                   ),
+                const PopupMenuItem<_ActionMenu>(
+                  value: _ActionMenu.supprimer,
+                  child: ListTile(
+                    leading: Icon(Icons.delete_outline),
+                    title: Text('Supprimer'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
               ],
             ),
           ],

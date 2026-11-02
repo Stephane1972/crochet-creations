@@ -208,7 +208,7 @@ class _EnTete extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     Text(
-                      client == null ? 'Sans client' : libelleClient(client),
+                      nomClientOuCopie(client: client, copie: devis.clientNom, sinon: 'Sans client'),
                       style: theme.textTheme.titleMedium,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,

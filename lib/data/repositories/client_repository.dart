@@ -4,6 +4,7 @@ import '../../core/utils/texte.dart';
 import '../../domain/enums.dart';
 import '../../domain/erreurs.dart';
 import '../../domain/regles_client.dart';
+import '../../domain/usage_historique.dart';
 import '../database/app_database.dart';
 import '../database/flux_en_direct.dart';
 import 'client_vues.dart';
@@ -125,6 +126,70 @@ class ClientRepository {
   Future<void> archiver(int id) => _marquerArchive(id, DateTime.now());
 
   Future<void> restaurer(int id) => _marquerArchive(id, null);
+
+  /// Où ce client apparaît : ses ventes, factures, devis et inscriptions à des cours.
+  Future<UsageHistorique> usage(int id) async {
+    final List<Vente> ventes = await (_db.select(_db.ventes)..where((t) => t.clientId.equals(id))).get();
+    final List<Facture> factures =
+        await (_db.select(_db.factures)..where((t) => t.clientId.equals(id))).get();
+    final List<DevisFiche> devis = await (_db.select(_db.devis)..where((t) => t.clientId.equals(id))).get();
+    return UsageHistorique(<ElementUsage>[
+      ElementUsage(ventes.length, 'vente', 'ventes'),
+      ElementUsage(factures.length, 'facture', 'factures'),
+      ElementUsage(devis.length, 'devis', 'devis'),
+      _elementInscriptions(await nombreInscriptions(id)),
+    ]);
+  }
+
+  /// Nombre de cours auxquels ce client est inscrit (liste d'attente et annulations comprises).
+  Future<int> nombreInscriptions(int id) async =>
+      (await (_db.select(_db.inscriptionsCours)..where((t) => t.clientId.equals(id))).get()).length;
+
+  ElementUsage _elementInscriptions(int nombre) =>
+      ElementUsage(nombre, 'inscription à un cours', 'inscriptions à des cours');
+
+  /// Supprime définitivement un client, même s'il a servi : sa fiche disparaît, mais ses ventes, ses factures et ses
+  /// devis sont conservés. Ils gardent son nom (les factures gardent aussi son adresse et son SIRET, copiés à
+  /// l'émission) et ne sont plus liés à aucune fiche.
+  ///
+  /// Refusé ([SuppressionImpossible]) tant que le client est inscrit à un cours : la liste des inscrits a besoin de sa
+  /// fiche. On peut alors l'archiver, ou le désinscrire d'abord.
+  Future<void> supprimer(int id) {
+    return _db.transaction(() async {
+      final Client client = await _client(id);
+
+      final int inscriptions = await nombreInscriptions(id);
+      if (inscriptions > 0) {
+        throw SuppressionImpossible(
+          cible: 'client',
+          usage: UsageHistorique(<ElementUsage>[_elementInscriptions(inscriptions)]),
+        );
+      }
+
+      // Le nom est copié avant de défaire le lien : c'est lui que l'historique affichera ensuite.
+      final String? nom = nullSiVide(libelleClient(client));
+      final DateTime maintenant = DateTime.now();
+      await (_db.update(_db.ventes)..where((t) => t.clientId.equals(id))).write(
+        VentesCompanion(
+          clientId: const Value<int?>(null),
+          clientNom: Value<String?>(nom),
+          modifieLe: Value<DateTime>(maintenant),
+        ),
+      );
+      await (_db.update(_db.devis)..where((t) => t.clientId.equals(id))).write(
+        DevisCompanion(
+          clientId: const Value<int?>(null),
+          clientNom: Value<String?>(nom),
+          modifieLe: Value<DateTime>(maintenant),
+        ),
+      );
+      // Une facture a déjà copié le nom, l'adresse et le SIRET à l'émission : seul le lien est défait.
+      await (_db.update(_db.factures)..where((t) => t.clientId.equals(id))).write(
+        const FacturesCompanion(clientId: Value<int?>(null)),
+      );
+      await (_db.delete(_db.clients)..where((t) => t.id.equals(id))).go();
+    });
+  }
 
   // --- Fiche et historique ---------------------------------------------------
 

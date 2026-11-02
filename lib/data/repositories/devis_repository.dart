@@ -144,6 +144,8 @@ class DevisRepository {
       await (_db.update(_db.devis)..where((t) => t.id.equals(id))).write(
         DevisCompanion(
           clientId: Value(saisie.clientId),
+          // Le nom copié d'un client supprimé ne sert que tant que le devis n'a pas de nouveau client.
+          clientNom: saisie.clientId == null ? const Value.absent() : const Value(null),
           dateValidite: Value(saisie.dateValidite == null ? null : debutDeJour(saisie.dateValidite!)),
           delaiRealisation: Value(nullSiVide(saisie.delaiRealisation)),
           acompteCentimes: Value(saisie.acompteCentimes),
@@ -253,6 +255,7 @@ class DevisRepository {
 
       final Vente vente = await _ventes.valider(
         clientId: devis.clientId,
+        clientNom: devis.clientNom,
         panier: panier,
         paiement: modeAcompte == null
             ? null

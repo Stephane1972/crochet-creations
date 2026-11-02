@@ -15,6 +15,14 @@ String libelleClient(Client c) {
   return raison;
 }
 
+/// Nom d'un client sur une vente ou un devis : sa fiche si elle existe, sinon le nom copié quand la fiche a été
+/// supprimée (« Camille Martin (client supprimé) »), sinon [sinon] (« Client de passage », « Sans client »).
+String nomClientOuCopie({Client? client, String? copie, required String sinon}) {
+  if (client != null) return libelleClient(client);
+  final String nom = copie?.trim() ?? '';
+  return nom.isEmpty ? sinon : '$nom (client supprimé)';
+}
+
 /// Personne à contacter chez un professionnel (affichée sous le nom de l'entreprise).
 String? contactClient(Client c) {
   final String personne = _personne(c);

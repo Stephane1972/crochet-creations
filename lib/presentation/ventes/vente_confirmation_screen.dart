@@ -199,7 +199,7 @@ class _Contenu extends StatelessWidget {
                   Text(annulee ? 'Vente annulée' : 'Vente enregistrée', style: theme.textTheme.headlineSmall),
                   Text(
                     'Le ${formatDateCourte(vente.dateVente)} · '
-                    '${client == null ? 'Client de passage' : libelleClient(client)}',
+                    '${nomClientOuCopie(client: client, copie: vente.clientNom, sinon: 'Client de passage')}',
                     style: theme.textTheme.bodyMedium?.copyWith(color: discret),
                   ),
                 ],

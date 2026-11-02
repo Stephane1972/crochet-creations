@@ -79,7 +79,8 @@ class _LigneDevis extends StatelessWidget {
       leading: Icon(Icons.request_quote_outlined, color: theme.colorScheme.primary),
       title: Text(devis.numero, style: theme.textTheme.titleSmall),
       subtitle: Text(
-        '${client == null ? 'Sans client' : libelleClient(client)} · ${formatDateCourte(devis.dateEmission)}',
+        '${nomClientOuCopie(client: client, copie: devis.clientNom, sinon: 'Sans client')} · '
+        '${formatDateCourte(devis.dateEmission)}',
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),

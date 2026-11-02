@@ -37,7 +37,7 @@ class AppDatabase extends _$AppDatabase {
 
   /// Version du schéma. **À augmenter à chaque modification de `tables.dart`**,
   /// avec l'étape de migration correspondante dans [migration] (voir ARCHITECTURE.md).
-  static const int versionSchema = 1;
+  static const int versionSchema = 2;
 
   @override
   int get schemaVersion => versionSchema;
@@ -56,7 +56,11 @@ class AppDatabase extends _$AppDatabase {
     //   if (from < 2) { await m.addColumn(produits, produits.nouvelleColonne); }
     //   if (from < 3) { await m.createTable(nouvelleTable); }
     onUpgrade: (Migrator m, int from, int to) async {
-      // Version 1 : rien à migrer pour l'instant.
+      // Version 2 : le nom du client est copié dans les ventes et les devis quand sa fiche est supprimée.
+      if (from < 2) {
+        await m.addColumn(ventes, ventes.clientNom);
+        await m.addColumn(devis, devis.clientNom);
+      }
     },
 
     beforeOpen: (OpeningDetails details) async {

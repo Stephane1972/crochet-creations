@@ -55,6 +55,7 @@ crochet-creations/
 │   ├── domain/
 │   │   ├── enums.dart                        listes de choix (catégories, statuts, modes de paiement…)
 │   │   ├── erreurs.dart                      erreurs métier à message clair
+│   │   ├── usage_historique.dart             « où apparaît cet élément » (ventes, factures, devis, inscriptions), en phrase
 │   │   ├── regles_client.dart                règles de saisie d'une fiche client (e-mail, téléphone, code postal, SIRET)
 │   │   ├── regles_entreprise.dart            SIREN, IBAN, informations manquantes pour facturer, textes par défaut
 │   │   ├── regles_devis.dart                 validité, statut affiché (expiré), transitions de statut, contrôle des dates et de l'acompte
@@ -78,9 +79,9 @@ crochet-creations/
 │   │   ├── repositories/
 │   │   │   ├── numerotation_repository.dart  FACT-…, DEVIS-…, PRD-…
 │   │   │   ├── parametres_repository.dart    profil entreprise, mode jour/nuit
-│   │   │   ├── produit_repository.dart       catalogue : créer, modifier, dupliquer, archiver, stock, historique
+│   │   │   ├── produit_repository.dart       catalogue : créer, modifier, dupliquer, archiver, supprimer, stock, historique
 │   │   │   ├── produit_vues.dart             ce que lisent les écrans : ProduitResume, ProduitDetail, historique
-│   │   │   ├── client_repository.dart        clients : créer, modifier, archiver, fiche et historique en direct
+│   │   │   ├── client_repository.dart        clients : créer, modifier, archiver, supprimer, fiche et historique en direct
 │   │   │   ├── client_vues.dart              nom affiché, initiales, historique d'un client (ventes, paiements, cours…)
 │   │   │   ├── vente_repository.dart         ventes : valider, annuler, encaisser, détail en direct
 │   │   │   ├── vente_vues.dart               VenteDetail : vente, lignes, paiements, client, factures, solde dû
@@ -207,6 +208,8 @@ les produits : `domain/produits/`, `data/produits/`, `presentation/produits/`.
 - **Suppression** : « soft delete » (colonne `archive_le`) pour produits, variantes, clients, cours et dépenses :
   l'élément est masqué mais l'historique reste intact. Les ventes, factures et devis ne s'archivent pas, ils
   changent de **statut** (une vente annulée remet le stock ; une facture émise ne se supprime jamais).
+  Un **client** ou un **produit** peut en plus être **supprimé pour de bon**, même s'il a servi : on **détache** alors
+  l'historique au lieu de le détruire (voir « Supprimer un client ou un produit » plus bas).
 
 ## Gestion d'état : Riverpod
 
@@ -354,6 +357,10 @@ Les valeurs des listes de choix sont enregistrées sous leur **nom Dart** : ne j
 `enums.dart` sans migration (un test, `enums_test.dart`, protège les noms cités dans les contraintes SQL).
 Après une migration, `PRAGMA foreign_key_check` vérifie qu'aucune liaison n'a été cassée.
 
+Historique des versions du schéma : **1** (étapes 2 à 12), **2** (`ventes.client_nom` et `devis.client_nom`, pour garder le nom
+d'un client supprimé). Une sauvegarde d'un schéma plus ancien se restaure sans changement : la restauration n'écrit que les
+colonnes présentes dans l'archive (voir « Restaurer »).
+
 ## Produits et stock (étape 3)
 
 ### Où est le stock ?
@@ -412,7 +419,8 @@ différentes ne se confondent plus (test `test/data/flux_en_direct_test.dart`).
 - **Dupliquer** : nouvelle référence, nom suivi de « (copie) », variantes copiées avec un stock à 0, **sans photos** ;
   la copie s'ouvre en modification.
 - **Archiver** : le produit disparaît du catalogue et ne peut plus être vendu, mais ses ventes passées restent
-  lisibles ; « Restaurer » le remet. Aucune suppression définitive (confirmation demandée avant d'archiver).
+  lisibles ; « Restaurer » le remet (confirmation demandée avant d'archiver).
+- **Supprimer** : voir « Supprimer un client ou un produit » plus bas.
 - **Noms de variantes uniques** par produit, sans tenir compte des majuscules, **archivées comprises** (sinon la
   restauration créerait un doublon).
 - **Historique** : lignes des ventes **validées** seulement (une vente annulée n'y figure pas), avec le client ou
@@ -436,9 +444,37 @@ différentes ne se confondent plus (test `test/data/flux_en_direct_test.dart`).
   3 à 10 caractères (lettres, chiffres, espace, tiret : adresses étrangères acceptées), SIREN à 9 chiffres ou SIRET à 14
   (espaces et points acceptés). Aucun contrôle de l'existence du numéro ni de sa clé.
 - **Archiver** : le client disparaît de la liste (filtre « Archivés » pour le retrouver), mais ses ventes, factures et
-  devis restent liés à lui et lisibles. Aucune suppression définitive (la base l'interdit d'ailleurs tant qu'une vente
-  le référence : `ON DELETE RESTRICT`).
+  devis restent liés à lui et lisibles.
+- **Supprimer** : voir « Supprimer un client ou un produit » plus bas (les clés étrangères `ON DELETE RESTRICT` restent la
+  garantie de la base : le code détache d'abord l'historique, puis supprime).
 - **Client de passage** : pas de fiche, `ventes.client_id` reste vide ; il se choisit au moment de la vente (étape 5).
+
+### Supprimer un client ou un produit
+
+`ClientRepository.supprimer` et `ProduitRepository.supprimer` : une **transaction** chacune. L'historique n'est pas détruit,
+il est **détaché** de la fiche supprimée. Les clés étrangères restent en `RESTRICT` : c'est le code qui défait les liens avant
+de supprimer, la base refuserait tout oubli.
+
+| | Client | Produit |
+|--|--------|---------|
+| Refus | inscrit à un cours : `SuppressionImpossible` (`inscriptions_cours.client_id` est obligatoire) | aucun |
+| Ventes | `client_id` vidé, **`client_nom` = nom affiché** copié | lignes : `produit_id` et `variante_id` vidés (la désignation, la quantité et le prix y sont déjà) |
+| Devis | idem (`client_id` vidé, `client_nom` copié) | lignes de devis : idem |
+| Factures | `client_id` vidé seulement : nom, adresse et SIRET ont été copiés à l'émission | — |
+| Dépenses | — | `produit_id` vidé (la dépense reste) |
+| Fiche | supprimée | supprimée avec ses variantes et ses photos ; les **fichiers** de photos sont rendus à l'appelant, qui les efface une fois la transaction réussie |
+
+- **Le nom copié** (`ventes.client_nom`, `devis.client_nom`, schéma 2) n'est renseigné qu'à la suppression du client ; il suit le
+  devis converti en commande (`VenteRepository.valider(clientNom: …)`), puis la facture (`FactureRepository.creer`). Modifier
+  un devis en lui donnant un autre client efface l'ancien nom. À l'affichage, `nomClientOuCopie` donne la fiche, sinon
+  « Nom (client supprimé) », sinon « Client de passage » / « Sans client ». L'export CSV et le PDF de devis suivent la même règle
+  (le PDF imprime le nom sans la mention « client supprimé »).
+- **`usage(id)`** (`UsageHistorique`) compte ce qui apparaît dans l'historique, pour la phrase de la confirmation ; la
+  confirmation est **renforcée** dès qu'il y a de l'historique. Un produit est compté par **ventes et devis distincts** (deux
+  lignes d'une même vente comptent une fois), variantes comprises.
+- **Écrans** : `_supprimer` des fiches client et produit (`confirmer` / `informer`, `dialogues.dart`). Pour un client inscrit à
+  un cours, la boîte propose d'archiver à la place.
+- Les numéros de référence d'un produit supprimé ne sont **pas réutilisés** (le compteur ne revient jamais en arrière).
 
 ### Historique d'un client
 
@@ -808,6 +844,9 @@ Le cahier des charges ne tranchait pas ces points ; voici ce qui a été retenu 
   historique, noms de variantes uniques, flux en direct, flux simultanés qui ne se confondent pas) ; clients (règles de saisie refusées avec le bon message,
   historique complet et limité au bon client, flux en direct) ; ventes (validation avec stock, remise, frais de port,
   paiement, tout-ou-rien en cas d'échec, encaissement du solde, annulation avec remboursement et remise en stock).
+- Suppression d'un client ou d'un produit : `suppression_repository_test` (historique conservé, noms copiés, lignes détachées,
+  inscriptions refusées), `migration_schema_test` (base du schéma 1 mise à jour sans perte), `service_sauvegarde_test`
+  (archive du schéma 1), `export_csv_test` et `devis_repository_test` (client supprimé), `domain/usage_historique_test`.
 - `test/widget_test.dart` et `test/presentation/` : parcours splash → accueil → réglages, écran d'erreur de
   démarrage ; liste de produits (recherche, filtres, alertes), fiche, formulaire (validations, abandon, photos),
   gestion des photos du formulaire ; liste de clients (recherche, filtres, archivés), fiche (coordonnées, historique,

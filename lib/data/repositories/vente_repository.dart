@@ -28,6 +28,8 @@ class VenteRepository {
   /// décrémentation du stock et l'encaissement éventuel sont enregistrés ensemble, ou rien du tout.
   ///
   /// - [clientId] vide = « client de passage » ;
+  /// - [clientNom] n'a de sens que sans [clientId] : le nom d'un client dont la fiche a été supprimée (cas d'un
+  ///   devis converti en commande) ;
   /// - [paiement] vide = vente impayée (paiement différé) ;
   /// - désignations et prix des lignes sont ceux du panier ; le coût matière est relevé au catalogue.
   ///
@@ -35,6 +37,7 @@ class VenteRepository {
   /// (message en français) ; la base n'est alors pas modifiée.
   Future<Vente> valider({
     int? clientId,
+    String? clientNom,
     required Panier panier,
     PaiementSaisi? paiement,
     String? notes,
@@ -80,6 +83,7 @@ class VenteRepository {
               sousTotalCentimes: totaux.sousTotalCentimes,
               totalCentimes: totaux.totalCentimes,
               clientId: Value(clientId),
+              clientNom: Value(clientId == null ? nullSiVide(clientNom) : null),
               dateVente: date == null ? const Value.absent() : Value(date),
               remiseType: Value(panier.remiseType),
               remiseValeur: Value(panier.remiseType == RemiseType.aucune ? 0 : panier.remiseValeur),

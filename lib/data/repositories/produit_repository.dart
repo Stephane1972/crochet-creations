@@ -4,6 +4,7 @@ import '../../core/utils/texte.dart';
 import '../../domain/calculs/stock.dart';
 import '../../domain/enums.dart';
 import '../../domain/erreurs.dart';
+import '../../domain/usage_historique.dart';
 import '../database/app_database.dart';
 import '../database/flux_en_direct.dart';
 import 'numerotation_repository.dart';
@@ -207,6 +208,79 @@ class ProduitRepository {
   Future<void> archiver(int id) => _marquerArchive(id, DateTime.now());
 
   Future<void> restaurer(int id) => _marquerArchive(id, null);
+
+  /// Où ce produit apparaît : les ventes et les devis qui contiennent le produit ou l'une de ses variantes.
+  Future<UsageHistorique> usage(int id) async {
+    final List<int> variantes = <int>[
+      for (final VarianteProduit v
+          in await (_db.select(_db.variantesProduit)..where((t) => t.produitId.equals(id))).get())
+        v.id,
+    ];
+    final List<LigneVente> lignesVente = await (_db.select(_db.lignesVente)
+          ..where(
+            (t) => variantes.isEmpty ? t.produitId.equals(id) : t.produitId.equals(id) | t.varianteId.isIn(variantes),
+          ))
+        .get();
+    final List<LigneDevis> lignesDevis = await (_db.select(_db.lignesDevis)
+          ..where(
+            (t) => variantes.isEmpty ? t.produitId.equals(id) : t.produitId.equals(id) | t.varianteId.isIn(variantes),
+          ))
+        .get();
+    // Une vente ou un devis qui contient plusieurs lignes du produit ne compte qu'une fois.
+    final Set<int> ventes = <int>{for (final LigneVente l in lignesVente) l.venteId};
+    final Set<int> devis = <int>{for (final LigneDevis l in lignesDevis) l.devisId};
+    return UsageHistorique(<ElementUsage>[
+      ElementUsage(ventes.length, 'vente', 'ventes'),
+      ElementUsage(devis.length, 'devis', 'devis'),
+    ]);
+  }
+
+  /// Nombre de dépenses qui désignent ce produit comme « produit concerné » (simple information).
+  Future<int> nombreDepensesLiees(int id) async =>
+      (await (_db.select(_db.depenses)..where((t) => t.produitId.equals(id))).get()).length;
+
+  /// Supprime définitivement un produit, même s'il a servi, avec ses variantes et ses photos.
+  ///
+  /// Les ventes et les devis qui le contiennent sont conservés : leurs lignes gardent leur désignation, leur
+  /// quantité et leur prix, mais ne sont plus liées à aucun produit (comme une ligne libre). Il en est de même des
+  /// dépenses qui le désignent. Une vente annulée plus tard ne remet donc rien en stock pour ce produit.
+  ///
+  /// Retourne les noms des fichiers de photos devenus inutiles : à effacer **après** la suppression
+  /// (`StockagePhotos.supprimer`), comme pour les photos remplacées dans un formulaire.
+  Future<List<String>> supprimer(int id) {
+    return _db.transaction(() async {
+      final Produit produit = await _produit(id);
+      final List<int> variantes = <int>[
+        for (final VarianteProduit v
+            in await (_db.select(_db.variantesProduit)..where((t) => t.produitId.equals(id))).get())
+          v.id,
+      ];
+
+      await (_db.update(_db.lignesVente)..where(
+            (t) => variantes.isEmpty ? t.produitId.equals(id) : t.produitId.equals(id) | t.varianteId.isIn(variantes),
+          ))
+          .write(const LignesVenteCompanion(produitId: Value<int?>(null), varianteId: Value<int?>(null)));
+      await (_db.update(_db.lignesDevis)..where(
+            (t) => variantes.isEmpty ? t.produitId.equals(id) : t.produitId.equals(id) | t.varianteId.isIn(variantes),
+          ))
+          .write(const LignesDevisCompanion(produitId: Value<int?>(null), varianteId: Value<int?>(null)));
+
+      final List<PhotoProduit> photos =
+          await (_db.select(_db.photosProduit)..where((t) => t.produitId.equals(id))).get();
+      final List<String> fichiers = <String>[
+        if (produit.photoPrincipaleChemin != null) produit.photoPrincipaleChemin!,
+        for (final PhotoProduit photo in photos) photo.chemin,
+      ];
+
+      await (_db.update(_db.depenses)..where((t) => t.produitId.equals(id))).write(
+        DepensesCompanion(produitId: const Value<int?>(null), modifieLe: Value<DateTime>(DateTime.now())),
+      );
+      await (_db.delete(_db.variantesProduit)..where((t) => t.produitId.equals(id))).go();
+      await (_db.delete(_db.photosProduit)..where((t) => t.produitId.equals(id))).go();
+      await (_db.delete(_db.produits)..where((t) => t.id.equals(id))).go();
+      return fichiers;
+    });
+  }
 
   /// Catalogue avec les variantes de chaque produit, mis à jour automatiquement
   /// à chaque modification des produits ou des variantes.
@@ -528,8 +602,9 @@ class ProduitRepository {
   }
 
   LigneHistoriqueVente _ligneHistorique(LigneVente ligne, Vente vente, Client? client) {
+    // Sans fiche : le nom copié sur la vente si le client a été supprimé, rien pour un client de passage.
     final String nom = client == null
-        ? ''
+        ? (vente.clientNom?.trim() ?? '')
         : nomClientAffiche(prenom: client.prenom, nom: client.nom, raisonSociale: client.raisonSociale);
     return LigneHistoriqueVente(
       venteId: vente.id,

@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:archive/archive.dart' show Archive, ArchiveFile, ZipDecoder;
 import 'package:crochet_creations/data/database/app_database.dart';
+import 'package:crochet_creations/data/repositories/client_repository.dart';
 import 'package:crochet_creations/data/sauvegarde/export_csv.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter_test/flutter_test.dart';
@@ -123,6 +124,21 @@ void main() {
       final String csv = (await export.fabriquerTextes())['clients.csv']!;
       expect(_lignes(csv)[1], endsWith(';30/10/2026'));
     });
+  });
+
+  test('un client supprimé : ses ventes et ses devis gardent son nom dans l’export, ses factures aussi', () async {
+    await remplirBase(db);
+    await db.delete(db.inscriptionsCours).go();
+    final Client client = (await db.select(db.clients).get()).single;
+    await ClientRepository(db).supprimer(client.id);
+
+    final Map<String, String> textes = await export.fabriquerTextes();
+
+    expect(_lignes(textes['ventes.csv']!)[1], startsWith('1;20/10/2026;Marie Dupont (client supprimé);'));
+    expect(_lignes(textes['ventes.csv']!)[2], startsWith('2;25/10/2026;Client de passage;'));
+    expect(_lignes(textes['devis.csv']!)[1], startsWith('DEVIS-2026-0001;22/10/2026;22/11/2026;Marie Dupont (client supprimé);'));
+    expect(_lignes(textes['factures.csv']!)[1], contains(';Marie Dupont;'));
+    expect(_lignes(textes['clients.csv']!), hasLength(1), reason: 'le client n’est plus dans la liste des clients');
   });
 
   group('le .zip', () {

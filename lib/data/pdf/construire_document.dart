@@ -88,7 +88,8 @@ String? adresseClientPourFacture(Client c) {
 }
 
 /// Rassemble ce qui s'imprime sur un devis : l'identité de l'entreprise (profil « Mon entreprise »), le client
-/// (sa fiche actuelle, un devis n'étant pas figé comme une facture), les lignes et les conditions du devis.
+/// (sa fiche actuelle, un devis n'étant pas figé comme une facture ; si la fiche a été supprimée, le nom copié sur
+/// le devis), les lignes et les conditions du devis.
 DocumentDevis construireDocumentDevis({
   required DevisFiche devis,
   required List<LigneDevis> lignes,
@@ -103,7 +104,7 @@ DocumentDevis construireDocumentDevis({
     acompteCentimes: devis.acompteCentimes,
     emetteur: emetteurDepuis(entreprise),
     client: client == null
-        ? const DestinataireDocument()
+        ? DestinataireDocument(nom: nullSiVide(devis.clientNom))
         : DestinataireDocument(
             nom: nullSiVide(libelleClient(client)),
             adresse: lignesDAdresse(adresseClientPourFacture(client)),

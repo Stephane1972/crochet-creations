@@ -383,6 +383,8 @@ void main() {
     await laisserFinir(tester);
     await tester.tap(find.widgetWithText(FilledButton, 'Supprimer'));
     await tester.pumpAndSettle();
+    // La suppression enchaîne la base puis l'effacement du fichier : on attend que la fiche se ferme.
+    await attendreJusqua(tester, () => find.byType(ProduitFicheScreen).evaluate().isEmpty);
     await laisserFinir(tester);
 
     expect(find.byType(ProduitFicheScreen), findsNothing);
@@ -412,6 +414,7 @@ void main() {
 
     await tester.tap(find.widgetWithText(FilledButton, 'Supprimer définitivement'));
     await tester.pumpAndSettle();
+    await attendreJusqua(tester, () => find.byType(ProduitFicheScreen).evaluate().isEmpty);
     await laisserFinir(tester);
 
     expect(find.byType(ProduitFicheScreen), findsNothing);

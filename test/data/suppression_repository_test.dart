@@ -329,10 +329,10 @@ void main() {
       expect((await db.select(db.devis).get()).single.totalCentimes, 6000);
     });
 
-    test('ventes et devis sont comptés, puis conservés', () async {
-      await remplirBase(db);
+    test('une vente est comptée, puis conservée', () async {
+      await remplirBase(db); // ses lignes de devis sont des lignes libres : seule la vente cite le produit
       final Produit p = (await produits.lister()).single;
-      expect((await produits.usage(p.id)).enumeration, '1 vente et 1 devis');
+      expect((await produits.usage(p.id)).enumeration, '1 vente');
 
       await produits.supprimer(p.id);
 

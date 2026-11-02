@@ -6,6 +6,50 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
 
 ## [Non publié]
 
+## [0.13.0] — Supprimer un client ou un produit (en attente de validation)
+
+Demande de Stéphane après l'étape 12 : pouvoir supprimer un client et un objet à vendre. Première des deux demandes (la
+seconde, les catégories de produits, fait l'objet d'une autre pull request).
+
+### Ajouté
+- **Supprimer un client** (fiche client, menu ⋮ → « Supprimer ») et **supprimer un produit** (fiche produit, menu ⋮ →
+  « Supprimer »), avec confirmation. Un élément **qui n'a jamais servi** demande une confirmation simple ; un élément **qui a
+  déjà servi** demande une confirmation renforcée (« Supprimer définitivement ») qui dit où il apparaît (« 2 ventes, 1 facture
+  et 1 devis ») et rappelle que l'archivage existe.
+- **L'historique est conservé.** Client supprimé : ses ventes et ses devis gardent son nom (nouvelle colonne `client_nom`,
+  affiché « Camille Martin (client supprimé) ») ; ses factures gardent son nom, son adresse et son SIRET, déjà copiés à
+  l'émission. Produit supprimé : les lignes de vente et de devis gardent leur désignation, leur quantité et leur prix, mais ne
+  sont plus liées à un produit ; ses variantes et ses photos (fichiers compris) sont effacées ; les dépenses qui le désignaient
+  sont conservées, sans lien. Le nom copié suit le devis converti en commande, puis la facture.
+- `UsageHistorique` / `ElementUsage` (`domain/usage_historique.dart`) : « où apparaît cet élément », en phrase française ;
+  `ClientRepository.usage`, `nombreInscriptions`, `ProduitRepository.usage`, `nombreDepensesLiees` ; `nomClientOuCopie`
+  (`client_vues.dart`) ; boîte d'information `informer` (`dialogues.dart`).
+- Tests : `suppression_repository_test` (client et produit utilisés ou non, noms copiés, lignes détachées, factures, dépenses,
+  références non réutilisées, inscriptions refusées), `migration_schema_test` (base du schéma 1 mise à jour), restauration d'une
+  sauvegarde du schéma 1 et d'une sauvegarde faite après suppression, export CSV, conversion d'un devis dont le client a été
+  supprimé, `usage_historique_test`, boîtes de dialogue des fiches client et produit.
+
+### Modifié
+- **Schéma de la base : version 2** (migration automatique au premier lancement) : colonne `client_nom` ajoutée à `ventes` et à
+  `devis`. Les anciennes sauvegardes (schéma 1) se restaurent normalement, la colonne restant vide.
+- Ventes, devis, export CSV (ventes et devis) et PDF de devis affichent le nom copié quand la fiche du client n'existe plus.
+
+### Décisions prises avec Stéphane
+- Supprimer un client ou un produit **déjà utilisé** : **autorisé, historique conservé** (confirmation renforcée).
+- Livraison en **deux pull requests** : suppression d'abord, catégories ensuite.
+
+### Limites connues et hypothèses (à confirmer)
+- **Un client inscrit à un cours ne peut pas être supprimé** (la liste des inscrits a besoin de sa fiche) : l'application propose
+  de l'**archiver**, ou il faut le désinscrire d'abord.
+- Une suppression est **définitive** : seule une sauvegarde permet de revenir en arrière. Restaurer une sauvegarde ancienne
+  fait revenir le client ou le produit supprimé depuis.
+- Les coordonnées et les notes d'un client supprimé disparaissent (seul son nom reste sur les ventes et les devis, plus son
+  adresse sur les factures déjà émises). Un client supprimé qu'on veut refacturer doit être recréé.
+- Modifier un devis dont le client a été supprimé garde son nom tant qu'on ne choisit pas un autre client ; l'écran de
+  modification, lui, affiche « Aucun client ».
+- Les produits d'un devis dont le produit a été supprimé restent des lignes libres : le devis se convertit en commande sans
+  toucher au stock.
+
 ## [0.12.0] — Étape 12 : finitions (en attente de validation)
 
 ### Ajouté

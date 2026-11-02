@@ -40,6 +40,14 @@ Hypothèse à confirmer : le profil « Mon entreprise » (écran 22) est constru
 - [x] Étape 11 : terminée et validée (PR #11)
 - [x] Étape 12 : terminée, **en attente de validation** (PR #12)
 
+### Demandes de Stéphane après l'étape 12
+
+- [x] Nom et logo de l'application (PR #13)
+- [x] Supprimer un client ou un produit, historique conservé : **en attente de validation** (PR « Suppression des clients et des
+  produits »)
+- [ ] Catégories de produits modifiables : créer une catégorie depuis le formulaire, écran « Catégories » (ajouter, renommer,
+  supprimer en déplaçant les produits) : à faire, après la suppression
+
 ## Version 2 : confort et échanges (propositions, non engagées)
 
 Idées à discuter après la version 1 :

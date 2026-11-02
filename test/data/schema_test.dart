@@ -82,7 +82,15 @@ void main() {
     test('la version du schéma est enregistrée dans le fichier', () async {
       final row = await db.customSelect('PRAGMA user_version').getSingle();
       expect(row.read<int>('user_version'), AppDatabase.versionSchema);
-      expect(AppDatabase.versionSchema, 1);
+      expect(AppDatabase.versionSchema, 2);
+    });
+
+    test('ventes et devis ont une colonne pour le nom d’un client supprimé', () async {
+      for (final String table in <String>['ventes', 'devis']) {
+        final colonnes = await db.customSelect('PRAGMA table_info("$table")').get();
+        final Set<String> noms = colonnes.map((r) => r.read<String>('name')).toSet();
+        expect(noms, contains('client_nom'), reason: table);
+      }
     });
 
     test('les clés étrangères sont activées', () async {

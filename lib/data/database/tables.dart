@@ -246,6 +246,10 @@ class Ventes extends Table with Tracabilite {
   /// Vide = « client de passage ».
   IntColumn get clientId =>
       integer().nullable().references(Clients, #id, onDelete: KeyAction.restrict)();
+
+  /// Nom du client, copié quand sa fiche est supprimée (`client_id` est alors vidé) : l'historique garde le nom.
+  /// Vide tant que le client existe, et pour un client de passage.
+  TextColumn get clientNom => text().nullable()();
   DateTimeColumn get dateVente => dateTime().withDefault(currentDateAndTime)();
   TextColumn get statut => textEnum<StatutVente>().withDefault(const Constant('validee'))();
 
@@ -399,6 +403,9 @@ class Devis extends Table with Tracabilite {
   TextColumn get numero => text().unique()();
   IntColumn get clientId =>
       integer().nullable().references(Clients, #id, onDelete: KeyAction.restrict)();
+
+  /// Nom du client, copié quand sa fiche est supprimée (`client_id` est alors vidé) : l'historique garde le nom.
+  TextColumn get clientNom => text().nullable()();
   DateTimeColumn get dateEmission => dateTime().withDefault(currentDateAndTime)();
 
   /// Date limite de validité du devis.

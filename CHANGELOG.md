@@ -6,6 +6,45 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
 
 ## [Non publié]
 
+## [0.14.0] — Catégories de produits modifiables (en attente de validation)
+
+Seconde demande de Stéphane après l'étape 12 : ajouter une catégorie à la main depuis « Nouveau produit », ou en supprimer une.
+
+### Ajouté
+- **Créer une catégorie depuis le formulaire produit** : la liste « Catégorie » se termine par **« + Nouvelle catégorie »** ; une
+  petite boîte demande le nom, crée la catégorie tout de suite et la sélectionne. Un nom vide, trop long (60 caractères) ou déjà
+  pris (sans tenir compte des majuscules, des accents ni des espaces) est expliqué dans la boîte, qui reste ouverte.
+- **Écran « Catégories »** (*Plus → Réglages → Catégories*) : la liste avec le nombre de produits de chacune (archivés compris),
+  **Nouvelle catégorie**, **Renommer** et **Supprimer**. Les cinq catégories d'origine (Crochet, Doudou, Boucles d'oreilles,
+  Accessoire, Sur mesure) sont des catégories comme les autres : on peut les renommer ou les supprimer.
+- **Supprimer une catégorie qui contient des produits** : l'application demande **où les déplacer** (aucune destination n'est
+  présélectionnée), déplace tous les produits, archivés compris, puis supprime la catégorie, en une seule opération « tout ou
+  rien ». Une catégorie vide se supprime après une simple confirmation. Si c'est la seule catégorie et qu'elle contient des
+  produits, l'application demande d'en créer une autre d'abord.
+- `CategorieRepository` (lister, observer, créer, renommer, supprimer avec déplacement), `domain/categories_produit.dart`
+  (clés et noms de départ, règles du nom), `presentation/produits/categories_screen.dart`, `categorie_dialogues.dart`,
+  `categories_providers.dart`.
+- Tests : `categorie_repository_test`, `domain/categories_produit_test`, `categories_ecrans_test` (ajout, renommage, suppression
+  avec déplacement, filtre de la liste des produits), « + Nouvelle catégorie » dans `produit_form_test`, migrations 1→3 et 2→3
+  (`migration_schema_test`), sauvegarde et restauration des catégories (`service_sauvegarde_test`).
+
+### Modifié
+- **Schéma de la base : version 3** (migration automatique au premier lancement) : nouvelle table `categories_produit` (`id`, `cle`,
+  `nom`, `position`) remplie avec les cinq catégories d'origine. `produits.categorie` garde le même texte : c'est la **clé** de la
+  catégorie (`crochet`, `doudou`, `bouclesOreilles`, `accessoire`, `surMesure`, comme avant), donc **aucun produit n'est modifié**
+  par la migration. Une catégorie créée reçoit une clé interne `cat_…` qui ne change jamais ; **renommer ne touche à aucun produit**.
+- Le type `CategorieProduit` (liste de choix fixe) disparaît de `enums.dart` ; le dépôt de produits refuse une catégorie qui n'existe
+  pas. La liste des produits, ses filtres, la fiche, les statistiques (« catégories les plus rentables », classées à marge égale
+  dans l'ordre de la liste) et l'export CSV utilisent le **nom actuel** des catégories. Un filtre sur une catégorie supprimée est
+  retiré tout seul.
+- **Sauvegarde** : la sauvegarde contient désormais 16 tables (`categories_produit` avant `produits`). Une sauvegarde faite avant
+  cette version (schéma 1 ou 2) se restaure normalement : les cinq catégories d'origine sont alors recréées.
+
+### Décisions prises avec Stéphane
+- Catégories gérées **depuis le formulaire produit et depuis un écran « Catégories » des Réglages**.
+- Supprimer une catégorie utilisée : **proposer de déplacer ses produits** dans une autre catégorie.
+- Livraison en **deux pull requests** : suppression d'abord (0.13.0), catégories ensuite (cette version).
+
 ## [0.13.0] — Supprimer un client ou un produit (en attente de validation)
 
 Demande de Stéphane après l'étape 12 : pouvoir supprimer un client et un objet à vendre. Première des deux demandes (la

@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
 
 import '../../core/constants/app_constants.dart';
+import '../../domain/categories_produit.dart';
 import '../../domain/enums.dart';
 import 'tables.dart';
 
@@ -14,6 +15,7 @@ part 'app_database.g.dart';
   tables: [
     ParametresEntreprise,
     NumerotationDocuments,
+    CategoriesProduit,
     Produits,
     VariantesProduit,
     PhotosProduit,
@@ -37,16 +39,29 @@ class AppDatabase extends _$AppDatabase {
 
   /// Version du schéma. **À augmenter à chaque modification de `tables.dart`**,
   /// avec l'étape de migration correspondante dans [migration] (voir ARCHITECTURE.md).
-  static const int versionSchema = 2;
+  static const int versionSchema = 3;
 
   @override
   int get schemaVersion => versionSchema;
+
+  /// Crée les cinq catégories de départ (celles qui existent déjà, par clé ou par nom, sont laissées telles quelles).
+  /// Sert à la première installation, à la mise à jour vers le schéma 3 et à la restauration d'une sauvegarde ancienne.
+  Future<void> insererCategoriesDeDepart() async {
+    for (int i = 0; i < categoriesDeDepart.length; i++) {
+      final CategorieDeDepart c = categoriesDeDepart[i];
+      await into(categoriesProduit).insert(
+        CategoriesProduitCompanion.insert(cle: c.cle, nom: c.nom, position: Value(i)),
+        mode: InsertMode.insertOrIgnore,
+      );
+    }
+  }
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
     // Première installation : création de toutes les tables et index.
     onCreate: (Migrator m) async {
       await m.createAll();
+      await insererCategoriesDeDepart();
     },
 
     // Mise à jour de l'application avec un schéma plus récent.
@@ -60,6 +75,12 @@ class AppDatabase extends _$AppDatabase {
       if (from < 2) {
         await m.addColumn(ventes, ventes.clientNom);
         await m.addColumn(devis, devis.clientNom);
+      }
+      // Version 3 : les catégories de produits deviennent modifiables. Les produits gardent leur valeur
+      // (`crochet`, `doudou`...) : ce sont les clés des cinq catégories de départ, créées ici.
+      if (from < 3) {
+        await m.createTable(categoriesProduit);
+        await insererCategoriesDeDepart();
       }
     },
 

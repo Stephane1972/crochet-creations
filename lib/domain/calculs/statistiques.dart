@@ -36,8 +36,8 @@ class LigneCompta {
   final int coutUnitaireCentimes;
   final int? produitId;
 
-  /// Catégorie du produit vendu (`null` pour une ligne libre ou un cours).
-  final CategorieProduit? categorie;
+  /// Clé de la catégorie du produit vendu (`null` pour une ligne libre ou un cours).
+  final String? categorie;
   final int? coursId;
 }
 
@@ -134,7 +134,9 @@ class ComposantVente {
   /// Coût matière total de l'élément (quantité comprise).
   final int coutCentimes;
   final NatureLigne nature;
-  final CategorieProduit? categorie;
+
+  /// Clé de la catégorie du produit (`null` : frais de port, ligne libre, cours).
+  final String? categorie;
   final bool estCours;
 }
 
@@ -219,7 +221,8 @@ class VenteProduit {
 class CategorieRentable {
   const CategorieRentable({required this.categorie, required this.encaisseCentimes, required this.coutCentimes});
 
-  final CategorieProduit categorie;
+  /// Clé de la catégorie : son nom actuel se cherche dans la liste des catégories (voir `nomCategorie`).
+  final String categorie;
   final int encaisseCentimes;
   final int coutCentimes;
 
@@ -300,6 +303,7 @@ StatsPeriode calculerStatsPeriode({
   required DateTime fin,
   required List<VenteCompta> ventes,
   required List<DepenseCompta> depenses,
+  List<String> ordreCategories = const <String>[],
 }) {
   int objets = 0;
   int prestations = 0;
@@ -307,8 +311,8 @@ StatsPeriode calculerStatsPeriode({
   int cout = 0;
   int nombreVentes = 0;
   int totalVentes = 0;
-  final Map<CategorieProduit, int> encaisseParCategorie = <CategorieProduit, int>{};
-  final Map<CategorieProduit, int> coutParCategorie = <CategorieProduit, int>{};
+  final Map<String, int> encaisseParCategorie = <String, int>{};
+  final Map<String, int> coutParCategorie = <String, int>{};
   final Map<String, _Cumul> vendus = <String, _Cumul>{};
 
   for (final VenteCompta vente in ventes) {
@@ -334,7 +338,7 @@ StatsPeriode calculerStatsPeriode({
         }
         if (c.estCours) cours += parts[i];
         cout += coutImpute;
-        final CategorieProduit? categorie = c.categorie;
+        final String? categorie = c.categorie;
         if (categorie != null) {
           encaisseParCategorie[categorie] = (encaisseParCategorie[categorie] ?? 0) + parts[i];
           coutParCategorie[categorie] = (coutParCategorie[categorie] ?? 0) + coutImpute;
@@ -371,9 +375,16 @@ StatsPeriode calculerStatsPeriode({
       return parTotal != 0 ? parTotal : a.designation.compareTo(b.designation);
     });
 
+  // À marge égale, l'ordre de la liste des catégories ([ordreCategories]) est conservé ; une catégorie qui n'y figure
+  // plus (supprimée entre-temps) passe après, par clé.
+  final List<String> cles = <String>[
+    ...ordreCategories,
+    ...(<String>{...encaisseParCategorie.keys, ...coutParCategorie.keys}.toList()..sort()),
+  ];
+  final Set<String> vues = <String>{};
   final List<CategorieRentable> categories = <CategorieRentable>[
-    for (final CategorieProduit c in CategorieProduit.values)
-      if ((encaisseParCategorie[c] ?? 0) != 0 || (coutParCategorie[c] ?? 0) != 0)
+    for (final String c in cles)
+      if (vues.add(c) && ((encaisseParCategorie[c] ?? 0) != 0 || (coutParCategorie[c] ?? 0) != 0))
         CategorieRentable(
           categorie: c,
           encaisseCentimes: encaisseParCategorie[c] ?? 0,

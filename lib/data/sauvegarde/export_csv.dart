@@ -88,6 +88,9 @@ class ExportCsv {
       if (v.archiveLe != null) continue;
       variantesDe.putIfAbsent(v.produitId, () => <VarianteProduit>[]).add(v);
     }
+    final Map<String, String> nomsCategories = <String, String>{
+      for (final CategorieProduit c in await _base.select(_base.categoriesProduit).get()) c.cle: c.nom,
+    };
 
     return construireCsv(
       <String>[
@@ -114,7 +117,7 @@ class ExportCsv {
           <String>[
             p.reference,
             p.nom,
-            p.categorie.libelle,
+            nomsCategories[p.categorie] ?? p.categorie,
             p.statut.libelle,
             montantCsv(p.prixVenteCentimes),
             montantCsv(p.coutMatiereCentimes),

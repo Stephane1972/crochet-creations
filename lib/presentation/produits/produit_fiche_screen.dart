@@ -15,6 +15,7 @@ import '../../domain/calculs/stock.dart';
 import '../../domain/enums.dart';
 import '../../domain/usage_historique.dart';
 import '../ventes/ajout_panier.dart';
+import 'categories_providers.dart';
 import 'produit_widgets.dart';
 import 'produits_providers.dart';
 import 'stock_dialog.dart';
@@ -382,7 +383,7 @@ class _BarreVente extends StatelessWidget {
 
 typedef _AjusterStock = void Function({VarianteProduit? variante});
 
-class _Contenu extends StatelessWidget {
+class _Contenu extends ConsumerWidget {
   const _Contenu({
     required this.detail,
     required this.onAjusterStock,
@@ -402,11 +403,12 @@ class _Contenu extends StatelessWidget {
   final VoidCallback onRestaurerProduit;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final ThemeData theme = Theme.of(context);
     final ProduitResume resume = detail.resume;
     final Produit produit = detail.produit;
     final List<Widget> etiquettes = etiquettesProduit(context, resume);
+    final Map<String, String> noms = ref.watch(nomsCategoriesProvider);
 
     return ListView(
       padding: const EdgeInsets.only(bottom: 24),
@@ -427,7 +429,7 @@ class _Contenu extends StatelessWidget {
               Text(produit.nom, style: theme.textTheme.headlineSmall),
               const SizedBox(height: 4),
               Text(
-                '${produit.reference} · ${produit.categorie.libelle}',
+                '${produit.reference} · ${nomCategorie(noms, produit.categorie)}',
                 style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
               ),
               const SizedBox(height: 8),
@@ -501,7 +503,7 @@ class _Galerie extends StatefulWidget {
   const _Galerie({required this.chemins, required this.categorie});
 
   final List<String> chemins;
-  final CategorieProduit categorie;
+  final String categorie;
 
   @override
   State<_Galerie> createState() => _GalerieState();

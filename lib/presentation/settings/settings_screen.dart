@@ -7,7 +7,7 @@ import '../../core/theme/theme_mode_provider.dart';
 import '../../core/widgets/app_logo.dart';
 import '../common/menu_tile.dart';
 
-/// Réglages : choix du thème (automatique / jour / nuit) et accès aux écrans « Mon entreprise » et
+/// Réglages : choix du thème (automatique / jour / nuit) et accès aux écrans « Mon entreprise », « Catégories » et
 /// « Sauvegarde et export ».
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -78,6 +78,13 @@ class SettingsScreen extends ConsumerWidget {
                   titre: 'Mon entreprise',
                   description: 'Nom, adresse, SIREN et mentions des factures.',
                   route: AppRoutes.monEntreprise,
+                ),
+                Divider(indent: 56),
+                MenuTile(
+                  icone: Icons.category_outlined,
+                  titre: 'Catégories',
+                  description: 'Ajouter, renommer ou supprimer les catégories de produits.',
+                  route: AppRoutes.categories,
                 ),
                 Divider(indent: 56),
                 MenuTile(

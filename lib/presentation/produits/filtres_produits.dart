@@ -3,8 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/utils/recherche.dart';
 import '../../data/database/app_database.dart';
 import '../../data/repositories/produit_vues.dart';
-import '../../domain/enums.dart';
-
 /// Recherche et filtres de la liste des produits.
 class FiltresProduits {
   const FiltresProduits({
@@ -16,8 +14,8 @@ class FiltresProduits {
 
   final String recherche;
 
-  /// `null` = toutes les catégories.
-  final CategorieProduit? categorie;
+  /// Clé de la catégorie choisie ; `null` = toutes les catégories.
+  final String? categorie;
 
   /// Seulement les produits dont le stock est faible ou épuisé.
   final bool aReapprovisionner;
@@ -35,7 +33,7 @@ class FiltresProduits {
     archives: archives,
   );
 
-  FiltresProduits avecCategorie(CategorieProduit? valeur) => FiltresProduits(
+  FiltresProduits avecCategorie(String? valeur) => FiltresProduits(
     recherche: recherche,
     categorie: valeur,
     aReapprovisionner: aReapprovisionner,
@@ -63,7 +61,7 @@ class FiltresProduitsNotifier extends Notifier<FiltresProduits> {
 
   void rechercher(String valeur) => state = state.avecRecherche(valeur);
 
-  void choisirCategorie(CategorieProduit? valeur) => state = state.avecCategorie(valeur);
+  void choisirCategorie(String? valeur) => state = state.avecCategorie(valeur);
 
   void basculerReapprovisionner() =>
       state = state.avecReapprovisionner(valeur: !state.aReapprovisionner);
@@ -82,23 +80,28 @@ final filtresProduitsProvider = NotifierProvider<FiltresProduitsNotifier, Filtre
 );
 
 /// Applique la recherche et les filtres (l'ordre alphabétique de la liste d'origine est conservé).
-List<ProduitResume> filtrerProduits(List<ProduitResume> produits, FiltresProduits filtres) {
+/// [nomsCategories] (clé → nom) permet de chercher aussi dans le nom de la catégorie.
+List<ProduitResume> filtrerProduits(
+  List<ProduitResume> produits,
+  FiltresProduits filtres, {
+  Map<String, String> nomsCategories = const <String, String>{},
+}) {
   return produits.where((ProduitResume r) {
     if (!filtres.archives && r.produit.archiveLe != null) return false;
     if (filtres.categorie != null && r.produit.categorie != filtres.categorie) return false;
     if (filtres.aReapprovisionner && !r.aReapprovisionner) return false;
-    return correspondALaRecherche(filtres.recherche, _champsRecherchables(r));
+    return correspondALaRecherche(filtres.recherche, _champsRecherchables(r, nomsCategories));
   }).toList();
 }
 
 /// Les textes dans lesquels on cherche : nom, référence, catégorie, matières, couleur, description
 /// et noms des variantes.
-List<String?> _champsRecherchables(ProduitResume r) {
+List<String?> _champsRecherchables(ProduitResume r, Map<String, String> nomsCategories) {
   final Produit p = r.produit;
   return <String?>[
     p.nom,
     p.reference,
-    p.categorie.libelle,
+    nomsCategories[p.categorie],
     p.matieres,
     p.couleur,
     p.description,

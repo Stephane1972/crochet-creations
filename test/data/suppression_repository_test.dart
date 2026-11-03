@@ -3,6 +3,7 @@ import 'package:crochet_creations/data/repositories/client_repository.dart';
 import 'package:crochet_creations/data/repositories/client_vues.dart';
 import 'package:crochet_creations/data/repositories/numerotation_repository.dart';
 import 'package:crochet_creations/data/repositories/produit_repository.dart';
+import 'package:crochet_creations/domain/categories_produit.dart';
 import 'package:crochet_creations/domain/enums.dart';
 import 'package:crochet_creations/domain/erreurs.dart';
 import 'package:crochet_creations/domain/usage_historique.dart';
@@ -28,7 +29,7 @@ void main() {
 
   const DonneesProduit doudou = DonneesProduit(
     nom: 'Doudou lapin',
-    categorie: CategorieProduit.doudou,
+    categorie: CleCategorie.doudou,
     prixVenteCentimes: 2500,
     photoPrincipaleChemin: 'principale.jpg',
   );

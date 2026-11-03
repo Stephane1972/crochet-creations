@@ -26,9 +26,6 @@ void main() {
   });
 
   test('chaque valeur a un libellé en français affichable', () {
-    for (final CategorieProduit v in CategorieProduit.values) {
-      expect(v.libelle, isNotEmpty);
-    }
     for (final ModePaiement v in ModePaiement.values) {
       expect(v.libelle, isNotEmpty);
     }
@@ -46,7 +43,6 @@ void main() {
       'Chèque',
       'Autre',
     ]);
-    expect(CategorieProduit.values, hasLength(5));
     expect(CategorieDepense.values, hasLength(8));
     expect(StatutPaiement.values, hasLength(4));
     expect(StatutDevis.values, hasLength(5));

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:crochet_creations/core/utils/money.dart';
 import 'package:crochet_creations/data/database/app_database.dart';
 import 'package:crochet_creations/data/repositories/produit_repository.dart';
+import 'package:crochet_creations/domain/categories_produit.dart';
 import 'package:crochet_creations/domain/enums.dart';
 import 'package:crochet_creations/presentation/produits/produits_screen.dart';
 import 'package:flutter/material.dart';
@@ -24,7 +25,7 @@ Future<void> ouvrirFormulaireNouveau(WidgetTester tester, EnvironnementTest env)
 }
 
 Future<void> choisirCategorie(WidgetTester tester, String libelle) async {
-  await appuyer(tester, find.byType(DropdownButtonFormField<CategorieProduit>));
+  await appuyer(tester, find.byType(DropdownButtonFormField<String>));
   await tester.tap(find.text(libelle).last);
   await tester.pumpAndSettle();
 }
@@ -90,7 +91,7 @@ void main() {
     expect(produits, hasLength(1));
     final Produit p = produits.single;
     expect(p.nom, 'Bonnet lama');
-    expect(p.categorie, CategorieProduit.accessoire);
+    expect(p.categorie, CleCategorie.accessoire);
     expect(p.prixVenteCentimes, 1250);
     expect(p.coutMatiereCentimes, 320);
     expect(p.tempsFabricationMinutes, 150);
@@ -100,6 +101,86 @@ void main() {
     expect(p.personnalisable, isFalse);
 
     await env.fermer(tester);
+  });
+
+  group('« Nouvelle catégorie » dans la liste des catégories', () {
+    Finder dansDialogue(Finder cible) => find.descendant(of: find.byType(AlertDialog), matching: cible);
+
+    testWidgets('la liste propose les catégories existantes puis « Nouvelle catégorie »', (WidgetTester tester) async {
+      final EnvironnementTest env = await EnvironnementTest.creer(tester);
+      await env.travailler(tester, () => env.categories.creer('Peluches'));
+      await ouvrirFormulaireNouveau(tester, env);
+
+      await appuyer(tester, find.byType(DropdownButtonFormField<String>));
+
+      for (final String nom in <String>['Crochet', 'Doudou', 'Boucles d’oreilles', 'Accessoire', 'Sur mesure', 'Peluches']) {
+        expect(find.text(nom), findsOneWidget, reason: nom);
+      }
+      expect(find.text('Nouvelle catégorie'), findsOneWidget);
+
+      await env.fermer(tester);
+    });
+
+    testWidgets('la catégorie créée depuis le formulaire est choisie et enregistrée avec le produit', (
+      WidgetTester tester,
+    ) async {
+      final EnvironnementTest env = await EnvironnementTest.creer(tester);
+      await ouvrirFormulaireNouveau(tester, env);
+
+      await saisir(tester, 'Nom du produit *', 'Renard');
+      await saisir(tester, 'Prix de vente (€) *', '18');
+      await choisirCategorie(tester, 'Nouvelle catégorie');
+      expect(find.byType(AlertDialog), findsOneWidget);
+      await tester.enterText(dansDialogue(find.byType(TextField)), '  Peluches ');
+      await tester.pump();
+      await appuyer(tester, dansDialogue(find.text('Créer')));
+      await laisserFinir(tester);
+
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.text('Peluches'), findsOneWidget); // affichée dans le champ
+
+      await appuyer(tester, find.text('Ajouter le produit'));
+
+      final Produit p = (await env.travailler(tester, () => env.produits.lister())).single;
+      final CategorieProduit categorie = (await env.travailler(tester, () => env.categories.parCle(p.categorie)))!;
+      expect(categorie.nom, 'Peluches');
+      expect(p.categorie, startsWith('cat_'));
+
+      await env.fermer(tester);
+    });
+
+    testWidgets('annuler la création garde le choix précédent', (WidgetTester tester) async {
+      final EnvironnementTest env = await EnvironnementTest.creer(tester);
+      await ouvrirFormulaireNouveau(tester, env);
+
+      await choisirCategorie(tester, 'Accessoire');
+      await choisirCategorie(tester, 'Nouvelle catégorie');
+      await appuyer(tester, dansDialogue(find.text('Annuler')));
+      await laisserFinir(tester);
+
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.text('Accessoire'), findsOneWidget);
+      expect(find.text('Nouvelle catégorie'), findsNothing);
+      expect(await env.travailler(tester, () => env.categories.lister()), hasLength(5));
+
+      await env.fermer(tester);
+    });
+
+    testWidgets('un nom déjà pris est expliqué sans fermer la boîte', (WidgetTester tester) async {
+      final EnvironnementTest env = await EnvironnementTest.creer(tester);
+      await ouvrirFormulaireNouveau(tester, env);
+
+      await choisirCategorie(tester, 'Nouvelle catégorie');
+      await tester.enterText(dansDialogue(find.byType(TextField)), 'accessoire');
+      await tester.pump();
+      await appuyer(tester, dansDialogue(find.text('Créer')));
+
+      expect(find.text('Une catégorie « Accessoire » existe déjà.'), findsOneWidget);
+      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(await env.travailler(tester, () => env.categories.lister()), hasLength(5));
+
+      await env.fermer(tester);
+    });
   });
 
   testWidgets('statut, personnalisable et produit sur commande', (WidgetTester tester) async {

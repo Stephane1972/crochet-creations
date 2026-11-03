@@ -1,4 +1,5 @@
 import 'package:crochet_creations/domain/calculs/statistiques.dart';
+import 'package:crochet_creations/domain/categories_produit.dart';
 import 'package:crochet_creations/domain/enums.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -12,7 +13,7 @@ void main() {
     int quantite = 1,
     int cout = 0,
     int produitId = 1,
-    CategorieProduit categorie = CategorieProduit.doudou,
+    String categorie = CleCategorie.doudou,
     String designation = 'Doudou lapin',
   }) => LigneCompta(
     nature: NatureLigne.bien,
@@ -429,17 +430,17 @@ void main() {
         vente(
           date: le5,
           lignes: <LigneCompta>[
-            objet(produitId: 1, categorie: CategorieProduit.doudou, total: 5000, quantite: 2, cout: 1000),
-            objet(produitId: 2, categorie: CategorieProduit.crochet, total: 10000, cout: 3000, designation: 'Plaid'),
-            objet(produitId: 3, categorie: CategorieProduit.accessoire, total: 800, cout: 100, designation: 'Pince'),
+            objet(produitId: 1, categorie: CleCategorie.doudou, total: 5000, quantite: 2, cout: 1000),
+            objet(produitId: 2, categorie: CleCategorie.crochet, total: 10000, cout: 3000, designation: 'Plaid'),
+            objet(produitId: 3, categorie: CleCategorie.accessoire, total: 800, cout: 100, designation: 'Pince'),
           ],
           paiements: <PaiementCompta>[paiement(le5, 15800)],
         ),
       ]);
-      expect(s.categories.map((CategorieRentable c) => c.categorie), <CategorieProduit>[
-        CategorieProduit.crochet, // marge 7 000
-        CategorieProduit.doudou, // marge 3 000
-        CategorieProduit.accessoire, // marge 700
+      expect(s.categories.map((CategorieRentable c) => c.categorie), <String>[
+        CleCategorie.crochet, // marge 7 000
+        CleCategorie.doudou, // marge 3 000
+        CleCategorie.accessoire, // marge 700
       ]);
       expect(s.categories.first.encaisseCentimes, 10000);
       expect(s.categories.first.coutCentimes, 3000);
@@ -451,14 +452,14 @@ void main() {
         vente(
           date: le5,
           lignes: <LigneCompta>[
-            objet(produitId: 1, categorie: CategorieProduit.doudou, total: 6000, cout: 2000),
-            objet(produitId: 2, categorie: CategorieProduit.crochet, total: 4000, cout: 1000, designation: 'Plaid'),
+            objet(produitId: 1, categorie: CleCategorie.doudou, total: 6000, cout: 2000),
+            objet(produitId: 2, categorie: CleCategorie.crochet, total: 4000, cout: 1000, designation: 'Plaid'),
           ],
           paiements: <PaiementCompta>[paiement(le5, 5000)],
         ),
       ]);
       final CategorieRentable doudou = s.categories.firstWhere(
-        (CategorieRentable c) => c.categorie == CategorieProduit.doudou,
+        (CategorieRentable c) => c.categorie == CleCategorie.doudou,
       );
       expect(doudou.encaisseCentimes, 3000);
       expect(doudou.coutCentimes, 1000);

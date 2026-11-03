@@ -1,5 +1,6 @@
 import 'package:crochet_creations/data/database/app_database.dart';
 import 'package:crochet_creations/data/sauvegarde/format_sauvegarde.dart';
+import 'package:crochet_creations/domain/categories_produit.dart';
 import 'package:crochet_creations/domain/enums.dart';
 import 'package:drift/drift.dart' show Value;
 
@@ -58,7 +59,7 @@ Future<void> remplirBase(AppDatabase db) async {
         ProduitsCompanion.insert(
           reference: 'PRD-0001',
           nom: 'Doudou lapin « Noisette »',
-          categorie: CategorieProduit.doudou,
+          categorie: CleCategorie.doudou,
           prixVenteCentimes: 2500,
           quantiteStock: const Value(4),
           matieres: const Value('Coton; laine mérinos'),

@@ -8,6 +8,7 @@ import 'package:crochet_creations/data/repositories/statistiques_vues.dart';
 import 'package:crochet_creations/data/repositories/vente_repository.dart';
 import 'package:crochet_creations/domain/calculs/panier.dart';
 import 'package:crochet_creations/domain/calculs/statistiques.dart';
+import 'package:crochet_creations/domain/categories_produit.dart';
 import 'package:crochet_creations/domain/enums.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter_test/flutter_test.dart';
@@ -60,7 +61,7 @@ void main() {
   });
   tearDown(() => db.close());
 
-  Future<int> produit(CategorieProduit categorie) => db
+  Future<int> produit(String categorie) => db
       .into(db.produits)
       .insert(
         ProduitsCompanion.insert(
@@ -191,7 +192,7 @@ void main() {
 
   group('argent encaissé par période', () {
     test('chaque paiement compte dans le jour, la semaine, le mois et l’année qui le contiennent', () async {
-      final int doudou = await produit(CategorieProduit.doudou);
+      final int doudou = await produit(CleCategorie.doudou);
       _L article(int prix) => _L('Doudou', prix: prix, cout: 100, produitId: doudou);
 
       final DateTime aujourdhui = DateTime(2026, 10, 29, 10);
@@ -222,7 +223,7 @@ void main() {
     });
 
     test('un acompte puis le solde : chaque paiement compte dans sa propre période', () async {
-      final int plaid = await produit(CategorieProduit.crochet);
+      final int plaid = await produit(CleCategorie.crochet);
       await vente(
         date: DateTime(2026, 9, 28, 10),
         lignes: <_L>[_L('Plaid', prix: 10000, cout: 3000, produitId: plaid)],
@@ -263,7 +264,7 @@ void main() {
       final Produit doudou = await produits.creer(
         const DonneesProduit(
           nom: 'Doudou lapin',
-          categorie: CategorieProduit.doudou,
+          categorie: CleCategorie.doudou,
           prixVenteCentimes: 2500,
           coutMatiereCentimes: 600,
           quantiteStock: 5,
@@ -317,7 +318,7 @@ void main() {
 
   group('objets, prestations, cours, catégories', () {
     test('un encaissement est réparti entre les lignes, la remise et les frais de port compris', () async {
-      final int doudou = await produit(CategorieProduit.doudou);
+      final int doudou = await produit(CleCategorie.doudou);
       final int unCours = await cours();
       final DateTime date = DateTime(2026, 10, 28, 10);
       await vente(
@@ -341,15 +342,15 @@ void main() {
       expect(mois.coutCentimes, 800);
       expect(mois.margeCentimes, 7500);
       expect(mois.categories, hasLength(1));
-      expect(mois.categories.single.categorie, CategorieProduit.doudou);
+      expect(mois.categories.single.categorie, CleCategorie.doudou);
       expect(mois.categories.single.encaisseCentimes, 2824);
       expect(mois.categories.single.coutCentimes, 800);
       expect(mois.categories.single.margeCentimes, 2024);
     });
 
     test('catégories classées par marge', () async {
-      final int doudou = await produit(CategorieProduit.doudou);
-      final int plaid = await produit(CategorieProduit.crochet);
+      final int doudou = await produit(CleCategorie.doudou);
+      final int plaid = await produit(CleCategorie.crochet);
       final DateTime date = DateTime(2026, 10, 10, 10);
       await vente(
         date: date,
@@ -361,9 +362,9 @@ void main() {
       );
 
       final StatsPeriode mois = (await calculer()).periode(PeriodeStats.mois);
-      expect(mois.categories.map((CategorieRentable c) => c.categorie), <CategorieProduit>[
-        CategorieProduit.crochet,
-        CategorieProduit.doudou,
+      expect(mois.categories.map((CategorieRentable c) => c.categorie), <String>[
+        CleCategorie.crochet,
+        CleCategorie.doudou,
       ]);
       expect(mois.categories.first.margeCentimes, 7000);
       expect(mois.categories.last.margeCentimes, 2000);
@@ -372,8 +373,8 @@ void main() {
 
   group('ventes faites pendant la période', () {
     test('meilleures ventes et panier moyen ne comptent que les ventes validées du mois', () async {
-      final int bonnet = await produit(CategorieProduit.crochet);
-      final int echarpe = await produit(CategorieProduit.crochet);
+      final int bonnet = await produit(CleCategorie.crochet);
+      final int echarpe = await produit(CleCategorie.crochet);
       final DateTime octobre = DateTime(2026, 10, 12, 10);
       await vente(
         date: octobre,

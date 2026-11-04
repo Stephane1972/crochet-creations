@@ -6,7 +6,18 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
 
 ## [Non publié]
 
-## [0.14.1] — Nouveau nom et nouveau logo (en attente de validation)
+## [0.14.2] — Logo de l'entreprise sur les factures et les devis (en attente de validation)
+
+### Modifié
+- Les **factures et les devis** portent maintenant le **logo de l'entreprise** (« Un p’tit crochet par ici », image fournie) en haut à
+  gauche, à la place de l'ancien logo monochrome. Il est imprimé en couleurs, plus grand qu'avant (96 × 90 pt) pour rester lisible ;
+  le nom de l'entreprise, lui, reste celui saisi dans *Mon entreprise* et s'imprime à côté du logo. Fichier : `assets/images/logo_entreprise.jpg`
+  (l'image fournie, recadrée, 640 px de large, JPEG de 63 Ko : un PDF reste léger).
+
+### Supprimé
+- `assets/images/logo_mono.png` et `logo_mono.svg` (ancien logo monochrome des PDF), devenus inutiles.
+
+## [0.14.1] — Nouveau nom et nouveau logo
 
 ### Modifié
 - **Nom de l'application : « Un p’tit crochet dans les stocks »** (au lieu de « Crochet & Créations »), à chaque endroit où

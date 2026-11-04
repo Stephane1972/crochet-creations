@@ -12,7 +12,7 @@ RessourcesPdf ressourcesPdfDeTest() {
     policeMoyenne: lire('assets/fonts/Poppins-Medium.ttf'),
     policeSemiGras: lire('assets/fonts/Poppins-SemiBold.ttf'),
     policeGras: lire('assets/fonts/Poppins-Bold.ttf'),
-    logo: lire('assets/images/logo_mono.png'),
+    logo: lire('assets/images/logo_entreprise.jpg'),
   );
 }
 

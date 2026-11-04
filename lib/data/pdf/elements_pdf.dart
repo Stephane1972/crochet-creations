@@ -92,11 +92,12 @@ pw.Widget enteteDocument({
   return pw.Row(
     crossAxisAlignment: pw.CrossAxisAlignment.start,
     children: <pw.Widget>[
-      pw.Image(pw.MemoryImage(ressources.logo), width: 64, height: 64),
-      pw.SizedBox(width: 12),
+      // Le logo (640 x 600 px) est assez détaillé : il est imprimé plus grand qu'une simple icône (96 x 90 pt).
+      pw.Image(pw.MemoryImage(ressources.logo), width: 96, height: 90),
+      pw.SizedBox(width: 14),
       pw.Expanded(
         child: pw.Padding(
-          padding: const pw.EdgeInsets.only(top: 10),
+          padding: const pw.EdgeInsets.only(top: 22),
           child: pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: <pw.Widget>[

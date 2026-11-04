@@ -19,7 +19,7 @@ class RessourcesPdf {
   final Uint8List policeSemiGras;
   final Uint8List policeGras;
 
-  /// Logo monochrome (PNG), pour imprimer aussi bien en couleur qu'en noir et blanc.
+  /// Logo de l'entreprise (JPEG sur fond blanc), imprimé en haut à gauche des factures et des devis.
   final Uint8List logo;
 }
 
@@ -36,6 +36,6 @@ Future<RessourcesPdf> chargerRessourcesPdf([AssetBundle? bundle]) async {
     policeMoyenne: await octets('assets/fonts/Poppins-Medium.ttf'),
     policeSemiGras: await octets('assets/fonts/Poppins-SemiBold.ttf'),
     policeGras: await octets('assets/fonts/Poppins-Bold.ttf'),
-    logo: await octets('assets/images/logo_mono.png'),
+    logo: await octets('assets/images/logo_entreprise.jpg'),
   );
 }

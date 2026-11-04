@@ -42,7 +42,8 @@ Hypothèse à confirmer : le profil « Mon entreprise » (écran 22) est constru
 
 ### Demandes de Stéphane après l'étape 12
 
-- [x] Nom et logo de l'application : **en attente de validation** (PR #13)
+- [x] Nom et logo de l'application (PR #13, validée)
+- [x] Logo de l'entreprise sur les factures et les devis : **en attente de validation**
 - [x] Supprimer un client ou un produit, historique conservé (PR #14, validée)
 - [x] Catégories de produits modifiables : créer une catégorie depuis le formulaire, écran « Catégories » (ajouter, renommer,
   supprimer en déplaçant les produits) (PR #15, validée)

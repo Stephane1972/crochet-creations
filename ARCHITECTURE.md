@@ -33,7 +33,7 @@ crochet-creations/
 ├── assets/
 │   ├── fonts/                        Poppins (titres) + licence OFL
 │   ├── icon/                         logo_source.png (logo fourni) et app_icon_foreground.png (généré, voir tool/generate_icons.py)
-│   └── images/                       logo_application.png (logo de l'application), logo_mono.svg et logo_mono.png (monochrome, pour les PDF)
+│   └── images/                       logo_application.png (logo de l'application), logo_entreprise.jpg (logo de l'entreprise, pour les PDF)
 ├── lib/
 │   ├── main.dart                     ouvre la base, lit le mode jour/nuit, lance l'application
 │   ├── app.dart                      MaterialApp : thèmes, langue française, routes
@@ -285,8 +285,8 @@ Navigation Flutter standard (`Navigator` + routes nommées), sans bibliothèque 
   `#FCE5E6` = couleur du pourtour du logo) et `assets/images/logo_application.png` (640 px), que le widget `AppLogo`
   affiche dans un carré aux coins arrondis. L'icône classique (Android avant 8) est le logo lui-même. Il n'y a plus de
   version monochrome de l'icône (thème d'icônes d'Android 13) ni de dépendance `flutter_svg`.
-  Les factures et devis gardent `logo_mono.png` (ancien logo monochrome, lu par `ressources_pdf.dart`) en attendant le
-  logo de l'entreprise ; le nom qu'ils portent est celui saisi dans *Mon entreprise*.
+  Les factures et devis impriment `logo_entreprise.jpg` (logo de l'entreprise, JPEG, lu par `ressources_pdf.dart` et dessiné
+  par `enteteDocument` dans `elements_pdf.dart`, 96 × 90 pt) ; le nom qu'ils portent est celui saisi dans *Mon entreprise*.
 
 ## Base de données (Drift / SQLite)
 

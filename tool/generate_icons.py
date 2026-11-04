@@ -5,7 +5,7 @@ Usage (depuis la racine du dépôt) :
     pip install pillow
     python3 tool/generate_icons.py
 
-Entrée : assets/icon/logo_source.png (1024 x 1024 px).
+Entrée : assets/icon/logo_source.png (carré, 1254 x 1254 px aujourd'hui ; 1024 px au minimum).
 
 Fichiers produits :
   - assets/icon/app_icon_foreground.png   premier plan de l'icône adaptative (fond transparent)

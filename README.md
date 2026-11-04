@@ -37,8 +37,8 @@ Le développement se fait en 12 étapes validées une par une (détail dans [ROA
 - **Nouveau logo** (la fillette aux pelotes) : **icône de lancement Android** (icône adaptative, sur fond rose) et **logo dans
   l'application** (écran de démarrage, accueil, réglages). L'image de départ est `assets/icon/logo_source.png` ; la commande
   `python3 tool/generate_icons.py` en refait les images dérivées.
-- Les **factures et devis** gardent pour l'instant l'ancien logo monochrome et le nom saisi dans *Mon entreprise* : le logo de
-  l'entreprise sera remplacé plus tard par un autre fichier.
+- Les **factures et devis** portent le **logo de l'entreprise** (« Un p’tit crochet par ici ») ; le nom imprimé à côté est celui
+  saisi dans *Mon entreprise*.
 
 ### Ce que contient l'étape 12 : finitions
 
@@ -206,7 +206,7 @@ validée **sans effet sur le stock** (lignes libres) ; le numéro du devis figur
   SIREN valide ne sont pas renseignés, la facture n'est pas créée : un message liste ce qui manque et propose
   d'ouvrir « Mon entreprise » (aucun numéro n'est consommé). Sinon la facture reçoit son numéro
   **FACT-AAAA-NNNN** (unique, dans l'ordre, une suite par année) et s'ouvre aussitôt.
-- **Le PDF** : fond blanc (même en mode nuit), bande rose et verte, logo monochrome, vos coordonnées, celles du
+- **Le PDF** : fond blanc (même en mode nuit), bande rose et verte, logo de l'entreprise, vos coordonnées, celles du
   client, tableau des articles (quantités, prix unitaires, totaux), remise, frais de port, **total mis en valeur**,
   mention de franchise de TVA, conditions de paiement, IBAN et remerciement s'ils sont renseignés, pied de page
   numéroté. Une longue facture continue sur plusieurs pages. Les coordonnées du client et les mentions sont

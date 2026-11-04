@@ -270,6 +270,16 @@ void main() {
   group('liste des produits', () {
     Finder dansProduits(Finder cible) => find.descendant(of: find.byType(ProduitsScreen), matching: cible);
 
+    /// La rangée de puces défile : celles qui sortent de l'écran ne sont pas construites, on avance jusqu'à la puce.
+    Future<void> montrerPuce(WidgetTester tester, Finder puce) async {
+      final Finder defilement = find.descendant(
+        of: dansProduits(find.byWidgetPredicate((Widget w) => w is ListView && w.scrollDirection == Axis.horizontal)),
+        matching: find.byType(Scrollable),
+      );
+      await tester.scrollUntilVisible(puce, 150, scrollable: defilement);
+      await tester.pumpAndSettle();
+    }
+
     Future<void> ouvrirProduits(WidgetTester tester, EnvironnementTest env) async {
       await ouvrirAccueil(tester, env);
       await tester.tap(ongletNav('Produits'));
@@ -283,6 +293,7 @@ void main() {
       await env.creerProduit(tester, nom: 'Renard', categorie: peluches.cle);
       await ouvrirProduits(tester, env);
 
+      await montrerPuce(tester, dansProduits(find.widgetWithText(ChoiceChip, 'Peluches')));
       expect(dansProduits(find.widgetWithText(ChoiceChip, 'Peluches')), findsOneWidget);
       expect(dansProduits(find.text('PRD-0001 · Peluches')), findsOneWidget);
 

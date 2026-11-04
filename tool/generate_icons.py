@@ -1,77 +1,61 @@
 #!/usr/bin/env python3
-"""Génère les PNG d'icône Android à partir des logos SVG.
+"""Prépare les images du logo de l'application à partir du logo fourni (carré).
 
 Usage (depuis la racine du dépôt) :
-    pip install cairosvg pillow
+    pip install pillow
     python3 tool/generate_icons.py
 
-Fichiers produits dans assets/icon/ :
-  - app_icon.png               icône classique (fond crème + logo)
-  - app_icon_foreground.png    premier plan de l'icône adaptative (fond transparent)
-  - app_icon_monochrome.png    version monochrome (icônes thématiques Android 13+)
+Entrée : assets/icon/logo_source.png (carré, 1254 x 1254 px aujourd'hui ; 1024 px au minimum).
 
-Ils sont ensuite transformés en mipmaps par `dart run flutter_launcher_icons`
-(voir tool/setup_android.sh).
+Fichiers produits :
+  - assets/icon/app_icon_foreground.png   premier plan de l'icône adaptative (fond transparent)
+  - assets/images/logo_application.png    logo affiché dans l'application (écran de démarrage, accueil, réglages)
+
+L'icône classique (Android avant la version 8) est logo_source.png lui-même ; le fond de l'icône adaptative est
+la couleur du pourtour du logo (`adaptive_icon_background` dans pubspec.yaml). Ces PNG sont ensuite transformés
+en icônes Android par `dart run flutter_launcher_icons` (voir tool/setup_android.sh).
 """
-import io
 from pathlib import Path
 
-import cairosvg
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFilter
 
 ROOT = Path(__file__).resolve().parent.parent
-LOGO = ROOT / "assets" / "images" / "logo.svg"
-LOGO_MONO = ROOT / "assets" / "images" / "logo_mono.svg"
-OUT = ROOT / "assets" / "icon"
-SIZE = 1024
-CREAM = (251, 247, 244, 255)  # #FBF7F4
+SOURCE = ROOT / "assets" / "icon" / "logo_source.png"
+PREMIER_PLAN = ROOT / "assets" / "icon" / "app_icon_foreground.png"
+LOGO_APPLICATION = ROOT / "assets" / "images" / "logo_application.png"
 
-
-def render(svg: Path, size: int, background=None) -> Image.Image:
-    png = cairosvg.svg2png(
-        url=str(svg), output_width=size, output_height=size, background_color=background
-    )
-    return Image.open(io.BytesIO(png)).convert("RGBA")
-
-
-def fit_centered(img: Image.Image, canvas: int, content: int) -> Image.Image:
-    """Recadre sur le contenu visible, le met à l'échelle (côté max = `content`) et le centre."""
-    bbox = img.getchannel("A").getbbox()
-    cropped = img.crop(bbox)
-    scale = content / max(cropped.size)
-    cropped = cropped.resize(
-        (round(cropped.width * scale), round(cropped.height * scale)), Image.LANCZOS
-    )
-    out = Image.new("RGBA", (canvas, canvas), (0, 0, 0, 0))
-    out.paste(
-        cropped,
-        ((canvas - cropped.width) // 2, (canvas - cropped.height) // 2),
-        cropped,
-    )
-    return out
+TAILLE_ICONE = 1024
+# Zone de sécurité d'Android : l'icône adaptative est dessinée sur 108 dp, mais seul un disque d'environ 66 dp
+# est toujours visible, quel que soit le masque (rond, carré arrondi…). Le logo entier est donc réduit pour que
+# ses éléments restent visibles ; le fond est de la même couleur que son pourtour.
+PART_PREMIER_PLAN = 0.62
+# Couleur du pourtour du logo (médiane) : fond de l'icône adaptative, à garder égale à `adaptive_icon_background`.
+FOND = "#FCE5E6"
+# Le pourtour du logo n'est pas tout à fait uniforme (un peu plus foncé en bas) : ses bords sont estompés pour qu'ils
+# se fondent dans le fond sans laisser de trait.
+ESTOMPAGE = 0.04  # part de la largeur
+TAILLE_LOGO_APPLICATION = 640
 
 
 def main() -> None:
-    OUT.mkdir(parents=True, exist_ok=True)
+    logo = Image.open(SOURCE).convert("RGBA")
 
-    logo = render(LOGO, SIZE * 2)  # rendu x2 pour un recadrage net
+    cote = round(TAILLE_ICONE * PART_PREMIER_PLAN)
+    reduit = logo.resize((cote, cote), Image.LANCZOS)
+    marge = round(cote * ESTOMPAGE)
+    masque = Image.new("L", (cote, cote), 0)
+    ImageDraw.Draw(masque).rectangle((marge, marge, cote - marge, cote - marge), fill=255)
+    reduit.putalpha(masque.filter(ImageFilter.GaussianBlur(marge / 2)))
+    premier_plan = Image.new("RGBA", (TAILLE_ICONE, TAILLE_ICONE), (0, 0, 0, 0))
+    decalage = (TAILLE_ICONE - cote) // 2
+    premier_plan.alpha_composite(reduit, (decalage, decalage))
+    premier_plan.save(PREMIER_PLAN, optimize=True)
 
-    # 1) Icône classique : logo sur fond crème, ~76 % de la surface
-    classic = Image.new("RGBA", (SIZE, SIZE), CREAM)
-    classic.alpha_composite(fit_centered(logo, SIZE, round(SIZE * 0.76)))
-    classic.convert("RGB").save(OUT / "app_icon.png")
+    logo.resize((TAILLE_LOGO_APPLICATION, TAILLE_LOGO_APPLICATION), Image.LANCZOS).convert("RGB").save(
+        LOGO_APPLICATION, optimize=True
+    )
 
-    # 2) Premier plan adaptatif : zone de sécurité Android = cercle de 66/108 (≈ 61 %)
-    fit_centered(logo, SIZE, round(SIZE * 0.56)).save(OUT / "app_icon_foreground.png")
-
-    # 3) Monochrome : noir pur, l'opacité vient de la luminosité du logo mono sur fond blanc
-    mono = render(LOGO_MONO, SIZE * 2, background="#FFFFFF").convert("L")
-    alpha = mono.point(lambda v: 255 - v)
-    mono_rgba = Image.new("RGBA", mono.size, (0, 0, 0, 0))
-    mono_rgba.putalpha(alpha)
-    fit_centered(mono_rgba, SIZE, round(SIZE * 0.56)).save(OUT / "app_icon_monochrome.png")
-
-    print("Icônes générées dans", OUT)
+    print("Images générées :", PREMIER_PLAN.relative_to(ROOT), "et", LOGO_APPLICATION.relative_to(ROOT))
 
 
 if __name__ == "__main__":

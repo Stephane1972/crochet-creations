@@ -1,10 +1,12 @@
 /// Constantes générales de l'application.
 abstract final class AppConstants {
-  static const String nomApplication = 'Crochet & Créations';
+  /// Nom affiché partout (écran de démarrage, réglages, sujets de partage) et sous l'icône Android
+  /// (réglé par `tool/setup_android.sh`, qui doit rester d'accord avec cette ligne).
+  static const String nomApplication = 'Un p’tit crochet dans les stocks';
   static const String accroche = 'Votre atelier, bien rangé';
 
   /// À garder synchronisée avec la ligne `version:` de pubspec.yaml.
-  static const String version = '0.14.0';
+  static const String version = '0.14.1';
 
   /// Seuils de la franchise en base de TVA (micro-entreprise), en centimes.
   /// Ventes de biens : 85 000 € — prestations de services : 37 500 €.

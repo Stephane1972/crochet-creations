@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Palette « Crochet & Créations ».
+/// Palette de l'application « Un p’tit crochet dans les stocks ».
 ///
 /// Les 11 premières couleurs viennent du cahier des charges.
 /// Les teintes « dérivées » complètent la palette pour obtenir un contraste

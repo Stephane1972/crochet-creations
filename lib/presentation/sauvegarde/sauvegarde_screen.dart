@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/constants/app_constants.dart';
 import '../../core/router/app_routes.dart';
 import '../../core/theme/theme_mode_provider.dart';
 import '../../core/utils/date_fr.dart';
@@ -70,7 +71,7 @@ class _SauvegardeScreenState extends ConsumerState<SauvegardeScreen> {
         cheminFichier: sauvegarde.fichier.path,
         nomFichier: sauvegarde.nom,
         typeMime: 'application/zip',
-        sujet: 'Sauvegarde Crochet & Créations du ${formatDateCourte(sauvegarde.date)}',
+        sujet: 'Sauvegarde du ${formatDateCourte(sauvegarde.date)} – ${AppConstants.nomApplication}',
       );
     });
   }
@@ -187,7 +188,7 @@ class _SauvegardeScreenState extends ConsumerState<SauvegardeScreen> {
         cheminFichier: fichier.path,
         nomFichier: fichier.uri.pathSegments.last,
         typeMime: 'application/zip',
-        sujet: 'Export CSV – Crochet & Créations',
+        sujet: 'Export CSV – ${AppConstants.nomApplication}',
       );
     });
   }
@@ -199,7 +200,7 @@ class _SauvegardeScreenState extends ConsumerState<SauvegardeScreen> {
         cheminFichier: fichier.path,
         nomFichier: fichier.uri.pathSegments.last,
         typeMime: 'application/json',
-        sujet: 'Export JSON – Crochet & Créations',
+        sujet: 'Export JSON – ${AppConstants.nomApplication}',
       );
     });
   }

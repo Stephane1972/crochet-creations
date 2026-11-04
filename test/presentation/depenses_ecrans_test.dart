@@ -5,6 +5,7 @@ import 'package:crochet_creations/core/router/app_routes.dart';
 import 'package:crochet_creations/core/utils/date_fr.dart';
 import 'package:crochet_creations/core/utils/money.dart';
 import 'package:crochet_creations/data/database/app_database.dart';
+import 'package:crochet_creations/domain/categories_produit.dart';
 import 'package:crochet_creations/domain/enums.dart';
 import 'package:crochet_creations/presentation/depenses/depense_form_screen.dart';
 import 'package:crochet_creations/presentation/depenses/depenses_screen.dart';
@@ -323,7 +324,7 @@ void main() {
   ) async {
     final EnvironnementTest env = await EnvironnementTest.creer(tester);
     final Produit doudou = await env.creerProduit(tester, nom: 'Doudou lapin', stock: 5);
-    await env.creerProduit(tester, nom: 'Boucles fleurs', categorie: CategorieProduit.bouclesOreilles);
+    await env.creerProduit(tester, nom: 'Boucles fleurs', categorie: CleCategorie.bouclesOreilles);
     await ouvrirFormulaire(tester, env, AppRoutes.depenseNouvelle);
 
     expect(dansFormulaire(find.text('Aucun produit')), findsOneWidget);

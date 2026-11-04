@@ -340,6 +340,8 @@ class ServiceSauvegarde {
       ),
       tables: tables,
       fichiers: fichiers,
+      // Une sauvegarde du schéma 1 ou 2 n'a pas de catégories : les produits y portent les clés des cinq de départ.
+      sansCategories: tablesBrutes['categories_produit'] == null,
     );
   }
 
@@ -408,6 +410,9 @@ class ServiceSauvegarde {
 
       // La ligne unique des réglages doit toujours exister, même si l'archive n'en contenait pas.
       await _base.customStatement('INSERT OR IGNORE INTO parametres_entreprise (id) VALUES (1)');
+
+      // Une sauvegarde faite avant les catégories modifiables : on recrée les cinq catégories de départ.
+      if (contenu.sansCategories) await _base.insererCategoriesDeDepart();
     });
   }
 
@@ -520,11 +525,19 @@ class ServiceSauvegarde {
 
 /// Une archive lue et vérifiée, prête à être restaurée.
 class _Contenu {
-  const _Contenu({required this.manifeste, required this.tables, required this.fichiers});
+  const _Contenu({
+    required this.manifeste,
+    required this.tables,
+    required this.fichiers,
+    required this.sansCategories,
+  });
 
   final ManifesteSauvegarde manifeste;
   final Map<String, List<Map<String, Object?>>> tables;
   final List<_FichierArchive> fichiers;
+
+  /// L'archive ne contient pas la table des catégories (sauvegarde d'un schéma antérieur au 3).
+  final bool sansCategories;
 }
 
 class _FichierArchive {

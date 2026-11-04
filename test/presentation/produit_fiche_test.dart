@@ -4,7 +4,7 @@ import 'package:crochet_creations/core/utils/date_fr.dart';
 import 'package:crochet_creations/core/utils/money.dart';
 import 'package:crochet_creations/data/database/app_database.dart';
 import 'package:crochet_creations/data/repositories/produit_repository.dart';
-import 'package:crochet_creations/domain/enums.dart';
+import 'package:crochet_creations/domain/categories_produit.dart';
 import 'package:crochet_creations/presentation/produits/produit_fiche_screen.dart';
 import 'package:crochet_creations/presentation/produits/produits_screen.dart';
 import 'package:crochet_creations/presentation/ventes/panier_screen.dart';
@@ -55,7 +55,7 @@ void main() {
       () => env.produits.creer(
         const DonneesProduit(
           nom: 'Doudou lapin',
-          categorie: CategorieProduit.doudou,
+          categorie: CleCategorie.doudou,
           prixVenteCentimes: 2500,
           coutMatiereCentimes: 600,
           tempsFabricationMinutes: 150,

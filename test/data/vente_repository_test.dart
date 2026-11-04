@@ -9,6 +9,7 @@ import 'package:crochet_creations/data/repositories/produit_repository.dart';
 import 'package:crochet_creations/data/repositories/vente_repository.dart';
 import 'package:crochet_creations/data/repositories/vente_vues.dart';
 import 'package:crochet_creations/domain/calculs/panier.dart';
+import 'package:crochet_creations/domain/categories_produit.dart';
 import 'package:crochet_creations/domain/enums.dart';
 import 'package:crochet_creations/domain/erreurs.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -31,7 +32,7 @@ void main() {
 
   const DonneesProduit doudou = DonneesProduit(
     nom: 'Doudou lapin',
-    categorie: CategorieProduit.doudou,
+    categorie: CleCategorie.doudou,
     prixVenteCentimes: 2500,
     coutMatiereCentimes: 600,
     quantiteStock: 5,
@@ -162,7 +163,7 @@ void main() {
       final Produit p = await produits.creer(
         const DonneesProduit(
           nom: 'Plaid sur mesure',
-          categorie: CategorieProduit.surMesure,
+          categorie: CleCategorie.surMesure,
           prixVenteCentimes: 9000,
           statut: StatutProduit.surCommande,
         ),
@@ -205,7 +206,7 @@ void main() {
       final Produit b = await produits.creer(
         const DonneesProduit(
           nom: 'Boucles roses',
-          categorie: CategorieProduit.bouclesOreilles,
+          categorie: CleCategorie.bouclesOreilles,
           prixVenteCentimes: 1500,
           quantiteStock: 1,
         ),
@@ -276,7 +277,7 @@ void main() {
       final Produit epuise = await produits.creer(
         const DonneesProduit(
           nom: 'Écharpe',
-          categorie: CategorieProduit.accessoire,
+          categorie: CleCategorie.accessoire,
           prixVenteCentimes: 3000,
           quantiteStock: 2,
           statut: StatutProduit.epuise,
@@ -386,7 +387,7 @@ void main() {
       final Produit p = await produits.creer(
         const DonneesProduit(
           nom: 'Plaid sur mesure',
-          categorie: CategorieProduit.surMesure,
+          categorie: CleCategorie.surMesure,
           prixVenteCentimes: 9000,
           statut: StatutProduit.surCommande,
         ),

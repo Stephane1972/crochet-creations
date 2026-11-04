@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'package:crochet_creations/app.dart';
 import 'package:crochet_creations/data/database/app_database.dart';
 import 'package:crochet_creations/data/providers.dart';
+import 'package:crochet_creations/data/repositories/categorie_repository.dart';
 import 'package:crochet_creations/data/repositories/client_repository.dart';
 import 'package:crochet_creations/data/repositories/cours_repository.dart';
 import 'package:crochet_creations/data/repositories/cours_vues.dart';
@@ -24,6 +25,7 @@ import 'package:crochet_creations/data/stockage/selecteur_photo.dart';
 import 'package:crochet_creations/data/stockage/stockage_pdf.dart';
 import 'package:crochet_creations/data/stockage/stockage_photos.dart';
 import 'package:crochet_creations/domain/calculs/panier.dart';
+import 'package:crochet_creations/domain/categories_produit.dart';
 import 'package:crochet_creations/domain/document_devis.dart';
 import 'package:crochet_creations/domain/document_facture.dart';
 import 'package:crochet_creations/domain/enums.dart';
@@ -147,6 +149,7 @@ class EnvironnementTest {
   final Directory dossier;
   final ProduitRepository produits;
   final ClientRepository clients;
+  late final CategorieRepository categories = CategorieRepository(db);
   late final VenteRepository ventes = VenteRepository(db, produits);
   late final CoursRepository cours = CoursRepository(db, ventes);
   late final DepenseRepository depenses = DepenseRepository(db);
@@ -313,7 +316,7 @@ class EnvironnementTest {
   Future<Produit> creerProduit(
     WidgetTester tester, {
     String nom = 'Doudou lapin',
-    CategorieProduit categorie = CategorieProduit.doudou,
+    String categorie = CleCategorie.doudou,
     int prix = 2500,
     int stock = 5,
     int seuil = 2,

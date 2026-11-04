@@ -30,7 +30,9 @@ class DonneesProduit {
   });
 
   final String nom;
-  final CategorieProduit categorie;
+
+  /// Clé d'une catégorie existante (`categories_produit.cle`).
+  final String categorie;
   final int prixVenteCentimes;
   final String? description;
   final String? matieres;
@@ -122,6 +124,7 @@ class ProduitRepository {
   }) async {
     donnees.valider();
     return _db.transaction(() async {
+      await _verifierCategorie(donnees.categorie);
       final String reference = await _numerotation.prochaineReferenceProduit();
       final int id = await _db
           .into(_db.produits)
@@ -163,6 +166,7 @@ class ProduitRepository {
   }) async {
     donnees.valider();
     return _db.transaction(() async {
+      await _verifierCategorie(donnees.categorie);
       final int lignes = await (_db.update(_db.produits)..where((t) => t.id.equals(id))).write(
         ProduitsCompanion(
           nom: Value(donnees.nom.trim()),
@@ -615,6 +619,13 @@ class ProduitRepository {
       totalLigneCentimes: ligne.totalLigneCentimes,
       clientNom: nom.isEmpty ? null : nom,
     );
+  }
+
+  /// Refuse une catégorie qui n'existe pas (ou plus) : la base n'a pas de clé étrangère sur cette colonne.
+  Future<void> _verifierCategorie(String cle) async {
+    final CategorieProduit? categorie = await (_db.select(_db.categoriesProduit)..where((t) => t.cle.equals(cle)))
+        .getSingleOrNull();
+    if (categorie == null) throw const DonneeInvalide('Cette catégorie n’existe plus : choisissez-en une autre.');
   }
 
   Future<Produit> _produit(int id) async {

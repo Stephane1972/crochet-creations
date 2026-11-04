@@ -17,6 +17,7 @@ import '../devis/devis_screen.dart';
 import '../entreprise/mon_entreprise_screen.dart';
 import '../factures/facture_detail_screen.dart';
 import '../factures/factures_screen.dart';
+import '../produits/categories_screen.dart';
 import '../produits/produit_fiche_screen.dart';
 import '../produits/produit_form_screen.dart';
 import '../sauvegarde/sauvegarde_screen.dart';
@@ -45,6 +46,8 @@ abstract final class AppRouter {
         return _page(settings, const MonEntrepriseScreen());
       case AppRoutes.sauvegarde:
         return _page(settings, const SauvegardeScreen());
+      case AppRoutes.categories:
+        return _page(settings, const CategoriesScreen());
       case AppRoutes.factures:
         return _page(settings, const FacturesScreen());
       case AppRoutes.factureDetail:

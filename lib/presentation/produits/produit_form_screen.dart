@@ -10,8 +10,11 @@ import '../../core/widgets/dialogues.dart';
 import '../../data/database/app_database.dart';
 import '../../data/providers.dart';
 import '../../data/repositories/produit_repository.dart';
+import '../../domain/categories_produit.dart';
 import '../../domain/enums.dart';
 import '../common/choix_photo.dart';
+import 'categorie_dialogues.dart';
+import 'categories_providers.dart';
 import 'photos_formulaire.dart';
 import 'produit_widgets.dart';
 
@@ -40,7 +43,11 @@ class _ProduitFormScreenState extends ConsumerState<ProduitFormScreen> {
   final TextEditingController _stock = TextEditingController(text: '0');
   final TextEditingController _seuil = TextEditingController(text: '0');
 
-  CategorieProduit? _categorie;
+  /// Clé de la catégorie choisie.
+  String? _categorie;
+
+  /// Change quand le champ « Catégorie » doit repartir de [_categorie] (choix annulé, catégorie créée).
+  int _versionChampCategorie = 0;
   StatutProduit _statut = StatutProduit.disponible;
   bool _personnalisable = false;
 
@@ -142,6 +149,62 @@ class _ProduitFormScreenState extends ConsumerState<ProduitFormScreen> {
 
   void _marquerModifie() {
     if (!_modifie) setState(() => _modifie = true);
+  }
+
+  // --- Catégorie ------------------------------------------------------------
+
+  /// Valeur spéciale de la liste : « + Nouvelle catégorie ». Ce n'est jamais une vraie clé.
+  static const String _nouvelleCategorie = '+nouvelle';
+
+  Widget _champCategorie() {
+    final List<CategorieProduit> categories = ref.watch(categoriesProduitProvider).valueOrNull ?? const <CategorieProduit>[];
+    final bool choixConnu = categories.any((CategorieProduit c) => c.cle == _categorie);
+    return DropdownButtonFormField<String>(
+      // Le champ repart de la catégorie choisie quand la liste (re)charge ou quand un choix est annulé.
+      key: ValueKey<String>('categorie-$_versionChampCategorie-${categories.length}'),
+      initialValue: choixConnu ? _categorie : null,
+      isExpanded: true,
+      decoration: const InputDecoration(labelText: 'Catégorie *'),
+      items: <DropdownMenuItem<String>>[
+        for (final CategorieProduit c in categories) DropdownMenuItem<String>(value: c.cle, child: Text(c.nom)),
+        const DropdownMenuItem<String>(
+          value: _nouvelleCategorie,
+          child: Row(
+            children: <Widget>[Icon(Icons.add), SizedBox(width: 8), Text('Nouvelle catégorie')],
+          ),
+        ),
+      ],
+      onChanged: (String? valeur) {
+        if (valeur == _nouvelleCategorie) {
+          _creerCategorie();
+        } else {
+          setState(() {
+            _categorie = valeur;
+            _modifie = true;
+          });
+        }
+      },
+      validator: (String? v) => v == null ? 'Choisissez une catégorie.' : null,
+    );
+  }
+
+  /// Demande un nom, crée la catégorie tout de suite (elle reste disponible même si on abandonne le formulaire)
+  /// et la sélectionne.
+  Future<void> _creerCategorie() async {
+    final CategorieProduit? creee = await demanderNomCategorie<CategorieProduit>(
+      context,
+      titre: 'Nouvelle catégorie',
+      libelleValider: 'Créer',
+      enregistrer: (String nom) => ref.read(categorieRepositoryProvider).creer(nom),
+    );
+    if (!mounted) return;
+    setState(() {
+      if (creee != null) {
+        _categorie = creee.cle;
+        _modifie = true;
+      }
+      _versionChampCategorie++;
+    });
   }
 
   // --- Photos ---------------------------------------------------------------
@@ -334,7 +397,7 @@ class _ProduitFormScreenState extends ConsumerState<ProduitFormScreen> {
           const SizedBox(height: 16),
           _TitreSection('Photos', theme),
           _SectionPhotos(
-            categorie: _categorie ?? CategorieProduit.crochet,
+            categorie: _categorie ?? CleCategorie.crochet,
             principale: _photos.principale,
             secondaires: _photos.secondaires,
             onChangerPrincipale: _changerPrincipale,
@@ -353,17 +416,7 @@ class _ProduitFormScreenState extends ConsumerState<ProduitFormScreen> {
                 validerLongueurMax(v, 200, 'Le nom'),
           ),
           const SizedBox(height: 12),
-          DropdownButtonFormField<CategorieProduit>(
-            initialValue: _categorie,
-            isExpanded: true,
-            decoration: const InputDecoration(labelText: 'Catégorie *'),
-            items: <DropdownMenuItem<CategorieProduit>>[
-              for (final CategorieProduit c in CategorieProduit.values)
-                DropdownMenuItem<CategorieProduit>(value: c, child: Text(c.libelle)),
-            ],
-            onChanged: (CategorieProduit? valeur) => setState(() => _categorie = valeur),
-            validator: (CategorieProduit? v) => v == null ? 'Choisissez une catégorie.' : null,
-          ),
+          _champCategorie(),
           const SizedBox(height: 12),
           TextFormField(
             controller: _description,
@@ -550,7 +603,7 @@ class _SectionPhotos extends StatelessWidget {
     required this.onRetirerSecondaire,
   });
 
-  final CategorieProduit categorie;
+  final String categorie;
   final String? principale;
   final List<PhotoForm> secondaires;
   final VoidCallback onChangerPrincipale;

@@ -9,6 +9,7 @@ import '../../data/repositories/statistiques_vues.dart';
 import '../../domain/calculs/statistiques.dart';
 import '../../domain/calculs/stock.dart';
 import '../depenses/depenses_widgets.dart';
+import '../produits/categories_providers.dart';
 import '../produits/produits_providers.dart';
 import 'franchise_tva_carte.dart';
 import 'statistiques_providers.dart';
@@ -395,15 +396,16 @@ class _MeilleuresVentes extends StatelessWidget {
   }
 }
 
-class _CategoriesRentables extends StatelessWidget {
+class _CategoriesRentables extends ConsumerWidget {
   const _CategoriesRentables({required this.stats});
 
   final StatsPeriode stats;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final ThemeData theme = Theme.of(context);
     final ColorScheme scheme = theme.colorScheme;
+    final Map<String, String> noms = ref.watch(nomsCategoriesProvider);
     return _Section(
       titre: 'Catégories les plus rentables',
       legende: 'Marge estimée des produits du catalogue, hors lignes libres et cours.',
@@ -419,7 +421,7 @@ class _CategoriesRentables extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: <Widget>[
-                            Text(c.categorie.libelle, style: theme.textTheme.bodyLarge),
+                            Text(nomCategorie(noms, c.categorie), style: theme.textTheme.bodyLarge),
                             Text(
                               'Encaissé ${formatEuros(c.encaisseCentimes)} · matière ${formatEuros(c.coutCentimes)}',
                               style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),

@@ -32,6 +32,12 @@ class StatistiquesRepository {
     final List<VenteCompta> ventes = await _ventesComptables(depuis);
     final List<DepenseCompta> depenses = await _depensesComptables(depuis);
     final ({int nombre, int totalCentimes}) impayees = await _facturesImpayees();
+    final List<String> ordreCategories = <String>[
+      for (final CategorieProduit c in await (_db.select(_db.categoriesProduit)
+            ..orderBy([(t) => OrderingTerm.asc(t.position), (t) => OrderingTerm.asc(t.id)]))
+          .get())
+        c.cle,
+    ];
 
     return Statistiques(
       maintenant: instant,
@@ -43,6 +49,7 @@ class StatistiquesRepository {
             fin: bornes[p]!.fin,
             ventes: ventes,
             depenses: depenses,
+            ordreCategories: ordreCategories,
           ),
       },
       facturesImpayeesNombre: impayees.nombre,
@@ -60,6 +67,7 @@ class StatistiquesRepository {
       _db.depenses,
       _db.factures,
       _db.produits,
+      _db.categoriesProduit,
     },
     () => calculer(maintenant: horloge?.call()),
   );
@@ -88,7 +96,7 @@ class StatistiquesRepository {
     }
     if (ventes.isEmpty) return <VenteCompta>[];
 
-    final Map<int, CategorieProduit> categories = <int, CategorieProduit>{
+    final Map<int, String> categories = <int, String>{
       for (final Produit p in await _db.select(_db.produits).get()) p.id: p.categorie,
     };
 

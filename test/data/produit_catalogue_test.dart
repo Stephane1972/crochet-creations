@@ -5,6 +5,7 @@ import 'package:crochet_creations/data/repositories/numerotation_repository.dart
 import 'package:crochet_creations/data/repositories/produit_repository.dart';
 import 'package:crochet_creations/data/repositories/produit_vues.dart';
 import 'package:crochet_creations/domain/calculs/stock.dart';
+import 'package:crochet_creations/domain/categories_produit.dart';
 import 'package:crochet_creations/domain/enums.dart';
 import 'package:crochet_creations/domain/erreurs.dart';
 import 'package:drift/drift.dart' show Value;
@@ -26,7 +27,7 @@ void main() {
 
   const DonneesProduit doudou = DonneesProduit(
     nom: 'Doudou lapin',
-    categorie: CategorieProduit.doudou,
+    categorie: CleCategorie.doudou,
     prixVenteCentimes: 2500,
     coutMatiereCentimes: 600,
     tempsFabricationMinutes: 150,
@@ -172,7 +173,7 @@ void main() {
       final Produit p = await repo.creer(
         const DonneesProduit(
           nom: 'Écharpe',
-          categorie: CategorieProduit.crochet,
+          categorie: CleCategorie.crochet,
           prixVenteCentimes: 3000,
           photoPrincipaleChemin: 'principale.jpg',
         ),

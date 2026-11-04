@@ -44,8 +44,13 @@ Future<void> saisirNom(WidgetTester tester, String texte) async {
   await tester.pump();
 }
 
-Future<CategorieProduit> categorie(WidgetTester tester, EnvironnementTest env, String cle) async =>
-    (await env.travailler(tester, () => env.categories.parCle(cle)))!;
+Future<CategorieProduit> categorie(WidgetTester tester, EnvironnementTest env, String cle) async {
+  final CategorieProduit? trouvee = await env.travailler<CategorieProduit?>(
+    tester,
+    () => env.categories.parCle(cle),
+  );
+  return trouvee!;
+}
 
 void main() {
   testWidgets('l’écran est atteint depuis Réglages et montre les cinq catégories avec leur nombre de produits', (

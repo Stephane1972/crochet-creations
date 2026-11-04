@@ -7,6 +7,7 @@ import 'package:archive/archive.dart' show Archive, ArchiveFile, ZipEncoder;
 import '../../core/utils/date_fr.dart';
 import '../../domain/csv.dart';
 import '../database/app_database.dart';
+import '../repositories/client_vues.dart' show nomClientOuCopie;
 import '../repositories/produit_vues.dart' show nomClientAffiche;
 import 'format_sauvegarde.dart';
 
@@ -87,6 +88,9 @@ class ExportCsv {
       if (v.archiveLe != null) continue;
       variantesDe.putIfAbsent(v.produitId, () => <VarianteProduit>[]).add(v);
     }
+    final Map<String, String> nomsCategories = <String, String>{
+      for (final CategorieProduit c in await _base.select(_base.categoriesProduit).get()) c.cle: c.nom,
+    };
 
     return construireCsv(
       <String>[
@@ -113,7 +117,7 @@ class ExportCsv {
           <String>[
             p.reference,
             p.nom,
-            p.categorie.libelle,
+            nomsCategories[p.categorie] ?? p.categorie,
             p.statut.libelle,
             montantCsv(p.prixVenteCentimes),
             montantCsv(p.coutMatiereCentimes),
@@ -220,7 +224,7 @@ class ExportCsv {
           <String>[
             '${v.id}',
             _date(v.dateVente),
-            _clientOuPassage(noms, v.clientId),
+            _clientOuPassage(noms, v.clientId, v.clientNom),
             v.statut.libelle,
             v.statutPaiement.libelle,
             (articlesDe[v.id] ?? const <String>[]).join(' ; '),
@@ -293,7 +297,7 @@ class ExportCsv {
             d.numero,
             _date(d.dateEmission),
             _dateOuVide(d.dateValidite),
-            d.clientId == null ? '' : (noms[d.clientId] ?? ''),
+            d.clientId == null ? nomClientOuCopie(copie: d.clientNom, sinon: '') : (noms[d.clientId] ?? ''),
             d.statut.libelle,
             montantCsv(d.sousTotalCentimes),
             montantCsv(d.remiseCentimes),
@@ -435,8 +439,9 @@ class ExportCsv {
   String _nomClient(Client c) =>
       nomClientAffiche(prenom: c.prenom, nom: c.nom, raisonSociale: c.raisonSociale);
 
-  String _clientOuPassage(Map<int, String> noms, int? clientId) {
-    if (clientId == null) return 'Client de passage';
+  /// Le client d'une vente : sa fiche, sinon le nom copié quand la fiche a été supprimée, sinon « Client de passage ».
+  String _clientOuPassage(Map<int, String> noms, int? clientId, String? copie) {
+    if (clientId == null) return nomClientOuCopie(copie: copie, sinon: 'Client de passage');
     return noms[clientId] ?? '';
   }
 

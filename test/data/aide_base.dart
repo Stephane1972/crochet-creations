@@ -1,5 +1,5 @@
 import 'package:crochet_creations/data/database/app_database.dart';
-import 'package:crochet_creations/domain/enums.dart';
+import 'package:crochet_creations/domain/categories_produit.dart';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 
@@ -20,7 +20,7 @@ extension PreparationBase on AppDatabase {
         ProduitsCompanion.insert(
           reference: reference,
           nom: 'Produit $reference',
-          categorie: CategorieProduit.crochet,
+          categorie: CleCategorie.crochet,
           prixVenteCentimes: prix,
           quantiteStock: Value(stock),
         ),

@@ -5,6 +5,7 @@ import 'package:crochet_creations/core/utils/money.dart';
 import 'package:crochet_creations/data/database/app_database.dart';
 import 'package:crochet_creations/data/repositories/produit_repository.dart';
 import 'package:crochet_creations/domain/calculs/panier.dart';
+import 'package:crochet_creations/domain/categories_produit.dart';
 import 'package:crochet_creations/domain/enums.dart';
 import 'package:crochet_creations/presentation/factures/factures_screen.dart';
 import 'package:crochet_creations/presentation/more/more_screen.dart';
@@ -80,7 +81,7 @@ Future<Produit> produit(
   WidgetTester tester,
   EnvironnementTest env, {
   required String nom,
-  required CategorieProduit categorie,
+  required String categorie,
   required int prix,
   int cout = 0,
   int stock = 10,
@@ -253,7 +254,7 @@ void main() {
       tester,
       env,
       nom: 'Doudou lapin',
-      categorie: CategorieProduit.doudou,
+      categorie: CleCategorie.doudou,
       prix: 2500,
       cout: 600,
     );
@@ -261,7 +262,7 @@ void main() {
       tester,
       env,
       nom: 'Bonnet',
-      categorie: CategorieProduit.crochet,
+      categorie: CleCategorie.crochet,
       prix: 3000,
       cout: 500,
     );
@@ -353,7 +354,7 @@ void main() {
       tester,
       env,
       nom: 'Plaid',
-      categorie: CategorieProduit.crochet,
+      categorie: CleCategorie.crochet,
       prix: 4000,
       stock: 3,
     );
@@ -361,7 +362,7 @@ void main() {
       tester,
       env,
       nom: 'Bonnet',
-      categorie: CategorieProduit.crochet,
+      categorie: CleCategorie.crochet,
       prix: 3000,
       stock: 1,
     );
@@ -369,7 +370,7 @@ void main() {
       tester,
       env,
       nom: 'Doudou lapin',
-      categorie: CategorieProduit.doudou,
+      categorie: CleCategorie.doudou,
       prix: 2500,
     );
     final Vente partielle = await vendre(tester, env, plaid, date: DateTime(2026, 10, 20), quantite: 2, paye: 1000);
@@ -456,14 +457,14 @@ void main() {
       tester,
       env,
       nom: 'Doudou lapin',
-      categorie: CategorieProduit.doudou,
+      categorie: CleCategorie.doudou,
       prix: 2500,
     );
     final Produit bonnet = await produit(
       tester,
       env,
       nom: 'Bonnet',
-      categorie: CategorieProduit.crochet,
+      categorie: CleCategorie.crochet,
       prix: 3000,
     );
     await vendre(tester, env, doudou, date: DateTime(2026, 10, 12, 10), quantite: 2);
@@ -499,7 +500,7 @@ void main() {
       tester,
       env,
       nom: 'Doudou lapin',
-      categorie: CategorieProduit.doudou,
+      categorie: CleCategorie.doudou,
       prix: 2500,
     );
     await vendre(tester, env, doudou, date: DateTime(2026, 10, 12, 10));

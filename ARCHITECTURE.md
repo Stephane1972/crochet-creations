@@ -53,8 +53,10 @@ crochet-creations/
 │   │   │   └── texte.dart                    nettoyage des saisies facultatives
 │   │   └── widgets/                          logo de l'application, icônes de barre d'état, dialogues de confirmation, étiquette
 │   ├── domain/
-│   │   ├── enums.dart                        listes de choix (catégories, statuts, modes de paiement…)
+│   │   ├── enums.dart                        listes de choix (statuts, modes de paiement…)
+│   │   ├── categories_produit.dart           clés et noms des catégories de départ, règles du nom d'une catégorie
 │   │   ├── erreurs.dart                      erreurs métier à message clair
+│   │   ├── usage_historique.dart             « où apparaît cet élément » (ventes, factures, devis, inscriptions), en phrase
 │   │   ├── regles_client.dart                règles de saisie d'une fiche client (e-mail, téléphone, code postal, SIRET)
 │   │   ├── regles_entreprise.dart            SIREN, IBAN, informations manquantes pour facturer, textes par défaut
 │   │   ├── regles_devis.dart                 validité, statut affiché (expiré), transitions de statut, contrôle des dates et de l'acompte
@@ -71,16 +73,17 @@ crochet-creations/
 │   │       └── numero_document.dart          FACT-2026-0001, DEVIS-2026-0001, PRD-0001
 │   ├── data/
 │   │   ├── database/
-│   │   │   ├── tables.dart                   les 15 tables (contraintes, index)
+│   │   │   ├── tables.dart                   les 16 tables (contraintes, index)
 │   │   │   ├── app_database.dart             base, version du schéma, migrations
 │   │   │   ├── flux_en_direct.dart           lecture « en direct » de plusieurs tables (observerTables)
 │   │   │   └── app_database.g.dart           (généré par build_runner, non versionné)
 │   │   ├── repositories/
 │   │   │   ├── numerotation_repository.dart  FACT-…, DEVIS-…, PRD-…
 │   │   │   ├── parametres_repository.dart    profil entreprise, mode jour/nuit
-│   │   │   ├── produit_repository.dart       catalogue : créer, modifier, dupliquer, archiver, stock, historique
+│   │   │   ├── produit_repository.dart       catalogue : créer, modifier, dupliquer, archiver, supprimer, stock, historique
 │   │   │   ├── produit_vues.dart             ce que lisent les écrans : ProduitResume, ProduitDetail, historique
-│   │   │   ├── client_repository.dart        clients : créer, modifier, archiver, fiche et historique en direct
+│   │   │   ├── categorie_repository.dart     catégories de produits : lister, créer, renommer, supprimer (en déplaçant les produits)
+│   │   │   ├── client_repository.dart        clients : créer, modifier, archiver, supprimer, fiche et historique en direct
 │   │   │   ├── client_vues.dart              nom affiché, initiales, historique d'un client (ventes, paiements, cours…)
 │   │   │   ├── vente_repository.dart         ventes : valider, annuler, encaisser, détail en direct
 │   │   │   ├── vente_vues.dart               VenteDetail : vente, lignes, paiements, client, factures, solde dû
@@ -160,7 +163,10 @@ crochet-creations/
 │       ├── produits/                         onglet Produits et ses écrans (voir « Produits et stock »)
 │       │   ├── produits_screen.dart          liste, recherche, filtres (écran 3)
 │       │   ├── produit_fiche_screen.dart     fiche d'un produit (écran 4)
-│       │   ├── produit_form_screen.dart      ajout / modification (écran 5)
+│       │   ├── produit_form_screen.dart      ajout / modification (écran 5), avec « + Nouvelle catégorie »
+│       │   ├── categories_screen.dart        Réglages › Catégories : ajouter, renommer, supprimer
+│       │   ├── categorie_dialogues.dart      boîte « nom de catégorie » (création et renommage)
+│       │   ├── categories_providers.dart     catégories en direct, noms par clé, nombre de produits par catégorie
 │       │   ├── photos_formulaire.dart        photos en cours d'édition et fichiers à nettoyer
 │       │   ├── variante_form_sheet.dart      feuille d'ajout / modification d'une variante
 │       │   ├── stock_dialog.dart             « Ajuster le stock »
@@ -207,6 +213,8 @@ les produits : `domain/produits/`, `data/produits/`, `presentation/produits/`.
 - **Suppression** : « soft delete » (colonne `archive_le`) pour produits, variantes, clients, cours et dépenses :
   l'élément est masqué mais l'historique reste intact. Les ventes, factures et devis ne s'archivent pas, ils
   changent de **statut** (une vente annulée remet le stock ; une facture émise ne se supprime jamais).
+  Un **client** ou un **produit** peut en plus être **supprimé pour de bon**, même s'il a servi : on **détache** alors
+  l'historique au lieu de le détruire (voir « Supprimer un client ou un produit » plus bas).
 
 ## Gestion d'état : Riverpod
 
@@ -223,7 +231,9 @@ les produits : `domain/produits/`, `data/produits/`, `presentation/produits/`.
 - produits (`presentation/produits/produits_providers.dart`) : `produitsResumesProvider` (catalogue, en direct),
   `produitDetailProvider(id)` et `historiqueProduitProvider(id)` (fiche et historique, en direct),
   `nombreAReapprovisionnerProvider` (pastille de l'accueil et du filtre) ;
-- `filtresProduitsProvider` : recherche, catégorie, « Archivés », « À réapprovisionner ». Il vit au-dessus des écrans :
+- catégories (`presentation/produits/categories_providers.dart`) : `categoriesProduitProvider` (liste en direct, dans l'ordre),
+  `nomsCategoriesProvider` (nom par clé), `nombreProduitsParCategorieProvider` (écran Catégories) ;
+- `filtresProduitsProvider` : recherche, catégorie (clé), « Archivés », « À réapprovisionner ». Il vit au-dessus des écrans :
   le filtre choisi depuis l'accueil (« Stock faible ») s'applique à l'ouverture de l'onglet Produits ;
 - clients (`presentation/clients/clients_providers.dart`) : `clientsProvider` (tous les clients, archivés compris, en
   direct), `clientProvider(id)` (fiche) et `historiqueClientProvider(id)` (devis, ventes, factures, paiements, cours) ;
@@ -282,13 +292,14 @@ Navigation Flutter standard (`Navigator` + routes nommées), sans bibliothèque 
 
 Un fichier `crochet_creations.sqlite` dans le stockage privé de l'application. Aucun serveur.
 
-### Les 15 tables
+### Les 16 tables
 
 | Table | Rôle |
 |-------|------|
 | `parametres_entreprise` | Profil « Mon entreprise » et réglages (mode jour/nuit). **Une seule ligne** (`id = 1`), créée automatiquement |
 | `numerotation_documents` | Dernier numéro attribué par suite : factures et devis (une suite par année), références produit |
-| `produits` | Catalogue : nom, catégorie, référence `PRD-0001`, matières, dimensions, temps de fabrication, coût, prix, stock, seuil, statut, « personnalisable », photo principale |
+| `categories_produit` | Catégories de produits : clé interne stable, nom modifiable, ordre d'affichage |
+| `produits` | Catalogue : nom, catégorie (clé de `categories_produit`), référence `PRD-0001`, matières, dimensions, temps de fabrication, coût, prix, stock, seuil, statut, « personnalisable », photo principale |
 | `variantes_produit` | Couleur / taille d'un produit, avec stock et prix propres |
 | `photos_produit` | Photos secondaires (la principale est dans `produits`) |
 | `clients` | Particuliers et professionnels (civilité, coordonnées, SIREN/SIRET, notes) |
@@ -360,6 +371,10 @@ Les valeurs des listes de choix sont enregistrées sous leur **nom Dart** : ne j
 `enums.dart` sans migration (un test, `enums_test.dart`, protège les noms cités dans les contraintes SQL).
 Après une migration, `PRAGMA foreign_key_check` vérifie qu'aucune liaison n'a été cassée.
 
+Historique des versions du schéma : **1** (étapes 2 à 12), **2** (`ventes.client_nom` et `devis.client_nom`, pour garder le nom
+d'un client supprimé), **3** (table `categories_produit`, remplie avec les cinq catégories de départ). Une sauvegarde d'un schéma plus ancien se restaure sans changement : la restauration n'écrit que les
+colonnes présentes dans l'archive (voir « Restaurer »).
+
 ## Produits et stock (étape 3)
 
 ### Où est le stock ?
@@ -418,13 +433,38 @@ différentes ne se confondent plus (test `test/data/flux_en_direct_test.dart`).
 - **Dupliquer** : nouvelle référence, nom suivi de « (copie) », variantes copiées avec un stock à 0, **sans photos** ;
   la copie s'ouvre en modification.
 - **Archiver** : le produit disparaît du catalogue et ne peut plus être vendu, mais ses ventes passées restent
-  lisibles ; « Restaurer » le remet. Aucune suppression définitive (confirmation demandée avant d'archiver).
+  lisibles ; « Restaurer » le remet (confirmation demandée avant d'archiver).
+- **Supprimer** : voir « Supprimer un client ou un produit » plus bas.
 - **Noms de variantes uniques** par produit, sans tenir compte des majuscules, **archivées comprises** (sinon la
   restauration créerait un doublon).
 - **Historique** : lignes des ventes **validées** seulement (une vente annulée n'y figure pas), avec le client ou
   « Client de passage ». Vide tant que les ventes (étape 5) n'existent pas.
 - **Vendable** : ni archivé, ni « épuisé », et stock > 0 sauf produit « sur commande ». Règle provisoire, à
   confirmer à l'étape 5.
+
+### Catégories de produits modifiables
+
+- **Une clé et un nom.** Chaque catégorie (`categories_produit`) a une **clé** interne qui ne change jamais et un **nom** que l'on
+  modifie à volonté. `produits.categorie` enregistre la **clé**, jamais le nom : renommer une catégorie ne touche donc à aucun
+  produit, et partout on affiche le nom actuel (`nomCategorie`, `nomsCategoriesProvider`). Les cinq catégories d'origine ont pour
+  clés les anciens noms de l'enum (`crochet`, `doudou`, `bouclesOreilles`, `accessoire`, `surMesure`) : la migration ne modifie aucun
+  produit et une ancienne sauvegarde se restaure telle quelle. Une catégorie créée reçoit une clé `cat_<heure en base 36>`.
+- **Pas de clé étrangère SQL** de `produits.categorie` vers `categories_produit` : cela aurait obligé à reconstruire la table
+  `produits` (la plus liée de la base) pour une migration sur des données réelles. L'intégrité est assurée par le code :
+  `ProduitRepository` refuse une catégorie inconnue à la création et à la modification (`_verifierCategorie`), et
+  `CategorieRepository.supprimer` déplace les produits **avant** de supprimer, dans la même transaction (tout ou rien). La table
+  `categories_produit` impose elle-même un nom et une clé non vides et uniques.
+- **Départ.** `AppDatabase.insererCategoriesDeDepart()` crée les cinq catégories (`INSERT OR IGNORE`) à la création de la base, à la
+  migration 2 → 3 et à la restauration d'une sauvegarde qui n'a pas la table. Une base déjà au schéma 3 ne les recrée jamais : une
+  catégorie d'origine supprimée ou renommée le reste.
+- **Écrans.** Le formulaire produit propose les catégories puis « + Nouvelle catégorie » (la catégorie est créée tout de suite, même
+  si le formulaire est abandonné ensuite) ; l'écran Réglages › Catégories ajoute, renomme et supprime. `demanderNomCategorie`
+  (`categorie_dialogues.dart`) enregistre **dans** la boîte : un nom refusé reste affiché avec son explication. La suppression d'une
+  catégorie utilisée ouvre une liste de destinations sans choix par défaut ; le nombre de produits est relu en base au moment de
+  supprimer, et le filtre de la liste des produits est retiré si c'était cette catégorie.
+- **Statistiques.** Les catégories rentables sont classées par marge ; à marge égale, l'ordre de la liste des catégories est conservé
+  (`ordreCategories`), une clé qui n'y figure plus passe après, par clé. Une vente est comptée dans la catégorie **actuelle** du
+  produit.
 
 ## Clients (étape 4)
 
@@ -442,9 +482,37 @@ différentes ne se confondent plus (test `test/data/flux_en_direct_test.dart`).
   3 à 10 caractères (lettres, chiffres, espace, tiret : adresses étrangères acceptées), SIREN à 9 chiffres ou SIRET à 14
   (espaces et points acceptés). Aucun contrôle de l'existence du numéro ni de sa clé.
 - **Archiver** : le client disparaît de la liste (filtre « Archivés » pour le retrouver), mais ses ventes, factures et
-  devis restent liés à lui et lisibles. Aucune suppression définitive (la base l'interdit d'ailleurs tant qu'une vente
-  le référence : `ON DELETE RESTRICT`).
+  devis restent liés à lui et lisibles.
+- **Supprimer** : voir « Supprimer un client ou un produit » plus bas (les clés étrangères `ON DELETE RESTRICT` restent la
+  garantie de la base : le code détache d'abord l'historique, puis supprime).
 - **Client de passage** : pas de fiche, `ventes.client_id` reste vide ; il se choisit au moment de la vente (étape 5).
+
+### Supprimer un client ou un produit
+
+`ClientRepository.supprimer` et `ProduitRepository.supprimer` : une **transaction** chacune. L'historique n'est pas détruit,
+il est **détaché** de la fiche supprimée. Les clés étrangères restent en `RESTRICT` : c'est le code qui défait les liens avant
+de supprimer, la base refuserait tout oubli.
+
+| | Client | Produit |
+|--|--------|---------|
+| Refus | inscrit à un cours : `SuppressionImpossible` (`inscriptions_cours.client_id` est obligatoire) | aucun |
+| Ventes | `client_id` vidé, **`client_nom` = nom affiché** copié | lignes : `produit_id` et `variante_id` vidés (la désignation, la quantité et le prix y sont déjà) |
+| Devis | idem (`client_id` vidé, `client_nom` copié) | lignes de devis : idem |
+| Factures | `client_id` vidé seulement : nom, adresse et SIRET ont été copiés à l'émission | — |
+| Dépenses | — | `produit_id` vidé (la dépense reste) |
+| Fiche | supprimée | supprimée avec ses variantes et ses photos ; les **fichiers** de photos sont rendus à l'appelant, qui les efface une fois la transaction réussie |
+
+- **Le nom copié** (`ventes.client_nom`, `devis.client_nom`, schéma 2) n'est renseigné qu'à la suppression du client ; il suit le
+  devis converti en commande (`VenteRepository.valider(clientNom: …)`), puis la facture (`FactureRepository.creer`). Modifier
+  un devis en lui donnant un autre client efface l'ancien nom. À l'affichage, `nomClientOuCopie` donne la fiche, sinon
+  « Nom (client supprimé) », sinon « Client de passage » / « Sans client ». L'export CSV et le PDF de devis suivent la même règle
+  (le PDF imprime le nom sans la mention « client supprimé »).
+- **`usage(id)`** (`UsageHistorique`) compte ce qui apparaît dans l'historique, pour la phrase de la confirmation ; la
+  confirmation est **renforcée** dès qu'il y a de l'historique. Un produit est compté par **ventes et devis distincts** (deux
+  lignes d'une même vente comptent une fois), variantes comprises.
+- **Écrans** : `_supprimer` des fiches client et produit (`confirmer` / `informer`, `dialogues.dart`). Pour un client inscrit à
+  un cours, la boîte propose d'archiver à la place.
+- Les numéros de référence d'un produit supprimé ne sont **pas réutilisés** (le compteur ne revient jamais en arrière).
 
 ### Historique d'un client
 
@@ -707,9 +775,9 @@ aux statistiques. Les chiffres clés portent des `Key` (`stat-ca`, `stat-marge`�
 
 Un `.zip` avec `donnees.json` et les fichiers. `donnees.json` contient un **manifeste** (`application`, `format` = version de
 l'organisation du fichier, `versionSchema` = `AppDatabase.versionSchema`, `versionApplication`, `creeLe`, `nombreFichiers`,
-`lignes` par table) puis `tables` : pour chacune des 15 tables, ses lignes lues par `SELECT * … ORDER BY id`, **telles que
+`lignes` par table) puis `tables` : pour chacune des 16 tables, ses lignes lues par `SELECT * … ORDER BY id`, **telles que
 SQLite les stocke** (dates en secondes, booléens 0/1, énumérations en texte). Rien n'est recalculé : une sauvegarde restaurée
-redonne exactement les mêmes lignes (un test le vérifie table par table). Les 15 lectures se font dans **une transaction** :
+redonne exactement les mêmes lignes (un test le vérifie table par table). Les 16 lectures se font dans **une transaction** :
 l'instantané est cohérent même si l'application écrit en même temps. Les fichiers sont rangés sous
 `fichiers/<dossier>/<nom>` (`photos_produits`, `factures`, `devis`) ; la base ne garde que des noms relatifs, ils retrouvent
 donc leur place.
@@ -814,6 +882,14 @@ Le cahier des charges ne tranchait pas ces points ; voici ce qui a été retenu 
   historique, noms de variantes uniques, flux en direct, flux simultanés qui ne se confondent pas) ; clients (règles de saisie refusées avec le bon message,
   historique complet et limité au bon client, flux en direct) ; ventes (validation avec stock, remise, frais de port,
   paiement, tout-ou-rien en cas d'échec, encaissement du solde, annulation avec remboursement et remise en stock).
+- Catégories de produits : `domain/categories_produit_test` (clés d'origine, règles du nom), `categorie_repository_test` (créer,
+  renommer, supprimer avec déplacement, refus sans rien changer, flux en direct), `schema_test` et `migration_schema_test`
+  (version 3, migrations 1→3 et 2→3, catégories d'origine non recréées), `service_sauvegarde_test` (ancienne archive sans catégories,
+  aller-retour des catégories), `produit_repository_test` (catégorie inconnue refusée), `categories_ecrans_test` (écran
+  Catégories, filtre) et « + Nouvelle catégorie » dans `produit_form_test`.
+- Suppression d'un client ou d'un produit : `suppression_repository_test` (historique conservé, noms copiés, lignes détachées,
+  inscriptions refusées), `migration_schema_test` (base du schéma 1 mise à jour sans perte), `service_sauvegarde_test`
+  (archive du schéma 1), `export_csv_test` et `devis_repository_test` (client supprimé), `domain/usage_historique_test`.
 - `test/widget_test.dart` et `test/presentation/` : parcours splash → accueil → réglages, écran d'erreur de
   démarrage ; liste de produits (recherche, filtres, alertes), fiche, formulaire (validations, abandon, photos),
   gestion des photos du formulaire ; liste de clients (recherche, filtres, archivés), fiche (coordonnées, historique,
@@ -853,7 +929,7 @@ Sauvegarde et export (étape 11) : `csv_test` (protection des cellules, montants
 téléphone et sur le même, copie de sécurité qui permet de revenir en arrière, archives refusées sans rien changer, restauration
 annulée en cas de colonne inconnue / contrainte / liaison cassée, écrans prévenus, sauvegarde automatique et rotation, export
 JSON), `export_csv_test` (contenu de chaque fichier, archive, BOM) et `sauvegarde_ecran_test` (parcours de l'écran).
-`test/data/aide_donnees.dart` remplit **les 15 tables** et compare deux états de la base ligne à ligne.
+`test/data/aide_donnees.dart` remplit **les 16 tables** et compare deux états de la base ligne à ligne.
 
 Finitions (étape 12) : `photo_retrouvee_test` (la photo retrouvée est proposée par les formulaires des produits, des cours et
 des dépenses, utilisée une seule fois, oubliée quand une autre photo est choisie, ignorée si son fichier a disparu).

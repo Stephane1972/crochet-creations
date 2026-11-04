@@ -75,7 +75,8 @@ class FactureRepository {
               dateVentePrestation: vente.dateVente,
               totalCentimes: vente.totalCentimes,
               clientId: Value(clientId),
-              clientNom: Value(client == null ? null : nullSiVide(libelleClient(client))),
+              // Sans fiche (client de passage, ou client supprimé depuis la vente), on garde le nom copié sur la vente.
+              clientNom: Value(client == null ? nullSiVide(vente.clientNom) : nullSiVide(libelleClient(client))),
               clientAdresse: Value(client == null ? null : adresseClientPourFacture(client)),
               clientSiret: Value(client == null ? null : nullSiVide(client.siret)),
               dateEmission: Value(emission),

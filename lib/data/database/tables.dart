@@ -1,4 +1,4 @@
-/// Schéma de la base de données (SQLite, via Drift) : 15 tables.
+/// Schéma de la base de données (SQLite, via Drift) : 16 tables.
 ///
 /// Conventions (détail dans ARCHITECTURE.md) :
 /// - **Montants** : nombres entiers de centimes (`1250` = 12,50 €). Jamais de décimaux.
@@ -102,6 +102,33 @@ class NumerotationDocuments extends Table {
 // Catalogue
 // -----------------------------------------------------------------------------
 
+/// Catégorie de produit, créée et modifiée par l'utilisatrice. Les cinq catégories de départ sont créées avec la
+/// base (voir `categoriesDeDepart`). Un produit enregistre la **clé** de sa catégorie (`produits.categorie`) : renommer
+/// une catégorie ne touche donc à aucun produit.
+///
+/// Pas de clé étrangère entre `produits.categorie` et `cle` : la colonne existait déjà (version 1) et l'ajout d'une
+/// contrainte demanderait de reconstruire la table des produits, que beaucoup d'autres tables référencent. C'est
+/// `ProduitRepository` qui vérifie la catégorie, et `CategorieRepository` qui déplace les produits avant de supprimer.
+@DataClassName('CategorieProduit')
+class CategoriesProduit extends Table with Tracabilite {
+  IntColumn get id => integer().autoIncrement()();
+
+  /// Identifiant interne, jamais modifié (`doudou`, `cat_mh2k9x`...) ; c'est lui que les produits enregistrent.
+  TextColumn get cle => text().unique()();
+
+  /// Nom affiché, modifiable.
+  TextColumn get nom => text().withLength(min: 1, max: 60).unique()();
+
+  /// Ordre d'affichage (croissant).
+  IntColumn get position => integer().withDefault(const Constant(0))();
+
+  @override
+  List<String> get customConstraints => [
+    'CHECK (length(trim(cle)) > 0)',
+    'CHECK (length(trim(nom)) > 0)',
+  ];
+}
+
 @DataClassName('Produit')
 @TableIndex(name: 'idx_produits_nom', columns: {#nom})
 @TableIndex(name: 'idx_produits_categorie', columns: {#categorie})
@@ -113,7 +140,9 @@ class Produits extends Table with Tracabilite, Archivable {
   /// Référence automatique (PRD-0001...), unique.
   TextColumn get reference => text().unique()();
   TextColumn get nom => text().withLength(min: 1, max: 200)();
-  TextColumn get categorie => textEnum<CategorieProduit>()();
+
+  /// Clé de la catégorie (`categories_produit.cle`).
+  TextColumn get categorie => text()();
   TextColumn get description => text().nullable()();
   TextColumn get matieres => text().nullable()();
 
@@ -246,6 +275,10 @@ class Ventes extends Table with Tracabilite {
   /// Vide = « client de passage ».
   IntColumn get clientId =>
       integer().nullable().references(Clients, #id, onDelete: KeyAction.restrict)();
+
+  /// Nom du client, copié quand sa fiche est supprimée (`client_id` est alors vidé) : l'historique garde le nom.
+  /// Vide tant que le client existe, et pour un client de passage.
+  TextColumn get clientNom => text().nullable()();
   DateTimeColumn get dateVente => dateTime().withDefault(currentDateAndTime)();
   TextColumn get statut => textEnum<StatutVente>().withDefault(const Constant('validee'))();
 
@@ -399,6 +432,9 @@ class Devis extends Table with Tracabilite {
   TextColumn get numero => text().unique()();
   IntColumn get clientId =>
       integer().nullable().references(Clients, #id, onDelete: KeyAction.restrict)();
+
+  /// Nom du client, copié quand sa fiche est supprimée (`client_id` est alors vidé) : l'historique garde le nom.
+  TextColumn get clientNom => text().nullable()();
   DateTimeColumn get dateEmission => dateTime().withDefault(currentDateAndTime)();
 
   /// Date limite de validité du devis.

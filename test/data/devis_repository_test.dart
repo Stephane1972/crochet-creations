@@ -501,6 +501,52 @@ void main() {
       expect(await nombreDe(db.paiements), 1);
     });
 
+    test('le client a été supprimé depuis : son nom suit le devis, la commande et la facture', () async {
+      await parametres.enregistrerProfil(profilComplet);
+      final Client client = await unClient();
+      final DevisFiche d = await devis.creer(saisie(clientId: client.id));
+      await clients.supprimer(client.id);
+
+      final DevisFiche apres = (await devis.obtenir(d.id))!;
+      expect(apres.clientId, isNull);
+      expect(apres.clientNom, 'Léa Bernard');
+      expect((await devis.detail(d.id))!.client, isNull);
+
+      final ResultatConversion resultat = await devis.convertir(d.id, avecFacture: true);
+
+      expect(resultat.problemeFacture, isNull);
+      expect(resultat.vente.clientId, isNull);
+      expect(resultat.vente.clientNom, 'Léa Bernard');
+      expect(resultat.facture!.clientNom, 'Léa Bernard');
+      expect(resultat.facture!.clientId, isNull);
+    });
+
+    test('on peut donner un nouveau client à un devis dont le client a été supprimé : l’ancien nom est oublié', () async {
+      final Client client = await unClient();
+      final DevisFiche d = await devis.creer(saisie(clientId: client.id));
+      await clients.supprimer(client.id);
+      final Client autre = await clients.creer(const DonneesClient(nom: 'Durand'));
+
+      await devis.modifier(d.id, saisie(clientId: autre.id));
+
+      final DevisFiche apres = (await devis.obtenir(d.id))!;
+      expect(apres.clientId, autre.id);
+      expect(apres.clientNom, isNull);
+    });
+
+    test('modifier un devis dont le client a été supprimé, sans lui en donner un autre, garde son nom', () async {
+      final Client client = await unClient();
+      final DevisFiche d = await devis.creer(saisie(clientId: client.id));
+      await clients.supprimer(client.id);
+
+      await devis.modifier(d.id, saisie(acompte: 1000));
+
+      final DevisFiche apres = (await devis.obtenir(d.id))!;
+      expect(apres.clientId, isNull);
+      expect(apres.clientNom, 'Léa Bernard');
+      expect(apres.acompteCentimes, 1000);
+    });
+
     test('profil incomplet : la conversion avec facture est refusée avant toute écriture', () async {
       final DevisFiche d = await devis.creer(saisie(acompte: 3000));
 

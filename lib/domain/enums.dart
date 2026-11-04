@@ -1,4 +1,4 @@
-/// Listes de choix de l'application (catégories, statuts, modes de paiement...).
+/// Listes de choix de l'application (statuts, modes de paiement...).
 ///
 /// ⚠️ Dans la base de données, chaque valeur est enregistrée sous son **nom Dart**
 /// (par exemple `bouclesOreilles`). Renommer une valeur ici sans migration rendrait
@@ -6,18 +6,6 @@
 /// Les noms de `NatureLigne`, `RemiseType`, `StatutFacture` et `TypeCompteur` sont aussi
 /// écrits dans des contraintes SQL (voir `tables.dart`) : ne pas les renommer.
 library;
-
-/// Catégorie d'un produit.
-enum CategorieProduit {
-  crochet('Crochet'),
-  doudou('Doudou'),
-  bouclesOreilles('Boucles d’oreilles'),
-  accessoire('Accessoire'),
-  surMesure('Sur mesure');
-
-  const CategorieProduit(this.libelle);
-  final String libelle;
-}
 
 /// Statut commercial d'un produit.
 enum StatutProduit {

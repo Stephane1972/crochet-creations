@@ -4,9 +4,13 @@ import 'dart:typed_data';
 
 import 'package:archive/archive.dart' show Archive, ArchiveFile, ZipDecoder, ZipEncoder;
 import 'package:crochet_creations/data/database/app_database.dart';
+import 'package:crochet_creations/data/repositories/categorie_repository.dart';
+import 'package:crochet_creations/data/repositories/client_repository.dart';
 import 'package:crochet_creations/data/sauvegarde/format_sauvegarde.dart';
 import 'package:crochet_creations/data/sauvegarde/service_sauvegarde.dart';
+import 'package:crochet_creations/domain/categories_produit.dart';
 import 'package:crochet_creations/domain/erreurs.dart';
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter_test/flutter_test.dart';
 
 import 'aide_base.dart';
@@ -362,6 +366,92 @@ void main() {
       await banc.service.restaurer(await liste.single.fichier.readAsBytes());
       expect(await instantane(banc.db), etatActuel);
       expect(await banc.contenuDe(banc.photos), containsPair('photo_3.jpg', 'photo 3'));
+    });
+
+    test('une sauvegarde faite avec le schéma 1 (sans « client_nom » ni catégories) est restaurée telle quelle', () async {
+      await remplirBase(banc.db);
+      await banc.ecrireFichiers();
+      final Uint8List actuelle = await banc.service.fabriquerArchive();
+      final Map<String, List<Map<String, Object?>>> avant = await instantane(banc.db);
+
+      // On « vieillit » l'archive : version 1 dans le manifeste et plus de colonne « client_nom ».
+      final Uint8List ancienne = _modifierDonnees(actuelle, (Map<String, dynamic> d) {
+        (d['manifeste'] as Map<String, dynamic>)['versionSchema'] = 1;
+        final Map<String, dynamic> tables = d['tables'] as Map<String, dynamic>;
+        tables.remove('categories_produit');
+        for (final String table in <String>['ventes', 'devis']) {
+          for (final dynamic ligne in tables[table] as List<dynamic>) {
+            (ligne as Map<String, dynamic>).remove('client_nom');
+          }
+        }
+      });
+
+      await banc.db.delete(banc.db.paiements).go();
+      await banc.db.delete(banc.db.factures).go();
+      await banc.service.restaurer(ancienne);
+
+      // Tout revient à l'identique ; les catégories, absentes de l'archive, sont recréées (les cinq de départ).
+      final Map<String, List<Map<String, Object?>>> apres = await instantane(banc.db);
+      expect(apres.remove('categories_produit'), hasLength(5));
+      avant.remove('categories_produit');
+      expect(apres, avant);
+      expect((await banc.db.select(banc.db.ventes).get()).every((Vente v) => v.clientNom == null), isTrue);
+      final List<CategorieProduit> categories = await CategorieRepository(banc.db).lister();
+      expect(categories.map((CategorieProduit c) => c.cle), <String>[
+        CleCategorie.crochet,
+        CleCategorie.doudou,
+        CleCategorie.bouclesOreilles,
+        CleCategorie.accessoire,
+        CleCategorie.surMesure,
+      ]);
+      await banc.verifierPropre();
+    });
+
+    test('les catégories créées, renommées ou supprimées font partie de la sauvegarde', () async {
+      await remplirBase(banc.db);
+      final CategorieRepository categories = CategorieRepository(banc.db);
+      final CategorieProduit peluches = await categories.creer('Peluches');
+      await categories.renommer(
+        (await categories.parCle(CleCategorie.crochet))!.id,
+        'Mes créations',
+      );
+      await categories.supprimer((await categories.parCle(CleCategorie.surMesure))!.id);
+      await (banc.db.update(banc.db.produits)).write(ProduitsCompanion(categorie: Value(peluches.cle)));
+      final Uint8List archive = await banc.service.fabriquerArchive();
+      final Map<String, List<Map<String, Object?>>> avant = await instantane(banc.db);
+
+      final _Banc autre = await _Banc.creer();
+      addTearDown(autre.fermer);
+      await autre.service.restaurer(archive);
+
+      expect(await instantane(autre.db), avant);
+      final List<CategorieProduit> restaurees = await CategorieRepository(autre.db).lister();
+      expect(restaurees.map((CategorieProduit c) => c.nom), <String>[
+        'Mes créations',
+        'Doudou',
+        'Boucles d’oreilles',
+        'Accessoire',
+        'Peluches',
+      ]);
+      expect((await autre.db.select(autre.db.produits).get()).every((Produit p) => p.categorie == peluches.cle), isTrue);
+    });
+
+    test('une sauvegarde faite après la suppression d’un client garde le nom copié', () async {
+      await remplirBase(banc.db);
+      await banc.db.delete(banc.db.inscriptionsCours).go();
+      final Client client = (await banc.db.select(banc.db.clients).get()).single;
+      await ClientRepository(banc.db).supprimer(client.id);
+      final Uint8List archive = await banc.service.fabriquerArchive();
+      final Map<String, List<Map<String, Object?>>> avant = await instantane(banc.db);
+
+      final _Banc autre = await _Banc.creer();
+      addTearDown(autre.fermer);
+      await autre.service.restaurer(archive);
+
+      expect(await instantane(autre.db), avant);
+      final Vente vente = (await autre.db.select(autre.db.ventes).get()).firstWhere((Vente v) => v.clientNom != null);
+      expect(vente.clientId, isNull);
+      expect(vente.clientNom, 'Marie Dupont');
     });
 
     test('une sauvegarde de base vide vide tout (la ligne des réglages est toujours là)', () async {

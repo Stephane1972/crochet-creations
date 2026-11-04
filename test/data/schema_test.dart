@@ -1,8 +1,9 @@
 import 'package:crochet_creations/core/constants/app_constants.dart';
 import 'package:crochet_creations/data/database/app_database.dart';
 import 'package:crochet_creations/domain/calculs/totaux.dart';
+import 'package:crochet_creations/domain/categories_produit.dart';
 import 'package:crochet_creations/domain/enums.dart';
-import 'package:drift/drift.dart' show Value;
+import 'package:drift/drift.dart' show OrderingTerm, Value;
 import 'package:flutter_test/flutter_test.dart';
 
 import 'aide_base.dart';
@@ -33,11 +34,12 @@ void main() {
   );
 
   group('structure', () {
-    test('les 15 tables du schéma existent', () async {
+    test('les 16 tables du schéma existent', () async {
       final List<String> tables = (await noms(
         'table',
       )).where((n) => !n.startsWith('sqlite_')).toList();
       expect(tables, <String>[
+        'categories_produit',
         'clients',
         'cours',
         'depenses',
@@ -82,7 +84,35 @@ void main() {
     test('la version du schéma est enregistrée dans le fichier', () async {
       final row = await db.customSelect('PRAGMA user_version').getSingle();
       expect(row.read<int>('user_version'), AppDatabase.versionSchema);
-      expect(AppDatabase.versionSchema, 1);
+      expect(AppDatabase.versionSchema, 3);
+    });
+
+    test('ventes et devis ont une colonne pour le nom d’un client supprimé', () async {
+      for (final String table in <String>['ventes', 'devis']) {
+        final colonnes = await db.customSelect('PRAGMA table_info("$table")').get();
+        final Set<String> noms = colonnes.map((r) => r.read<String>('name')).toSet();
+        expect(noms, contains('client_nom'), reason: table);
+      }
+    });
+
+    test('les cinq catégories de départ existent dès la création, dans l’ordre', () async {
+      final List<CategorieProduit> categories = await (db.select(
+        db.categoriesProduit,
+      )..orderBy([(t) => OrderingTerm.asc(t.position)])).get();
+      expect(categories.map((CategorieProduit c) => c.cle), <String>[
+        CleCategorie.crochet,
+        CleCategorie.doudou,
+        CleCategorie.bouclesOreilles,
+        CleCategorie.accessoire,
+        CleCategorie.surMesure,
+      ]);
+      expect(categories.map((CategorieProduit c) => c.nom), <String>[
+        'Crochet',
+        'Doudou',
+        'Boucles d’oreilles',
+        'Accessoire',
+        'Sur mesure',
+      ]);
     });
 
     test('les clés étrangères sont activées', () async {
@@ -157,6 +187,15 @@ void main() {
   });
 
   group('contraintes de cohérence', () {
+    test('une catégorie a un nom et une clé non vides, uniques', () async {
+      await expectLater(sql("INSERT INTO categories_produit (cle, nom) VALUES ('cat_a', '  ')"), throwsException);
+      await expectLater(sql("INSERT INTO categories_produit (cle, nom) VALUES ('  ', 'Peluches')"), throwsException);
+      await expectLater(sql("INSERT INTO categories_produit (cle, nom) VALUES ('cat_a', 'Crochet')"), throwsException);
+      await expectLater(sql("INSERT INTO categories_produit (cle, nom) VALUES ('doudou', 'Peluches')"), throwsException);
+      await sql("INSERT INTO categories_produit (cle, nom) VALUES ('cat_a', 'Peluches')");
+      expect(await db.select(db.categoriesProduit).get(), hasLength(6));
+    });
+
     test('un stock négatif est refusé', () async {
       await expectLater(
         sql(

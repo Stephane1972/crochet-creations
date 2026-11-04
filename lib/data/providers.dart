@@ -8,6 +8,7 @@ import 'partage/service_partage_fichiers.dart';
 import 'pdf/devis_pdf.dart';
 import 'pdf/facture_pdf.dart';
 import 'pdf/ressources_pdf.dart';
+import 'repositories/categorie_repository.dart';
 import 'repositories/client_repository.dart';
 import 'repositories/cours_repository.dart';
 import 'repositories/depense_repository.dart';
@@ -46,6 +47,10 @@ final produitRepositoryProvider = Provider<ProduitRepository>(
     ref.watch(appDatabaseProvider),
     ref.watch(numerotationRepositoryProvider),
   ),
+);
+
+final categorieRepositoryProvider = Provider<CategorieRepository>(
+  (ref) => CategorieRepository(ref.watch(appDatabaseProvider)),
 );
 
 final clientRepositoryProvider = Provider<ClientRepository>(

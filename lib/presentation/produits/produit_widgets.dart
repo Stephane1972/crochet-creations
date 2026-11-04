@@ -7,18 +7,21 @@ import '../../data/database/app_database.dart';
 import '../../data/providers.dart';
 import '../../data/repositories/produit_vues.dart';
 import '../../domain/calculs/stock.dart';
+import '../../domain/categories_produit.dart';
 import '../../domain/enums.dart';
 
 export '../../core/widgets/etiquette.dart';
 
-/// Icône associée à chaque catégorie (affichée quand un produit n'a pas de photo).
-IconData iconeCategorie(CategorieProduit categorie) {
-  return switch (categorie) {
-    CategorieProduit.crochet => Icons.dry_cleaning_outlined,
-    CategorieProduit.doudou => Icons.toys_outlined,
-    CategorieProduit.bouclesOreilles => Icons.diamond_outlined,
-    CategorieProduit.accessoire => Icons.watch_outlined,
-    CategorieProduit.surMesure => Icons.design_services_outlined,
+/// Icône associée à une catégorie, d'après sa clé (affichée quand un produit n'a pas de photo). Les cinq catégories
+/// de départ ont la leur ; une catégorie créée depuis a l'icône générique.
+IconData iconeCategorie(String cle) {
+  return switch (cle) {
+    CleCategorie.crochet => Icons.dry_cleaning_outlined,
+    CleCategorie.doudou => Icons.toys_outlined,
+    CleCategorie.bouclesOreilles => Icons.diamond_outlined,
+    CleCategorie.accessoire => Icons.watch_outlined,
+    CleCategorie.surMesure => Icons.design_services_outlined,
+    _ => Icons.category_outlined,
   };
 }
 
@@ -36,7 +39,8 @@ class ImageProduit extends ConsumerWidget {
   });
 
   final String? chemin;
-  final CategorieProduit categorie;
+  /// Clé de la catégorie du produit (pour l'icône de substitution).
+  final String categorie;
   final double? largeur;
   final double? hauteur;
   final double rayon;

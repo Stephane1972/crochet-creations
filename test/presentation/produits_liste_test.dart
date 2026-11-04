@@ -1,4 +1,5 @@
 import 'package:crochet_creations/core/utils/money.dart';
+import 'package:crochet_creations/domain/categories_produit.dart';
 import 'package:crochet_creations/domain/enums.dart';
 import 'package:crochet_creations/presentation/home/home_screen.dart';
 import 'package:crochet_creations/presentation/produits/produits_screen.dart';
@@ -38,21 +39,21 @@ Future<void> garnirCatalogue(WidgetTester tester, EnvironnementTest env) async {
   await env.creerProduit(
     tester,
     nom: 'Écharpe en laine',
-    categorie: CategorieProduit.crochet,
+    categorie: CleCategorie.crochet,
     prix: 3200,
     stock: 0,
   ); // épuisé
   await env.creerProduit(
     tester,
     nom: 'Boucles soleil',
-    categorie: CategorieProduit.bouclesOreilles,
+    categorie: CleCategorie.bouclesOreilles,
     prix: 1200,
     stock: 1,
   ); // stock faible
   await env.creerProduit(
     tester,
     nom: 'Pull sur mesure',
-    categorie: CategorieProduit.surMesure,
+    categorie: CleCategorie.surMesure,
     prix: 8000,
     stock: 0,
     statut: StatutProduit.surCommande,

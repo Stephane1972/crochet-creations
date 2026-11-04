@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/router/app_routes.dart';
 import '../../data/database/app_database.dart';
 import '../../data/repositories/produit_vues.dart';
-import '../../domain/enums.dart';
+import 'categories_providers.dart';
 import 'filtres_produits.dart';
 import 'produit_widgets.dart';
 import 'produits_providers.dart';
@@ -35,10 +35,24 @@ class _ProduitsScreenState extends ConsumerState<ProduitsScreen> {
   Widget build(BuildContext context) {
     final AsyncValue<List<ProduitResume>> produits = ref.watch(produitsResumesProvider);
     final FiltresProduits filtres = ref.watch(filtresProduitsProvider);
+    final List<CategorieProduit> categories =
+        ref.watch(categoriesProduitProvider).valueOrNull ?? const <CategorieProduit>[];
 
     // Un filtre posé ailleurs (raccourci de l'accueil) doit aussi vider ou remplir le champ de recherche.
     ref.listen<FiltresProduits>(filtresProduitsProvider, (FiltresProduits? avant, FiltresProduits apres) {
       if (_recherche.text != apres.recherche) _recherche.text = apres.recherche;
+    });
+
+    // Une catégorie supprimée depuis l'écran « Catégories » ne doit pas rester un filtre invisible.
+    ref.listen<AsyncValue<List<CategorieProduit>>>(categoriesProduitProvider, (
+      AsyncValue<List<CategorieProduit>>? avant,
+      AsyncValue<List<CategorieProduit>> apres,
+    ) {
+      final List<CategorieProduit>? liste = apres.valueOrNull;
+      final String? choisie = ref.read(filtresProduitsProvider).categorie;
+      if (liste != null && choisie != null && !liste.any((CategorieProduit c) => c.cle == choisie)) {
+        ref.read(filtresProduitsProvider.notifier).choisirCategorie(null);
+      }
     });
 
     return Scaffold(
@@ -74,7 +88,11 @@ class _ProduitsScreenState extends ConsumerState<ProduitsScreen> {
               ),
             ),
           ),
-          _BarreFiltres(filtres: filtres, nombreAReapprovisionner: ref.watch(nombreAReapprovisionnerProvider)),
+          _BarreFiltres(
+            filtres: filtres,
+            categories: categories,
+            nombreAReapprovisionner: ref.watch(nombreAReapprovisionnerProvider),
+          ),
           Expanded(
             child: produits.when(
               loading: () => const Center(child: CircularProgressIndicator()),
@@ -82,7 +100,11 @@ class _ProduitsScreenState extends ConsumerState<ProduitsScreen> {
                 onRetry: () => ref.invalidate(produitsResumesProvider),
               ),
               data: (List<ProduitResume> tous) {
-                final List<ProduitResume> visibles = filtrerProduits(tous, filtres);
+                final List<ProduitResume> visibles = filtrerProduits(
+                  tous,
+                  filtres,
+                  nomsCategories: ref.watch(nomsCategoriesProvider),
+                );
                 if (visibles.isEmpty) {
                   return _ListeVide(
                     catalogueVide: tous.where((ProduitResume r) => r.produit.archiveLe == null).isEmpty &&
@@ -101,9 +123,10 @@ class _ProduitsScreenState extends ConsumerState<ProduitsScreen> {
 }
 
 class _BarreFiltres extends ConsumerWidget {
-  const _BarreFiltres({required this.filtres, required this.nombreAReapprovisionner});
+  const _BarreFiltres({required this.filtres, required this.categories, required this.nombreAReapprovisionner});
 
   final FiltresProduits filtres;
+  final List<CategorieProduit> categories;
   final int? nombreAReapprovisionner;
 
   @override
@@ -129,12 +152,12 @@ class _BarreFiltres extends ConsumerWidget {
             selected: filtres.categorie == null,
             onSelected: (bool _) => actions.choisirCategorie(null),
           ),
-          for (final CategorieProduit c in CategorieProduit.values) ...<Widget>[
+          for (final CategorieProduit c in categories) ...<Widget>[
             const SizedBox(width: 8),
             ChoiceChip(
-              label: Text(c.libelle),
-              selected: filtres.categorie == c,
-              onSelected: (bool selectionne) => actions.choisirCategorie(selectionne ? c : null),
+              label: Text(c.nom),
+              selected: filtres.categorie == c.cle,
+              onSelected: (bool selectionne) => actions.choisirCategorie(selectionne ? c.cle : null),
             ),
           ],
           const SizedBox(width: 8),
@@ -171,14 +194,15 @@ class _Liste extends StatelessWidget {
   }
 }
 
-class _CarteProduit extends StatelessWidget {
+class _CarteProduit extends ConsumerWidget {
   const _CarteProduit({required this.resume});
 
   final ProduitResume resume;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final ThemeData theme = Theme.of(context);
+    final Map<String, String> noms = ref.watch(nomsCategoriesProvider);
     final Color discret = theme.colorScheme.onSurfaceVariant;
     final Produit produit = resume.produit;
     final List<Widget> etiquettes = etiquettesProduit(context, resume);
@@ -212,7 +236,7 @@ class _CarteProduit extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '${produit.reference} · ${produit.categorie.libelle}',
+                      '${produit.reference} · ${nomCategorie(noms, produit.categorie)}',
                       style: theme.textTheme.bodySmall?.copyWith(color: discret),
                     ),
                     if (etiquettes.isNotEmpty) ...<Widget>[

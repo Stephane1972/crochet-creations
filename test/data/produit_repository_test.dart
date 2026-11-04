@@ -1,6 +1,7 @@
 import 'package:crochet_creations/data/database/app_database.dart';
 import 'package:crochet_creations/data/repositories/numerotation_repository.dart';
 import 'package:crochet_creations/data/repositories/produit_repository.dart';
+import 'package:crochet_creations/domain/categories_produit.dart';
 import 'package:crochet_creations/domain/enums.dart';
 import 'package:crochet_creations/domain/erreurs.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -19,7 +20,7 @@ void main() {
 
   const DonneesProduit doudou = DonneesProduit(
     nom: 'Doudou lapin',
-    categorie: CategorieProduit.doudou,
+    categorie: CleCategorie.doudou,
     prixVenteCentimes: 2500,
     coutMatiereCentimes: 600,
     quantiteStock: 5,
@@ -31,7 +32,7 @@ void main() {
       final Produit p = await repo.creer(doudou);
       expect(p.reference, 'PRD-0001');
       expect(p.nom, 'Doudou lapin');
-      expect(p.categorie, CategorieProduit.doudou);
+      expect(p.categorie, CleCategorie.doudou);
       expect(p.prixVenteCentimes, 2500);
       expect(p.quantiteStock, 5);
       expect(p.statut, StatutProduit.disponible);
@@ -45,7 +46,7 @@ void main() {
       final Produit p = await repo.creer(
         const DonneesProduit(
           nom: '  Boucles soleil  ',
-          categorie: CategorieProduit.bouclesOreilles,
+          categorie: CleCategorie.bouclesOreilles,
           prixVenteCentimes: 1200,
           description: '   ',
           matieres: ' coton ',
@@ -59,17 +60,32 @@ void main() {
     test('les saisies invalides sont refusées avec un message clair', () async {
       await expectLater(
         repo.creer(
-          const DonneesProduit(nom: '  ', categorie: CategorieProduit.crochet, prixVenteCentimes: 100),
+          const DonneesProduit(nom: '  ', categorie: CleCategorie.crochet, prixVenteCentimes: 100),
         ),
         throwsA(isA<DonneeInvalide>()),
       );
       await expectLater(
         repo.creer(
-          const DonneesProduit(nom: 'X', categorie: CategorieProduit.crochet, prixVenteCentimes: -1),
+          const DonneesProduit(nom: 'X', categorie: CleCategorie.crochet, prixVenteCentimes: -1),
         ),
         throwsA(isA<DonneeInvalide>()),
       );
       expect(await repo.lister(), isEmpty);
+    });
+
+    test('une catégorie qui n’existe pas est refusée, à la création comme à la modification', () async {
+      await expectLater(
+        repo.creer(const DonneesProduit(nom: 'X', categorie: 'cat_fantome', prixVenteCentimes: 100)),
+        throwsA(isA<DonneeInvalide>()),
+      );
+      expect(await repo.lister(), isEmpty);
+
+      final Produit cree = await repo.creer(doudou);
+      await expectLater(
+        repo.modifier(cree.id, const DonneesProduit(nom: 'X', categorie: 'cat_fantome', prixVenteCentimes: 100)),
+        throwsA(isA<DonneeInvalide>()),
+      );
+      expect((await repo.obtenir(cree.id))!.categorie, CleCategorie.doudou);
     });
 
     test('modification : la référence ne change pas', () async {
@@ -78,7 +94,7 @@ void main() {
         cree.id,
         const DonneesProduit(
           nom: 'Doudou lapin rose',
-          categorie: CategorieProduit.doudou,
+          categorie: CleCategorie.doudou,
           prixVenteCentimes: 2800,
           quantiteStock: 4,
           statut: StatutProduit.surCommande,
@@ -109,9 +125,9 @@ void main() {
     });
 
     test('la liste est triée par nom, sans tenir compte des majuscules', () async {
-      await repo.creer(const DonneesProduit(nom: 'bonnet', categorie: CategorieProduit.accessoire, prixVenteCentimes: 1));
-      await repo.creer(const DonneesProduit(nom: 'Amigurumi', categorie: CategorieProduit.crochet, prixVenteCentimes: 1));
-      await repo.creer(const DonneesProduit(nom: 'Cabas', categorie: CategorieProduit.crochet, prixVenteCentimes: 1));
+      await repo.creer(const DonneesProduit(nom: 'bonnet', categorie: CleCategorie.accessoire, prixVenteCentimes: 1));
+      await repo.creer(const DonneesProduit(nom: 'Amigurumi', categorie: CleCategorie.crochet, prixVenteCentimes: 1));
+      await repo.creer(const DonneesProduit(nom: 'Cabas', categorie: CleCategorie.crochet, prixVenteCentimes: 1));
 
       final List<Produit> liste = await repo.observerCatalogue().first;
       expect(liste.map((p) => p.nom), <String>['Amigurumi', 'bonnet', 'Cabas']);
@@ -148,7 +164,7 @@ void main() {
       final Produit p = await repo.creer(
         const DonneesProduit(
           nom: 'Doudou sur mesure',
-          categorie: CategorieProduit.surMesure,
+          categorie: CleCategorie.surMesure,
           prixVenteCentimes: 4000,
           statut: StatutProduit.surCommande,
         ),

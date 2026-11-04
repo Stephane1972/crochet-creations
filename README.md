@@ -51,6 +51,36 @@ Le développement se fait en 12 étapes validées une par une (détail dans [ROA
   comportement sont identiques partout.
 - Aucun changement de schéma de la base, aucune nouvelle dépendance.
 
+### Supprimer un client ou un produit (après l'étape 12)
+
+- **Où** : *fiche client* ou *fiche produit* → menu **⋮** → **Supprimer**. L'**archivage** (qui retire seulement de la liste)
+  reste proposé à côté ; il est plus prudent, car on peut restaurer.
+- **Jamais utilisé** : une confirmation simple, puis c'est supprimé (le produit emporte ses variantes et ses photos).
+- **Déjà utilisé** : une confirmation renforcée dit où l'élément apparaît (par exemple « 2 ventes, 1 facture et 1 devis ») ;
+  il faut choisir **Supprimer définitivement**. L'**historique est conservé** : les ventes et devis d'un client supprimé
+  gardent son nom (« Camille Martin (client supprimé) »), les factures gardent son nom, son adresse et son SIRET ; les ventes et
+  devis d'un produit supprimé gardent la désignation, la quantité et le prix. Les dépenses qui désignaient le produit restent.
+- **Exception** : un client **inscrit à un cours** ne peut pas être supprimé ; l'application propose de l'**archiver**.
+- **Attention** : c'est **définitif** (seule une sauvegarde permet de revenir en arrière), et les coordonnées et notes du client
+  disparaissent avec sa fiche.
+- Le schéma de la base passe en **version 2** (deux colonnes `client_nom`, migration automatique) ; les anciennes sauvegardes
+  se restaurent normalement.
+
+### Catégories de produits modifiables (après l'étape 12)
+
+- **Depuis « Nouveau produit »** : la liste **Catégorie** se termine par **+ Nouvelle catégorie**. On tape le nom, la catégorie
+  est créée et choisie tout de suite. Elle reste disponible même si on abandonne le formulaire.
+- **Écran « Catégories »** (*Plus → Réglages → Catégories*) : la liste avec le nombre de produits de chaque catégorie, le bouton
+  **Nouvelle catégorie**, et pour chaque ligne **Renommer** (le nom change partout : liste, fiche, filtres, statistiques) et
+  **Supprimer**. Les cinq catégories d'origine se renomment ou se suppriment comme les autres.
+- **Supprimer une catégorie** : vide, une simple confirmation. Qui contient des produits (archivés compris), l'application demande
+  **dans quelle catégorie les déplacer** (il faut en choisir une), puis déplace et supprime. Aucun produit n'est jamais perdu ni
+  laissé sans catégorie. Si c'est la dernière catégorie, il faut d'abord en créer une autre.
+- Deux catégories ne peuvent pas porter le même nom (sans tenir compte des majuscules, des accents ni des espaces) ; 60 caractères
+  au plus.
+- Le schéma de la base passe en **version 3** (nouvelle table `categories_produit`, migration automatique, aucun produit modifié) ;
+  les anciennes sauvegardes se restaurent normalement.
+
 ### Ce que contient l'étape 11 : sauvegarde et export
 
 - **Écran « Sauvegarde et export »** (écran 23, *Plus → Réglages → Sauvegarde et export*) : sauvegarder, partager, restaurer

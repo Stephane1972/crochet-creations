@@ -134,7 +134,7 @@ class _DevisConversionScreenState extends ConsumerState<DevisConversionScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     Text(
-                      '${client == null ? 'Sans client' : libelleClient(client)} · '
+                      '${nomClientOuCopie(client: client, copie: devis.clientNom, sinon: 'Sans client')} · '
                       'établi le ${formatDateCourte(devis.dateEmission)}',
                       style: theme.textTheme.bodyMedium?.copyWith(color: discret),
                     ),

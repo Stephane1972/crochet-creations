@@ -1,3 +1,5 @@
+import 'usage_historique.dart';
+
 /// Erreurs « métier » : situations normales que l'interface doit expliquer
 /// à l'utilisatrice avec un message clair (et non un plantage).
 sealed class ErreurMetier implements Exception {
@@ -53,4 +55,20 @@ class ProfilIncomplet extends ErreurMetier {
 /// La remise saisie est impossible (pourcentage au-delà de 100 %, montant supérieur au total...).
 class RemiseInvalide extends ErreurMetier {
   const RemiseInvalide(super.message);
+}
+
+/// Un client ne peut pas être supprimé : il est inscrit à un cours, et la liste des inscrits a besoin de sa fiche.
+/// L'interface propose alors de l'archiver.
+class SuppressionImpossible extends ErreurMetier {
+  SuppressionImpossible({required this.cible, required this.usage})
+    : super(
+        'Ce $cible ne peut pas être supprimé : il apparaît dans ${usage.enumeration}. '
+        'Archivez-le plutôt : il disparaît des listes, mais l’historique est conservé.',
+      );
+
+  /// « client » ou « produit ».
+  final String cible;
+
+  /// Où il apparaît.
+  final UsageHistorique usage;
 }

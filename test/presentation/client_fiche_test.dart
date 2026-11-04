@@ -327,4 +327,115 @@ void main() {
 
     await env.fermer(tester);
   });
+
+  testWidgets('supprimer un client sans historique : confirmation, puis la fiche se ferme', (
+    WidgetTester tester,
+  ) async {
+    final EnvironnementTest env = await EnvironnementTest.creer(tester);
+    final Client c = await env.creerClient(tester, _camille);
+    await ouvrirFiche(tester, env, 'Camille Martin');
+
+    // On annule : rien ne change.
+    await ouvrirMenuClient(tester);
+    await tester.tap(find.text('Supprimer'));
+    await tester.pumpAndSettle();
+    await laisserFinir(tester);
+    expect(find.text('Supprimer ce client ?'), findsOneWidget);
+    expect(find.textContaining('irréversible'), findsOneWidget);
+    expect(find.textContaining('apparaît dans'), findsNothing);
+    await tester.tap(find.widgetWithText(TextButton, 'Annuler'));
+    await tester.pumpAndSettle();
+    expect(await env.travailler(tester, () => env.clients.obtenir(c.id)), isNotNull);
+    expect(find.byType(ClientFicheScreen), findsOneWidget);
+
+    // On confirme.
+    await ouvrirMenuClient(tester);
+    await tester.tap(find.text('Supprimer'));
+    await tester.pumpAndSettle();
+    await laisserFinir(tester);
+    await tester.tap(find.widgetWithText(FilledButton, 'Supprimer'));
+    await tester.pumpAndSettle();
+    await laisserFinir(tester);
+
+    expect(find.byType(ClientFicheScreen), findsNothing);
+    expect(find.text('Client supprimé.'), findsOneWidget);
+    expect(await env.travailler(tester, () => env.clients.obtenir(c.id)), isNull);
+
+    await env.fermer(tester);
+  });
+
+  testWidgets('supprimer un client qui a des ventes : la confirmation le dit, les ventes gardent son nom', (
+    WidgetTester tester,
+  ) async {
+    final EnvironnementTest env = await EnvironnementTest.creer(tester);
+    final Client c = await env.creerClient(tester, _camille);
+    await env.ajouterVenteClient(tester, clientId: c.id, total: 2500, date: DateTime(2026, 10, 1));
+    await env.ajouterVenteClient(tester, clientId: c.id, total: 1000, date: DateTime(2026, 10, 2));
+    await ouvrirFiche(tester, env, 'Camille Martin');
+
+    await ouvrirMenuClient(tester);
+    await tester.tap(find.text('Supprimer'));
+    await tester.pumpAndSettle();
+    await laisserFinir(tester);
+
+    expect(find.text('Supprimer ce client ?'), findsOneWidget);
+    expect(find.textContaining('apparaît dans 2 ventes'), findsOneWidget);
+    expect(find.textContaining('archivez-le plutôt'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Supprimer définitivement'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Supprimer définitivement'));
+    await tester.pumpAndSettle();
+    await laisserFinir(tester);
+
+    expect(find.byType(ClientFicheScreen), findsNothing);
+    expect(find.text('Client supprimé.'), findsOneWidget);
+    expect(await env.travailler(tester, () => env.clients.obtenir(c.id)), isNull);
+    final List<Vente> ventes = await env.travailler(tester, () => env.db.select(env.db.ventes).get());
+    expect(ventes, hasLength(2));
+    expect(ventes.every((Vente v) => v.clientId == null && v.clientNom == 'Camille Martin'), isTrue);
+    expect(ventes.fold<int>(0, (int somme, Vente v) => somme + v.totalCentimes), 3500);
+
+    await env.fermer(tester);
+  });
+
+  testWidgets('un client inscrit à un cours ne se supprime pas : on propose de l’archiver', (
+    WidgetTester tester,
+  ) async {
+    final EnvironnementTest env = await EnvironnementTest.creer(tester);
+    final Client c = await env.creerClient(tester, _camille);
+    final CoursFiche cours = await env.creerCours(tester);
+    await env.inscrire(tester, coursId: cours.id, clientId: c.id);
+    await ouvrirFiche(tester, env, 'Camille Martin');
+
+    await ouvrirMenuClient(tester);
+    await tester.tap(find.text('Supprimer'));
+    await tester.pumpAndSettle();
+    await laisserFinir(tester);
+
+    expect(find.text('Suppression impossible'), findsOneWidget);
+    expect(find.textContaining('inscrit à 1 cours'), findsOneWidget);
+    expect(find.text('Supprimer ce client ?'), findsNothing);
+
+    // « Fermer » : rien ne change.
+    await tester.tap(find.widgetWithText(TextButton, 'Fermer'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ClientFicheScreen), findsOneWidget);
+    expect((await env.travailler(tester, () => env.clients.obtenir(c.id)))!.archiveLe, isNull);
+
+    // « Archiver » : le client est archivé, pas supprimé.
+    await ouvrirMenuClient(tester);
+    await tester.tap(find.text('Supprimer'));
+    await tester.pumpAndSettle();
+    await laisserFinir(tester);
+    await tester.tap(find.widgetWithText(FilledButton, 'Archiver'));
+    await tester.pumpAndSettle();
+    await laisserFinir(tester);
+
+    expect(find.text('Client archivé.'), findsOneWidget);
+    final Client? apres = await env.travailler(tester, () => env.clients.obtenir(c.id));
+    expect(apres, isNotNull);
+    expect(apres!.archiveLe, isNotNull);
+
+    await env.fermer(tester);
+  });
 }

@@ -6,7 +6,7 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
 
 ## [Non publié]
 
-## [0.12.1] — Nouveau nom et nouveau logo (en attente de validation)
+## [0.14.1] — Nouveau nom et nouveau logo (en attente de validation)
 
 ### Modifié
 - **Nom de l'application : « Un p’tit crochet dans les stocks »** (au lieu de « Crochet & Créations »), à chaque endroit où
@@ -16,8 +16,10 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
 - **Logo** : la fillette aux pelotes (image fournie) devient l'**icône de lancement Android** (icône adaptative, fond `#FCE5E6`,
   logo entier réduit à 62 % pour rester visible avec tous les masques d'Android ; icône classique = le logo lui-même) et le
   **logo dans l'application** (`AppLogo` : écran de démarrage, accueil, réglages), en carré aux coins arrondis.
-- `tool/generate_icons.py` part maintenant du logo fourni (`assets/icon/logo_source.png`) et produit le premier plan de
-  l'icône et `assets/images/logo_application.png`.
+- `tool/generate_icons.py` part maintenant du logo fourni (`assets/icon/logo_source.png`, version haute définition de
+  1254 × 1254 px) et produit le premier plan de l'icône et `assets/images/logo_application.png`.
+- La branche a été mise à jour avec `main` (suppression des clients et produits, catégories modifiables) : la version passe
+  à 0.14.1.
 - Documentation : l'étape 12 est marquée comme validée.
 
 ### Supprimé
@@ -37,6 +39,89 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
 - Le logo contient du texte (« Un p'tit crochet par ici ») : à la taille d'une icône, ce texte est trop petit pour être lu. Une
   variante recadrée sur la fillette (sans texte) donnerait une icône plus lisible.
 - Plus de version monochrome pour les icônes thématiques d'Android 13 : l'icône reste en couleurs.
+
+## [0.14.0] — Catégories de produits modifiables (validée)
+
+Seconde demande de Stéphane après l'étape 12 : ajouter une catégorie à la main depuis « Nouveau produit », ou en supprimer une.
+
+### Ajouté
+- **Créer une catégorie depuis le formulaire produit** : la liste « Catégorie » se termine par **« + Nouvelle catégorie »** ; une
+  petite boîte demande le nom, crée la catégorie tout de suite et la sélectionne. Un nom vide, trop long (60 caractères) ou déjà
+  pris (sans tenir compte des majuscules, des accents ni des espaces) est expliqué dans la boîte, qui reste ouverte.
+- **Écran « Catégories »** (*Plus → Réglages → Catégories*) : la liste avec le nombre de produits de chacune (archivés compris),
+  **Nouvelle catégorie**, **Renommer** et **Supprimer**. Les cinq catégories d'origine (Crochet, Doudou, Boucles d'oreilles,
+  Accessoire, Sur mesure) sont des catégories comme les autres : on peut les renommer ou les supprimer.
+- **Supprimer une catégorie qui contient des produits** : l'application demande **où les déplacer** (aucune destination n'est
+  présélectionnée), déplace tous les produits, archivés compris, puis supprime la catégorie, en une seule opération « tout ou
+  rien ». Une catégorie vide se supprime après une simple confirmation. Si c'est la seule catégorie et qu'elle contient des
+  produits, l'application demande d'en créer une autre d'abord.
+- `CategorieRepository` (lister, observer, créer, renommer, supprimer avec déplacement), `domain/categories_produit.dart`
+  (clés et noms de départ, règles du nom), `presentation/produits/categories_screen.dart`, `categorie_dialogues.dart`,
+  `categories_providers.dart`.
+- Tests : `categorie_repository_test`, `domain/categories_produit_test`, `categories_ecrans_test` (ajout, renommage, suppression
+  avec déplacement, filtre de la liste des produits), « + Nouvelle catégorie » dans `produit_form_test`, migrations 1→3 et 2→3
+  (`migration_schema_test`), sauvegarde et restauration des catégories (`service_sauvegarde_test`).
+
+### Modifié
+- **Schéma de la base : version 3** (migration automatique au premier lancement) : nouvelle table `categories_produit` (`id`, `cle`,
+  `nom`, `position`) remplie avec les cinq catégories d'origine. `produits.categorie` garde le même texte : c'est la **clé** de la
+  catégorie (`crochet`, `doudou`, `bouclesOreilles`, `accessoire`, `surMesure`, comme avant), donc **aucun produit n'est modifié**
+  par la migration. Une catégorie créée reçoit une clé interne `cat_…` qui ne change jamais ; **renommer ne touche à aucun produit**.
+- Le type `CategorieProduit` (liste de choix fixe) disparaît de `enums.dart` ; le dépôt de produits refuse une catégorie qui n'existe
+  pas. La liste des produits, ses filtres, la fiche, les statistiques (« catégories les plus rentables », classées à marge égale
+  dans l'ordre de la liste) et l'export CSV utilisent le **nom actuel** des catégories. Un filtre sur une catégorie supprimée est
+  retiré tout seul.
+- **Sauvegarde** : la sauvegarde contient désormais 16 tables (`categories_produit` avant `produits`). Une sauvegarde faite avant
+  cette version (schéma 1 ou 2) se restaure normalement : les cinq catégories d'origine sont alors recréées.
+
+### Décisions prises avec Stéphane
+- Catégories gérées **depuis le formulaire produit et depuis un écran « Catégories » des Réglages**.
+- Supprimer une catégorie utilisée : **proposer de déplacer ses produits** dans une autre catégorie.
+- Livraison en **deux pull requests** : suppression d'abord (0.13.0), catégories ensuite (cette version).
+
+## [0.13.0] — Supprimer un client ou un produit (validée)
+
+Demande de Stéphane après l'étape 12 : pouvoir supprimer un client et un objet à vendre. Première des deux demandes (la
+seconde, les catégories de produits, fait l'objet d'une autre pull request).
+
+### Ajouté
+- **Supprimer un client** (fiche client, menu ⋮ → « Supprimer ») et **supprimer un produit** (fiche produit, menu ⋮ →
+  « Supprimer »), avec confirmation. Un élément **qui n'a jamais servi** demande une confirmation simple ; un élément **qui a
+  déjà servi** demande une confirmation renforcée (« Supprimer définitivement ») qui dit où il apparaît (« 2 ventes, 1 facture
+  et 1 devis ») et rappelle que l'archivage existe.
+- **L'historique est conservé.** Client supprimé : ses ventes et ses devis gardent son nom (nouvelle colonne `client_nom`,
+  affiché « Camille Martin (client supprimé) ») ; ses factures gardent son nom, son adresse et son SIRET, déjà copiés à
+  l'émission. Produit supprimé : les lignes de vente et de devis gardent leur désignation, leur quantité et leur prix, mais ne
+  sont plus liées à un produit ; ses variantes et ses photos (fichiers compris) sont effacées ; les dépenses qui le désignaient
+  sont conservées, sans lien. Le nom copié suit le devis converti en commande, puis la facture.
+- `UsageHistorique` / `ElementUsage` (`domain/usage_historique.dart`) : « où apparaît cet élément », en phrase française ;
+  `ClientRepository.usage`, `nombreInscriptions`, `ProduitRepository.usage`, `nombreDepensesLiees` ; `nomClientOuCopie`
+  (`client_vues.dart`) ; boîte d'information `informer` (`dialogues.dart`).
+- Tests : `suppression_repository_test` (client et produit utilisés ou non, noms copiés, lignes détachées, factures, dépenses,
+  références non réutilisées, inscriptions refusées), `migration_schema_test` (base du schéma 1 mise à jour), restauration d'une
+  sauvegarde du schéma 1 et d'une sauvegarde faite après suppression, export CSV, conversion d'un devis dont le client a été
+  supprimé, `usage_historique_test`, boîtes de dialogue des fiches client et produit.
+
+### Modifié
+- **Schéma de la base : version 2** (migration automatique au premier lancement) : colonne `client_nom` ajoutée à `ventes` et à
+  `devis`. Les anciennes sauvegardes (schéma 1) se restaurent normalement, la colonne restant vide.
+- Ventes, devis, export CSV (ventes et devis) et PDF de devis affichent le nom copié quand la fiche du client n'existe plus.
+
+### Décisions prises avec Stéphane
+- Supprimer un client ou un produit **déjà utilisé** : **autorisé, historique conservé** (confirmation renforcée).
+- Livraison en **deux pull requests** : suppression d'abord, catégories ensuite.
+
+### Limites connues et hypothèses (à confirmer)
+- **Un client inscrit à un cours ne peut pas être supprimé** (la liste des inscrits a besoin de sa fiche) : l'application propose
+  de l'**archiver**, ou il faut le désinscrire d'abord.
+- Une suppression est **définitive** : seule une sauvegarde permet de revenir en arrière. Restaurer une sauvegarde ancienne
+  fait revenir le client ou le produit supprimé depuis.
+- Les coordonnées et les notes d'un client supprimé disparaissent (seul son nom reste sur les ventes et les devis, plus son
+  adresse sur les factures déjà émises). Un client supprimé qu'on veut refacturer doit être recréé.
+- Modifier un devis dont le client a été supprimé garde son nom tant qu'on ne choisit pas un autre client ; l'écran de
+  modification, lui, affiche « Aucun client ».
+- Les produits d'un devis dont le produit a été supprimé restent des lignes libres : le devis se convertit en commande sans
+  toucher au stock.
 
 ## [0.12.0] — Étape 12 : finitions
 

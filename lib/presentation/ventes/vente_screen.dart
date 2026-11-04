@@ -8,6 +8,7 @@ import '../../core/widgets/etiquette.dart';
 import '../../data/database/app_database.dart';
 import '../../data/repositories/produit_vues.dart';
 import '../../domain/calculs/panier.dart';
+import '../produits/categories_providers.dart';
 import '../produits/filtres_produits.dart';
 import '../produits/produit_widgets.dart';
 import '../produits/produits_providers.dart';
@@ -99,6 +100,7 @@ class _VenteScreenState extends ConsumerState<VenteScreen> {
                 final List<ProduitResume> visibles = filtrerProduits(
                   tous,
                   const FiltresProduits().avecRecherche(_texte),
+                  nomsCategories: ref.watch(nomsCategoriesProvider),
                 );
                 return _Liste(
                   produits: visibles,

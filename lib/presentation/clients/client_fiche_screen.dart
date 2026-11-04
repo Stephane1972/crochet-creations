@@ -11,10 +11,11 @@ import '../../data/repositories/client_repository.dart';
 import '../../data/repositories/client_vues.dart';
 import '../../domain/enums.dart';
 import '../../domain/regles_devis.dart';
+import '../../domain/usage_historique.dart';
 import 'client_widgets.dart';
 import 'clients_providers.dart';
 
-enum _ActionMenu { archiver, restaurer }
+enum _ActionMenu { archiver, restaurer, supprimer }
 
 /// Fiche d'un client : coordonnées et historique des devis, ventes, factures, paiements et cours (écran 7).
 class ClientFicheScreen extends ConsumerStatefulWidget {
@@ -64,6 +65,59 @@ class _ClientFicheScreenState extends ConsumerState<ClientFicheScreen> {
     if (mounted) afficherMessage(context, 'Client restauré dans la liste.');
   });
 
+  /// Supprime le client, même s'il a servi : ses ventes, factures et devis restent, avec son nom. Seul un client
+  /// inscrit à un cours ne peut pas l'être : on propose alors de l'archiver.
+  Future<void> _supprimer(Client client) => _executer(() async {
+    final String nom = libelleClient(client);
+    final int inscriptions = await _repo.nombreInscriptions(client.id);
+    if (!mounted) return;
+
+    if (inscriptions > 0) {
+      final String explication =
+          '« $nom » est inscrit${inscriptions > 1 ? ' à $inscriptions cours' : ' à 1 cours'} : la liste des inscrits '
+          'a besoin de sa fiche. Désinscrivez-le d’abord pour pouvoir le supprimer.';
+      if (client.archiveLe != null) {
+        await informer(
+          context,
+          titre: 'Suppression impossible',
+          message: '$explication Ce client est déjà archivé : il n’apparaît plus dans la liste.',
+        );
+        return;
+      }
+      final bool archiver = await confirmer(
+        context,
+        titre: 'Suppression impossible',
+        message: '$explication Vous pouvez aussi l’archiver : il disparaît de la liste des clients, '
+            'mais ses ventes, factures, devis et inscriptions restent conservés.',
+        libelleConfirmer: 'Archiver',
+        libelleAnnuler: 'Fermer',
+      );
+      if (!archiver || !mounted) return;
+      await _repo.archiver(client.id);
+      if (mounted) afficherMessage(context, 'Client archivé.');
+      return;
+    }
+
+    final UsageHistorique usage = await _repo.usage(client.id);
+    if (!mounted) return;
+    final String consequence = usage.estUtilise
+        ? '\n\n« $nom » apparaît dans ${usage.enumeration}. Cet historique est conservé et garde son nom, '
+              'mais n’est plus lié à une fiche client : ses coordonnées et ses notes disparaissent. '
+              'Pour seulement le retirer des listes en gardant sa fiche, archivez-le plutôt.'
+        : '';
+    final bool ok = await confirmer(
+      context,
+      titre: 'Supprimer ce client ?',
+      message: '« $nom » sera supprimé définitivement. Cette action est irréversible.$consequence',
+      libelleConfirmer: usage.estUtilise ? 'Supprimer définitivement' : 'Supprimer',
+    );
+    if (!ok || !mounted) return;
+    await _repo.supprimer(client.id);
+    if (!mounted) return;
+    afficherMessage(context, 'Client supprimé.');
+    Navigator.of(context).pop();
+  });
+
   @override
   Widget build(BuildContext context) {
     final AsyncValue<Client?> fiche = ref.watch(clientProvider(widget.clientId));
@@ -87,6 +141,8 @@ class _ClientFicheScreenState extends ConsumerState<ClientFicheScreen> {
                     _archiver(client);
                   case _ActionMenu.restaurer:
                     _restaurer(client);
+                  case _ActionMenu.supprimer:
+                    _supprimer(client);
                 }
               },
               itemBuilder: (BuildContext context) => <PopupMenuEntry<_ActionMenu>>[
@@ -108,6 +164,14 @@ class _ClientFicheScreenState extends ConsumerState<ClientFicheScreen> {
                       contentPadding: EdgeInsets.zero,
                     ),
                   ),
+                const PopupMenuItem<_ActionMenu>(
+                  value: _ActionMenu.supprimer,
+                  child: ListTile(
+                    leading: Icon(Icons.delete_outline),
+                    title: Text('Supprimer'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
               ],
             ),
           ],

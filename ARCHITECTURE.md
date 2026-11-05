@@ -193,7 +193,11 @@ crochet-creations/
 │   └── widget_test.dart                      parcours splash → accueil → réglages
 ├── tool/
 │   ├── generate_icons.py             logo fourni → premier plan d'icône adaptative et logo de l'application
-│   ├── setup_android.sh              crée android/, règle le nom, génère les icônes
+│   ├── setup_android.sh              crée android/, règle le nom, prépare la signature, génère les icônes
+│   ├── patch_signature_android.py    branche la clé de signature stable dans android/app/build.gradle.kts
+│   ├── empreinte_signature_apk.py    lit la signature d'un APK (SHA-256 / SHA-1) et la compare à l'attendue
+│   ├── signature_attendue.txt        empreinte SHA-256 attendue de la clé stable (publique)
+│   ├── tests/                        tests Python des scripts de signature (modèle Gradle de Flutter en copie)
 │   └── ci_annoter.sh                 publie les erreurs de la CI en annotations lisibles
 ├── pubspec.yaml
 └── analysis_options.yaml
@@ -836,6 +840,23 @@ devra être ajoutée à ce script. `image_picker` (étape 3) n'en demande aucune
 de photos du système, sans permission. L'appareil photo, lui, ouvre l'application photo du téléphone ; si
 Android ferme l'application pendant la prise de vue, la photo est retrouvée au démarrage suivant (voir *Photos*).
 Si cette contrainte gêne, on pourra versionner `android/` à la place (il suffit de retirer `/android/` du `.gitignore`).
+
+### Signature de l'APK
+
+`flutter create` signe la version *release* avec la clé de débogage de la machine : sur GitHub Actions, elle est recréée à
+chaque exécution, donc deux APK n'ont jamais la même signature (vérifié en lisant le bloc de signature v2/v3 de plusieurs
+APK de la CI), et Android refuse l'installation « par-dessus ». `tool/patch_signature_android.py` (appelé par
+`setup_android.sh`) insère dans `android/app/build.gradle.kts` un `signingConfigs.create("publication")` qui lit
+`ANDROID_KEYSTORE_FILE`, `ANDROID_KEYSTORE_PASSWORD` et `ANDROID_KEY_ALIAS` dans l'environnement ; la version *release* utilise cette
+configuration si `ANDROID_KEYSTORE_FILE` est défini, sinon la clé de débogage. Il est idempotent et échoue bruyamment si le
+modèle Gradle de Flutter change (mieux vaut une construction rouge qu'un APK signé avec la mauvaise clé).
+
+Dans le workflow : l'étape « Préparer la clé de signature » décode le secret `ANDROID_KEYSTORE_BASE64` dans `$RUNNER_TEMP`,
+contrôle qu'il s'ouvre avec le mot de passe (`keytool -list`) puis exporte les trois variables ; « Vérifier la signature de
+l'APK » appelle `tool/empreinte_signature_apk.py`, qui lit le certificat dans l'APK (sans SDK Android) et le compare à
+`tool/signature_attendue.txt`. La clé (`.p12`) n'est jamais dans le dépôt. L'empreinte SHA-1 sert à déclarer l'application
+dans Google Cloud pour la connexion à Google Drive (étapes suivantes). Les deux scripts ont leurs tests dans `tool/tests/`
+(`python3 -m unittest discover -s tool/tests -v`), lancés par la CI avant la préparation de la clé.
 
 ## Choix techniques
 

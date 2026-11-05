@@ -2,7 +2,8 @@
 # Prépare la plateforme Android de l'application :
 #   1. crée le dossier android/ s'il n'existe pas (via `flutter create`) ;
 #   2. règle le nom affiché sous l'icône : « Un p’tit crochet dans les stocks » ;
-#   3. génère les icônes de l'application à partir de assets/icon/ (logo fourni, voir tool/generate_icons.py).
+#   3. prépare la signature de l'APK : clé stable si la CI la fournit, sinon clé de débogage (tool/patch_signature_android.py) ;
+#   4. génère les icônes de l'application à partir de assets/icon/ (logo fourni, voir tool/generate_icons.py).
 #
 # Utilisation (à la racine du dépôt, après `flutter pub get`) :
 #   bash tool/setup_android.sh
@@ -48,6 +49,9 @@ fi
 
 echo "→ Nom affiché sous l'icône : $NOM_AFFICHE"
 sed -i "s|android:label=\"[^\"]*\"|android:label=\"$NOM_AFFICHE\"|" "$MANIFEST"
+
+echo "→ Signature de l'APK"
+python3 tool/patch_signature_android.py
 
 echo "→ Génération des icônes"
 dart run flutter_launcher_icons

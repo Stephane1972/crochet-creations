@@ -43,10 +43,26 @@ Hypothèse à confirmer : le profil « Mon entreprise » (écran 22) est constru
 ### Demandes de Stéphane après l'étape 12
 
 - [x] Nom et logo de l'application (PR #13, validée)
-- [x] Logo de l'entreprise sur les factures et les devis : **en attente de validation**
+- [x] Logo de l'entreprise sur les factures et les devis (PR #16, validée)
 - [x] Supprimer un client ou un produit, historique conservé (PR #14, validée)
 - [x] Catégories de produits modifiables : créer une catégorie depuis le formulaire, écran « Catégories » (ajouter, renommer,
   supprimer en déplaçant les produits) (PR #15, validée)
+
+### Évolution demandée en novembre 2026 : bloc-notes, lieux de vente, statistiques, Google Drive
+
+Plan validé par Stéphane, une pull request par étape (la facturation électronique / Factur-X est volontairement reportée) :
+
+| Étape | Contenu | État |
+|------:|---------|------|
+| 0 | Signature stable de l'APK (mises à jour sans perte de données, préalable à Google Drive) | **en attente de validation** |
+| 1 | Lieux de vente sur chaque vente (liste personnalisable, « Non renseigné » pour les anciennes ventes) | à faire |
+| 2 | Bloc-notes avec catégories (Futures commandes, Documents entreprise, catégories personnelles) | à faire |
+| 3 | Sauvegarde locale fiable : archive écrite en flux, liste des fichiers et empreintes, progression, contrôle de l'espace | à faire |
+| 4 | Pièces jointes des notes : photos, vidéos, documents (limites affichées) | à faire |
+| 5 | Statistiques par mois, année, lieu de vente et catégorie (argent encaissé), graphique et tableau | à faire |
+| 6 | Google Drive, partie 1 : connexion, dossiers, envoi des fichiers, état | à faire |
+| 7 | Google Drive, partie 2 : sauvegardes versionnées, restauration, changement de téléphone | à faire |
+| 8 | Partage Drive (jamais public par défaut) et exports, dont le catalogue avec photos | à faire |
 
 ## Version 2 : confort et échanges (propositions, non engagées)
 

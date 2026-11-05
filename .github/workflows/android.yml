@@ -63,6 +63,63 @@ jobs:
       - name: Préparer Android (dossier android/, nom, icônes)
         run: bash tool/setup_android.sh
 
+      # Tests des scripts Python de signature (modèle Gradle de Flutter en copie, faux APK signé) : sans Flutter ni SDK Android.
+      - name: Tester les scripts de signature
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python3 -m unittest discover -s tool/tests -v
+
+      # Signature stable de l'APK. Sans elle, chaque construction est signée avec une clé de débogage différente
+      # et Android refuse d'installer un APK par-dessus le précédent (il faudrait désinstaller, donc perdre les données).
+      # La clé vient de deux « secrets » du dépôt (Settings → Secrets and variables → Actions) :
+      #   ANDROID_KEYSTORE_BASE64   la clé (fichier .p12) encodée en texte ;
+      #   ANDROID_KEYSTORE_PASSWORD son mot de passe.
+      # Sans ces secrets (copie du dépôt, pull request d'un tiers), l'APK est signé avec la clé de débogage : il fonctionne,
+      # mais ne s'installe pas par-dessus une autre version. Voir README, « Signature de l'application ».
+      - name: Préparer la clé de signature
+        id: cle
+        env:
+          CLE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          CLE_MOT_DE_PASSE: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -z "$CLE_BASE64" ] || [ -z "$CLE_MOT_DE_PASSE" ]; then
+            ABSENTS=""
+            [ -z "$CLE_BASE64" ] && ABSENTS="ANDROID_KEYSTORE_BASE64"
+            [ -z "$CLE_MOT_DE_PASSE" ] && ABSENTS="${ABSENTS:+$ABSENTS et }ANDROID_KEYSTORE_PASSWORD"
+            echo "stable=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=Signature::Secret(s) de signature absent(s) ou vide(s) : $ABSENTS. L'APK est signé avec une clé de débogage propre à cette construction (il ne s'installera pas par-dessus une autre version)."
+            exit 0
+          fi
+          FICHIER="$RUNNER_TEMP/cle-signature.p12"
+          # Mot de passe : première ligne non vide, sans espaces ni retours à la ligne parasites (copier-coller).
+          CLE_MOT_DE_PASSE="$(printf '%s\n' "$CLE_MOT_DE_PASSE" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | grep -m1 .)"
+          # Clé : les espaces et retours à la ligne éventuels sont ignorés. Si le collage contenait aussi du texte en trop
+          # (titres, consignes), on retient la plus longue ligne qui ressemble à du base64.
+          TEXTE="$(printf '%s' "$CLE_BASE64" | tr -d ' \n\r')"
+          if [ -n "$(printf '%s' "$TEXTE" | tr -d 'A-Za-z0-9+/=')" ]; then
+            TEXTE="$(printf '%s\n' "$CLE_BASE64" | tr -d '\r' | awk '{ gsub(/[ \t]/, ""); if (length($0) > length(meilleure) && $0 ~ /^[A-Za-z0-9+\/]+=*$/) meilleure = $0 } END { print meilleure }')"
+            echo "::warning title=Signature::Le secret ANDROID_KEYSTORE_BASE64 contenait du texte en trop : seule la plus longue ligne de base64 (${#TEXTE} caractères) a été retenue. Pour faire propre, recréer le secret avec uniquement cette ligne."
+          fi
+          printf '%s' "$TEXTE" | base64 -d > "$FICHIER" || {
+            # Diagnostic sans rien révéler de la clé : seulement la longueur et le nombre de caractères interdits.
+            BRUT="$(printf '%s' "$CLE_BASE64" | tr -d ' \n\r')"
+            INTERDITS="$(printf '%s' "$BRUT" | tr -d 'A-Za-z0-9+/=' | wc -c)"
+            echo "::error title=Signature::Le secret ANDROID_KEYSTORE_BASE64 n'est pas du texte base64 valide : ${#BRUT} caractères reçus (une clé complète en compte environ 3 600), dont $INTERDITS caractère(s) interdit(s). Le collage est probablement incomplet : recopier uniquement la longue ligne."
+            exit 1
+          }
+          # Contrôle immédiat : mauvaise clé ou mauvais mot de passe = échec clair ici, pas une signature silencieusement fausse.
+          keytool -list -keystore "$FICHIER" -storepass "$CLE_MOT_DE_PASSE" -alias crochet-creations > /dev/null 2>&1 || {
+            echo "::error title=Signature::Impossible d'ouvrir la clé ($(stat -c %s "$FICHIER") octets décodés, une clé complète en fait environ 2 700 ; mot de passe de ${#CLE_MOT_DE_PASSE} caractères, attendu : 28) : vérifier les secrets ANDROID_KEYSTORE_BASE64 (clé) et ANDROID_KEYSTORE_PASSWORD (mot de passe ; alias attendu : crochet-creations)."
+            exit 1
+          }
+          {
+            echo "ANDROID_KEYSTORE_FILE=$FICHIER"
+            echo "ANDROID_KEYSTORE_PASSWORD=$CLE_MOT_DE_PASSE"
+            echo "ANDROID_KEY_ALIAS=crochet-creations"
+          } >> "$GITHUB_ENV"
+          echo "stable=true" >> "$GITHUB_OUTPUT"
+          echo "Clé de signature stable prête."
+
       - name: Analyser le code
         id: analyse
         run: |
@@ -107,6 +164,22 @@ jobs:
           if [ "$code" -ne 0 ]; then bash tool/ci_annoter.sh "Échec de la construction de l'APK" build-apk.log "(Error|error|FAILURE|What went wrong)"; fi
           exit $code
 
+      # Relit la signature de l'APK construit. Avec la clé stable, l'empreinte doit être celle de tool/signature_attendue.txt
+      # (sinon la construction est en échec) ; l'empreinte est affichée dans le résumé de l'exécution et dans la pré-version.
+      - name: Vérifier la signature de l'APK
+        if: ${{ !cancelled() && steps.apk.outcome == 'success' }}
+        env:
+          CLE_STABLE: ${{ steps.cle.outputs.stable }}
+        run: |
+          set +e
+          ATTENDUE=()
+          if [ "$CLE_STABLE" = "true" ]; then ATTENDUE=(--attendue tool/signature_attendue.txt); fi
+          python3 tool/empreinte_signature_apk.py build/app/outputs/flutter-apk/app-release.apk "${ATTENDUE[@]}" --github --ecrire empreinte-signature.txt
+          code=$?
+          # 3 = signature illisible : simple avertissement (déjà affiché), ne bloque pas la construction.
+          if [ "$code" -eq 3 ]; then code=0; fi
+          exit $code
+
       # Publication n°1 : pré-version GitHub (onglet « Releases » du dépôt).
       # L'APK s'y télécharge directement depuis le téléphone, sans dossier .zip,
       # et sans utiliser le quota de stockage d'artefacts de GitHub Actions.
@@ -116,15 +189,23 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           BRANCHE: ${{ github.head_ref || github.ref_name }}
           COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+          CLE_STABLE: ${{ steps.cle.outputs.stable }}
         run: |
           COURT="${COMMIT:0:7}"
+          # Le verdict sur la signature (conforme / différente de l'attendue) vient de l'étape « Vérifier la signature ».
+          if [ "$CLE_STABLE" = "true" ]; then
+            SIGNATURE="Signature de l'APK — avec la clé stable, il s'installe par-dessus la version précédente et les données sont conservées."
+          else
+            SIGNATURE="Signature de l'APK — clé de débogage propre à cette construction : il ne s'installe pas par-dessus une autre version (désinstaller d'abord, après avoir fait une sauvegarde)."
+          fi
+          if [ -f empreinte-signature.txt ]; then SIGNATURE="$SIGNATURE"$'\n\n'"$(cat empreinte-signature.txt)"; fi
           TAG="apk-$(echo "$BRANCHE" | tr '/' '-')"
           cp build/app/outputs/flutter-apk/app-release.apk "crochet-creations-$COURT.apk"
           gh release delete "$TAG" --cleanup-tag --yes 2>/dev/null || true
           gh release create "$TAG" "crochet-creations-$COURT.apk" \
             --repo "$GITHUB_REPOSITORY" --target "$COMMIT" --prerelease \
             --title "APK de test — $BRANCHE ($COURT)" \
-            --notes "Version de test construite automatiquement à partir du commit $COURT. Remplacée à chaque nouvel envoi sur la branche."
+            --notes "Version de test construite automatiquement à partir du commit $COURT. Remplacée à chaque nouvel envoi sur la branche."$'\n\n'"$SIGNATURE"
           # Exemples de factures PDF fabriqués par les tests : permettent de vérifier la mise en page à l'œil.
           if ls build/exemples_pdf/*.pdf >/dev/null 2>&1; then
             gh release upload "$TAG" build/exemples_pdf/*.pdf --repo "$GITHUB_REPOSITORY" --clobber

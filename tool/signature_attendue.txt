@@ -1,0 +1,5 @@
+# Empreinte SHA-256 du certificat de la clé de signature stable de l'application (information publique, pas un secret).
+# La CI la compare à celle de l'APK construit quand les secrets GitHub de signature sont présents :
+# si elles diffèrent, la construction est marquée en échec (ce n'est pas la bonne clé).
+# À mettre à jour UNIQUEMENT si la clé de signature est volontairement remplacée (voir README, « Signature de l'application »).
+44:7A:F7:AB:EA:17:B9:13:81:24:2B:C5:18:39:A1:42:18:7F:BC:80:B2:33:EA:FD:27:A1:4A:53:5D:2F:D3:84

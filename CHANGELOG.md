@@ -6,6 +6,36 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
 
 ## [Non publié]
 
+## [0.14.3] — Signature stable de l'APK (en attente de validation)
+
+### Ajouté
+- **L'APK est maintenant signé avec une clé stable** : une fois la clé installée dans les « secrets » du dépôt GitHub
+  (deux secrets, voir README, *Signature de l'application*), chaque APK construit par la CI porte la même signature et
+  **s'installe par-dessus la version précédente, sans désinstaller ni perdre les données**. Jusqu'ici chaque construction
+  était signée avec une clé de débogage recréée à chaque fois : Android refusait donc l'installation « par-dessus ».
+- `tool/patch_signature_android.py` : adapte `android/app/build.gradle.kts` (généré par `flutter create`) pour signer la
+  version *release* avec la clé stable quand elle est fournie, sinon avec la clé de débogage ; il s'arrête avec une erreur
+  claire si le modèle de Flutter change. Appelé par `tool/setup_android.sh`.
+- `tool/empreinte_signature_apk.py` : lit la signature d'un APK (sans SDK Android) et affiche les empreintes SHA-256 et SHA-1
+  du certificat ; compare au besoin à l'empreinte attendue, `tool/signature_attendue.txt` (information publique).
+- Workflow : étape « Préparer la clé de signature » (lit les secrets, contrôle la clé et le mot de passe, échoue clairement
+  si l'un est faux), étape « Vérifier la signature de l'APK » (construction en échec si l'empreinte n'est pas celle attendue),
+  empreintes affichées dans le résumé de l'exécution et dans les notes de la pré-version.
+- `tool/tests/test_signature.py` (11 tests, lancés par la CI, sans Flutter ni SDK Android) : branchement de la clé sur une copie du
+  modèle Gradle de Flutter 3.47.9 (idempotence, échec bruyant si le modèle change), lecture du certificat dans un faux APK signé
+  (schémas v2 et v3), empreinte conforme / différente / fichier illisible.
+- `.gitignore` : les clés `*.p12` et `*.pfx` ne peuvent plus être versionnées par erreur.
+
+### Inchangé volontairement
+- Sans les secrets (copie du dépôt, pull request d'un tiers) la CI fonctionne comme avant, avec la clé de débogage et un avertissement.
+- Aucun changement dans l'application elle-même : base, écrans, PDF et sauvegardes sont identiques à la 0.14.2.
+
+### À savoir une seule fois
+- Le premier APK signé avec la clé stable n'a pas la même signature que l'application déjà installée : Android refusera de
+  l'installer par-dessus. Procédure : faire une sauvegarde (*Réglages › Sauvegarde et export*) et la partager **hors du
+  téléphone**, désinstaller, installer le nouvel APK, restaurer la sauvegarde. Ensuite, toutes les mises à jour se feront par-dessus.
+- Cette signature fixe est aussi un préalable à la connexion à Google Drive (étapes suivantes).
+
 ## [0.14.2] — Logo de l'entreprise sur les factures et les devis (en attente de validation)
 
 ### Modifié

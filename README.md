@@ -305,6 +305,34 @@ on peut aussi la lancer à la main (**Actions → Android → Run workflow**). L
 est remplacée à chaque nouvel envoi. L'APK est aussi proposé en « artefact » dans l'onglet Actions
 lorsque le quota de stockage du compte GitHub le permet.
 
+### Signature de l'application (mises à jour sans perte de données)
+
+Android n'installe une nouvelle version **par-dessus** l'ancienne que si les deux sont signées avec la **même clé**. La CI
+signe l'APK avec une clé stable conservée dans les « secrets » du dépôt ; la clé elle-même n'est **jamais** dans le dépôt
+(`*.p12` est ignoré par git). Sans ces secrets, la CI reste fonctionnelle mais signe avec une clé de débogage différente à
+chaque construction (avertissement dans le journal).
+
+**Mise en place, une seule fois** : sur GitHub, dépôt › **Settings › Secrets and variables › Actions › New repository secret**,
+créer deux secrets :
+
+| Nom du secret | Contenu |
+|---------------|---------|
+| `ANDROID_KEYSTORE_BASE64` | la clé de signature (fichier `.p12`) encodée en texte base64 |
+| `ANDROID_KEYSTORE_PASSWORD` | le mot de passe de la clé (l'alias, `crochet-creations`, est écrit dans le workflow) |
+
+**Vérification** : dans les notes de la pré-version et dans le résumé de l'exécution (onglet *Actions*), l'empreinte du
+certificat est affichée, avec le verdict « Conforme à l'empreinte attendue ». Cette empreinte SHA-256 est aussi enregistrée dans
+`tool/signature_attendue.txt` : si elle diffère, la construction est marquée en échec. L'empreinte **SHA-1** affichée est celle
+que demandera Google Cloud pour la connexion à Google Drive.
+
+**À conserver précieusement** : le fichier `.p12` et son mot de passe (gestionnaire de mots de passe, clé USB). GitHub ne
+permet pas de relire un secret. Perdre la clé n'est pas dramatique, mais oblige à en créer une nouvelle et donc à
+désinstaller/réinstaller l'application une fois (faire alors une sauvegarde avant).
+
+**Première installation après ce changement** : l'application déjà installée porte une autre signature, Android refusera de
+l'écraser. Faire une sauvegarde (*Réglages › Sauvegarde et export*) et la partager hors du téléphone, désinstaller, installer
+le nouvel APK, puis restaurer. Ensuite, chaque APK s'installe par-dessus le précédent.
+
 ### Option B — Lancer en local (nécessite Flutter)
 
 Prérequis : [Flutter](https://docs.flutter.dev/get-started/install) (canal *stable*) et Android Studio
@@ -332,7 +360,7 @@ Flutter doit être récent (canal *stable*, Flutter 3.38 / Dart 3.10 au minimum)
 lib/            code de l'application : presentation, domain, data (voir ARCHITECTURE.md)
 assets/         logo, icônes, police Poppins
 test/           tests automatiques
-tool/           scripts : génération des icônes et du dossier android/, annotations de la CI
+tool/           scripts : génération des icônes et du dossier android/, signature de l'APK, annotations de la CI
 .github/        construction automatique de l'APK
 ```
 

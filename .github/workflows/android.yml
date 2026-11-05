@@ -91,17 +91,25 @@ jobs:
             exit 0
           fi
           FICHIER="$RUNNER_TEMP/cle-signature.p12"
-          # Les espaces et retours à la ligne éventuels (copier-coller) sont ignorés.
-          printf '%s' "$CLE_BASE64" | tr -d ' \n\r' | base64 -d > "$FICHIER" || {
+          # Mot de passe : première ligne non vide, sans espaces ni retours à la ligne parasites (copier-coller).
+          CLE_MOT_DE_PASSE="$(printf '%s\n' "$CLE_MOT_DE_PASSE" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | grep -m1 .)"
+          # Clé : les espaces et retours à la ligne éventuels sont ignorés. Si le collage contenait aussi du texte en trop
+          # (titres, consignes), on retient la plus longue ligne qui ressemble à du base64.
+          TEXTE="$(printf '%s' "$CLE_BASE64" | tr -d ' \n\r')"
+          if [ -n "$(printf '%s' "$TEXTE" | tr -d 'A-Za-z0-9+/=')" ]; then
+            TEXTE="$(printf '%s\n' "$CLE_BASE64" | tr -d '\r' | awk '{ gsub(/[ \t]/, ""); if (length($0) > length(meilleure) && $0 ~ /^[A-Za-z0-9+\/]+=*$/) meilleure = $0 } END { print meilleure }')"
+            echo "::warning title=Signature::Le secret ANDROID_KEYSTORE_BASE64 contenait du texte en trop : seule la plus longue ligne de base64 (${#TEXTE} caractères) a été retenue. Pour faire propre, recréer le secret avec uniquement cette ligne."
+          fi
+          printf '%s' "$TEXTE" | base64 -d > "$FICHIER" || {
             # Diagnostic sans rien révéler de la clé : seulement la longueur et le nombre de caractères interdits.
-            TEXTE="$(printf '%s' "$CLE_BASE64" | tr -d ' \n\r')"
-            INTERDITS="$(printf '%s' "$TEXTE" | tr -d 'A-Za-z0-9+/=' | wc -c)"
-            echo "::error title=Signature::Le secret ANDROID_KEYSTORE_BASE64 n'est pas du texte base64 valide : ${#TEXTE} caractères reçus (une clé complète en compte environ 3 600), dont $INTERDITS caractère(s) interdit(s). Le collage est probablement incomplet ou contient du texte en trop : recopier uniquement la longue ligne."
+            BRUT="$(printf '%s' "$CLE_BASE64" | tr -d ' \n\r')"
+            INTERDITS="$(printf '%s' "$BRUT" | tr -d 'A-Za-z0-9+/=' | wc -c)"
+            echo "::error title=Signature::Le secret ANDROID_KEYSTORE_BASE64 n'est pas du texte base64 valide : ${#BRUT} caractères reçus (une clé complète en compte environ 3 600), dont $INTERDITS caractère(s) interdit(s). Le collage est probablement incomplet : recopier uniquement la longue ligne."
             exit 1
           }
           # Contrôle immédiat : mauvaise clé ou mauvais mot de passe = échec clair ici, pas une signature silencieusement fausse.
           keytool -list -keystore "$FICHIER" -storepass "$CLE_MOT_DE_PASSE" -alias crochet-creations > /dev/null 2>&1 || {
-            echo "::error title=Signature::Impossible d'ouvrir la clé ($(stat -c %s "$FICHIER") octets décodés, une clé complète en fait environ 2 700 ; mot de passe de ${#CLE_MOT_DE_PASSE} caractères) : vérifier les secrets ANDROID_KEYSTORE_BASE64 (clé) et ANDROID_KEYSTORE_PASSWORD (mot de passe ; alias attendu : crochet-creations)."
+            echo "::error title=Signature::Impossible d'ouvrir la clé ($(stat -c %s "$FICHIER") octets décodés, une clé complète en fait environ 2 700 ; mot de passe de ${#CLE_MOT_DE_PASSE} caractères, attendu : 28) : vérifier les secrets ANDROID_KEYSTORE_BASE64 (clé) et ANDROID_KEYSTORE_PASSWORD (mot de passe ; alias attendu : crochet-creations)."
             exit 1
           }
           {

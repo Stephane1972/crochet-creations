@@ -1,3 +1,6 @@
+# --- Python (scripts de tool/) ---
+__pycache__/
+
 # --- Flutter / Dart ---
 .dart_tool/
 .packages
@@ -31,6 +34,8 @@ coverage/
 # --- Secrets (ne jamais versionner) ---
 *.jks
 *.keystore
+*.p12
+*.pfx
 key.properties
 local.properties
 .env

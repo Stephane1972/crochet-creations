@@ -20,7 +20,15 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
   du certificat ; compare au besoin à l'empreinte attendue, `tool/signature_attendue.txt` (information publique).
 - Workflow : étape « Préparer la clé de signature » (lit les secrets, contrôle la clé et le mot de passe, échoue clairement
   si l'un est faux), étape « Vérifier la signature de l'APK » (construction en échec si l'empreinte n'est pas celle attendue),
-  empreintes affichées dans le résumé de l'exécution et dans les notes de la pré-version.
+  empreintes affichées dans le résumé de l'exécution et dans les notes de la pré-version. La lecture des secrets est tolérante
+  aux collages faits depuis un téléphone (titres ou consignes collés autour de la clé : la plus longue ligne de base64 est retenue,
+  avec un avertissement ; espaces et retours à la ligne autour du mot de passe ignorés) ; une clé tronquée ou un mauvais mot de passe
+  échouent avec un message chiffré (longueurs) qui ne révèle rien de la clé.
+
+### Vérifié en CI
+- Deux constructions successives du même code (APK différents octet pour octet) portent **le même certificat** :
+  SHA-256 `44:7A:F7:AB:…:2F:D3:84`, SHA-1 `9A:AF:31:A6:51:CD:BB:E1:3E:DE:A3:C9:1C:52:E0:D9:D9:E9:69:D2` ; les constructions sans les
+  secrets, elles, changeaient de certificat à chaque fois.
 - `tool/tests/test_signature.py` (11 tests, lancés par la CI, sans Flutter ni SDK Android) : branchement de la clé sur une copie du
   modèle Gradle de Flutter 3.47.9 (idempotence, échec bruyant si le modèle change), lecture du certificat dans un faux APK signé
   (schémas v2 et v3), empreinte conforme / différente / fichier illisible.

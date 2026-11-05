@@ -320,6 +320,9 @@ créer deux secrets :
 | `ANDROID_KEYSTORE_BASE64` | la clé de signature (fichier `.p12`) encodée en texte base64 |
 | `ANDROID_KEYSTORE_PASSWORD` | le mot de passe de la clé (l'alias, `crochet-creations`, est écrit dans le workflow) |
 
+Un collage fait depuis un téléphone embarque facilement des retours à la ligne ou du texte en trop : la CI les ignore (et le signale
+par un avertissement) ; si la clé est vraiment incomplète ou le mot de passe faux, le journal indique les longueurs reçues.
+
 **Vérification** : dans les notes de la pré-version et dans le résumé de l'exécution (onglet *Actions*), l'empreinte du
 certificat est affichée, avec le verdict « Conforme à l'empreinte attendue ». Cette empreinte SHA-256 est aussi enregistrée dans
 `tool/signature_attendue.txt` : si elle diffère, la construction est marquée en échec. L'empreinte **SHA-1** affichée est celle

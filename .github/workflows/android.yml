@@ -83,8 +83,11 @@ jobs:
           CLE_MOT_DE_PASSE: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: |
           if [ -z "$CLE_BASE64" ] || [ -z "$CLE_MOT_DE_PASSE" ]; then
+            ABSENTS=""
+            [ -z "$CLE_BASE64" ] && ABSENTS="ANDROID_KEYSTORE_BASE64"
+            [ -z "$CLE_MOT_DE_PASSE" ] && ABSENTS="${ABSENTS:+$ABSENTS et }ANDROID_KEYSTORE_PASSWORD"
             echo "stable=false" >> "$GITHUB_OUTPUT"
-            echo "::warning title=Signature::Secrets de signature absents : l'APK est signé avec une clé de débogage propre à cette construction (il ne s'installera pas par-dessus une autre version)."
+            echo "::warning title=Signature::Secret(s) de signature absent(s) ou vide(s) : $ABSENTS. L'APK est signé avec une clé de débogage propre à cette construction (il ne s'installera pas par-dessus une autre version)."
             exit 0
           fi
           FICHIER="$RUNNER_TEMP/cle-signature.p12"

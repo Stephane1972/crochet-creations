@@ -214,7 +214,7 @@ void main() {
         refus('autre lieu'),
       );
       await expectLater(
-        lieux.supprimer(marche.id, deplacerVers: DestinationVentes.lieu(999)),
+        lieux.supprimer(marche.id, deplacerVers: const DestinationVentes.lieu(999)),
         throwsA(isA<ElementIntrouvable>()),
       );
       expect((await ventes.obtenir(v.id))!.lieuId, marche.id);

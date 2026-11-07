@@ -476,8 +476,10 @@ void main() {
         'Vente en ligne',
         'Fête du village',
       ]);
-      expect((await autre.db.select(autre.db.ventes).get()).every((Vente v) => v.lieuId == fete.id), isTrue);
-      expect(await restaures.nombreVentes(fete.id), 1);
+      final List<Vente> ventes = await autre.db.select(autre.db.ventes).get();
+      expect(ventes, isNotEmpty);
+      expect(ventes.every((Vente v) => v.lieuId == fete.id), isTrue);
+      expect(await restaures.nombreVentes(fete.id), ventes.length);
     });
 
     test('une sauvegarde faite après la suppression d’un client garde le nom copié', () async {

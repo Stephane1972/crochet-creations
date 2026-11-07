@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'package:crochet_creations/data/database/app_database.dart';
 import 'package:crochet_creations/domain/categories_produit.dart';
-import 'package:crochet_creations/domain/lieux_vente.dart';
 import 'package:drift/drift.dart' show OrderingTerm, Value, driftRuntimeOptions;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';

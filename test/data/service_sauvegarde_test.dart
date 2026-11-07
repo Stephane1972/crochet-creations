@@ -4,9 +4,11 @@ import 'dart:typed_data';
 
 import 'package:archive/archive.dart' show Archive, ArchiveFile, ZipDecoder, ZipEncoder;
 import 'package:crochet_creations/data/database/app_database.dart';
+import 'package:crochet_creations/data/repositories/categorie_note_repository.dart';
 import 'package:crochet_creations/data/repositories/categorie_repository.dart';
 import 'package:crochet_creations/data/repositories/client_repository.dart';
 import 'package:crochet_creations/data/repositories/lieu_vente_repository.dart';
+import 'package:crochet_creations/data/repositories/note_repository.dart';
 import 'package:crochet_creations/data/sauvegarde/format_sauvegarde.dart';
 import 'package:crochet_creations/data/sauvegarde/service_sauvegarde.dart';
 import 'package:crochet_creations/domain/categories_produit.dart';
@@ -174,6 +176,8 @@ void main() {
       expect(manifeste.lignesDe('produits'), 1);
       expect(manifeste.lignesDe('ventes'), 2);
       expect(manifeste.lignesDe('depenses'), 1);
+      expect(manifeste.lignesDe('categories_note'), 2);
+      expect(manifeste.lignesDe('notes'), 2);
       expect(manifeste.lignes.keys.toList(), FormatSauvegarde.tables);
       expect(await banc.service.lister(), isEmpty); // examiner ne fabrique aucune copie de sécurité
     });
@@ -369,7 +373,7 @@ void main() {
       expect(await banc.contenuDe(banc.photos), containsPair('photo_3.jpg', 'photo 3'));
     });
 
-    test('une sauvegarde faite avec le schéma 1 (sans « client_nom », catégories ni lieux) est restaurée telle quelle', () async {
+    test('une sauvegarde faite avec le schéma 1 (sans « client_nom », catégories, lieux ni bloc-notes) est restaurée telle quelle', () async {
       await remplirBase(banc.db);
       await banc.ecrireFichiers();
       final Uint8List actuelle = await banc.service.fabriquerArchive();
@@ -381,6 +385,8 @@ void main() {
         final Map<String, dynamic> tables = d['tables'] as Map<String, dynamic>;
         tables.remove('categories_produit');
         tables.remove('lieux_vente');
+        tables.remove('categories_note');
+        tables.remove('notes');
         for (final String table in <String>['ventes', 'devis']) {
           for (final dynamic ligne in tables[table] as List<dynamic>) {
             (ligne as Map<String, dynamic>).remove('client_nom');
@@ -402,6 +408,11 @@ void main() {
       avant.remove('categories_produit');
       expect(apres.remove('lieux_vente'), hasLength(4));
       avant.remove('lieux_vente');
+      // Pas de bloc-notes dans l'archive : les deux catégories de notes de départ sont créées, sans note.
+      expect(apres.remove('categories_note'), hasLength(2));
+      avant.remove('categories_note');
+      expect(apres.remove('notes'), isEmpty);
+      avant.remove('notes');
       for (final Map<String, Object?> vente in avant['ventes']!) {
         vente['lieu_id'] = null;
       }
@@ -480,6 +491,72 @@ void main() {
       expect(ventes, isNotEmpty);
       expect(ventes.every((Vente v) => v.lieuId == fete.id), isTrue);
       expect(await restaures.nombreVentes(fete.id), ventes.length);
+    });
+
+    test('les catégories de notes et les notes (avec leur catégorie) font partie de la sauvegarde', () async {
+      await remplirBase(banc.db);
+      final CategorieNoteRepository categories = CategorieNoteRepository(banc.db);
+      final NoteRepository notes = NoteRepository(banc.db);
+      final CategorieNote modeles = await categories.creer('Modèles à essayer');
+      final CategorieNote futures = (await categories.lister()).firstWhere(
+        (CategorieNote c) => c.nom == 'Futures commandes',
+      );
+      await categories.renommer(futures.id, 'Commandes à venir');
+      final CategorieNote documents = (await categories.lister()).firstWhere(
+        (CategorieNote c) => c.nom == 'Documents entreprise',
+      );
+      await categories.supprimer(documents.id); // aucune note dedans : simple suppression
+      await notes.creer(titre: 'Poncho', contenu: 'Laine bleue\n\n2 pelotes', categorieId: modeles.id);
+      final Uint8List archive = await banc.service.fabriquerArchive();
+      final Map<String, List<Map<String, Object?>>> avant = await instantane(banc.db);
+
+      final _Banc autre = await _Banc.creer();
+      addTearDown(autre.fermer);
+      await autre.service.restaurer(archive);
+
+      expect(await instantane(autre.db), avant);
+      final CategorieNoteRepository restaurees = CategorieNoteRepository(autre.db);
+      expect((await restaurees.lister()).map((CategorieNote c) => c.nom), <String>[
+        'Commandes à venir',
+        'Modèles à essayer',
+      ]);
+      final List<Note> notesRestaurees = await NoteRepository(autre.db).lister();
+      expect(notesRestaurees.map((Note n) => n.titre).toSet(), <String>{'Doudou pour Léa', 'Idée de bonnet', 'Poncho'});
+      final Note poncho = notesRestaurees.firstWhere((Note n) => n.titre == 'Poncho');
+      expect(poncho.contenu, 'Laine bleue\n\n2 pelotes');
+      expect(poncho.categorieId, modeles.id);
+      expect(await restaurees.nombreNotes(futures.id), 1);
+    });
+
+    test('une sauvegarde faite avant le bloc-notes (schéma 4) est restaurée : catégories de départ recréées, pas de note', () async {
+      await remplirBase(banc.db);
+      await banc.ecrireFichiers();
+      final Uint8List actuelle = await banc.service.fabriquerArchive();
+      final Map<String, List<Map<String, Object?>>> avant = await instantane(banc.db);
+
+      final Uint8List ancienne = _modifierDonnees(actuelle, (Map<String, dynamic> d) {
+        (d['manifeste'] as Map<String, dynamic>)['versionSchema'] = 4;
+        final Map<String, dynamic> tables = d['tables'] as Map<String, dynamic>;
+        tables.remove('categories_note');
+        tables.remove('notes');
+      });
+
+      await banc.db.delete(banc.db.notes).go();
+      await banc.db.delete(banc.db.categoriesNote).go();
+      await banc.db.delete(banc.db.paiements).go();
+      await banc.db.delete(banc.db.factures).go();
+      await banc.service.restaurer(ancienne);
+
+      final Map<String, List<Map<String, Object?>>> apres = await instantane(banc.db);
+      expect(apres.remove('categories_note'), hasLength(2));
+      expect(apres.remove('notes'), isEmpty);
+      avant.remove('categories_note');
+      avant.remove('notes');
+      expect(apres, avant);
+      expect(
+        (await CategorieNoteRepository(banc.db).lister()).map((CategorieNote c) => c.nom),
+        <String>['Futures commandes', 'Documents entreprise'],
+      );
     });
 
     test('une sauvegarde faite après la suppression d’un client garde le nom copié', () async {

@@ -25,7 +25,7 @@ abstract final class FormatSauvegarde {
 
   static const List<String> dossiersFichiers = <String>[dossierPhotos, dossierFactures, dossierDevis];
 
-  /// Les 17 tables, **dans l'ordre où on peut les remplir** : une table vient après celles qu'elle référence
+  /// Les 19 tables, **dans l'ordre où on peut les remplir** : une table vient après celles qu'elle référence
   /// (une vente après son client, une ligne après sa vente...). On les vide dans l'ordre inverse.
   /// Un test vérifie que cette liste est exactement celle de la base : une nouvelle table doit y être ajoutée.
   static const List<String> tables = <String>[
@@ -46,6 +46,8 @@ abstract final class FormatSauvegarde {
     'lignes_devis',
     'inscriptions_cours',
     'depenses',
+    'categories_note',
+    'notes',
   ];
 }
 

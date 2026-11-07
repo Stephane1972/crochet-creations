@@ -6,7 +6,45 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
 
 ## [Non publié]
 
-## [0.15.0] — Lieux de vente (en attente de validation)
+## [0.16.0] — Bloc-notes (en attente de validation)
+
+### Ajouté
+- **Un bloc-notes** (*Plus → Bloc-notes*) : des notes avec un **titre** (obligatoire, 120 caractères au plus), un **texte**
+  (facultatif, sur plusieurs lignes) et une **catégorie** (facultative). La liste montre le titre, le début du texte, la
+  catégorie et la date de la dernière modification ; la note modifiée en dernier est en haut.
+- **Deux catégories au départ** : **Futures commandes** et **Documents entreprise**. Elles se renomment ou se suppriment comme
+  les autres. Une note sans catégorie est rangée dans **« Sans catégorie »**.
+- **Filtres** en haut de la liste : Toutes, chaque catégorie, Sans catégorie.
+- **Écran d'une note** : titre, catégorie (une feuille du bas avec « Sans catégorie », les catégories et **+ Nouvelle catégorie**, qui
+  crée la catégorie et la choisit aussitôt) et texte. « Enregistrer » en haut ; quitter une saisie non enregistrée demande
+  confirmation. Le menu « Plus d'actions » permet de **supprimer la note** (confirmation, **suppression définitive**).
+- **Réglages › Catégories de notes** (et l'icône d'étiquette du bloc-notes) : la liste avec le nombre de notes de chaque catégorie,
+  **Nouvelle catégorie**, **Renommer** (les notes restent dans la catégorie) et **Supprimer**. Une catégorie qui a des notes ne se
+  supprime qu'en choisissant **où les déplacer** : une autre catégorie, ou « Sans catégorie » ; rien n'est présélectionné.
+  **Aucune note n'est jamais supprimée par la suppression d'une catégorie.**
+- Règles du nom d'une catégorie : obligatoire, 60 caractères au plus, pas deux catégories de même nom (sans tenir compte des
+  majuscules, des accents ni des espaces), et pas « Sans catégorie » (c'est le libellé d'une note sans catégorie).
+
+### Modifié
+- Le schéma de la base passe en **version 5** : tables `categories_note` et `notes` (la note pointe vers sa catégorie ; une catégorie
+  qui a des notes ne peut pas être supprimée par la base elle-même). La mise à jour est automatique, aucune donnée existante n'est
+  touchée ; les deux catégories de départ sont créées.
+- **Sauvegarde** : elle contient désormais 19 tables (`categories_note` puis `notes`, en dernier). Une sauvegarde faite avant cette
+  version se restaure normalement : le bloc-notes est vide et les deux catégories de départ sont créées.
+- Le numéro de version de l'application passe à 0.16.0 (build 19). La **mention « en attente de validation »** de l'étape 1 est
+  retirée : elle a été validée (PR #18).
+
+### Inchangé volontairement
+- Les notes n'ont **pas de pièces jointes** pour l'instant (photos, vidéos et documents viennent à l'étape 4 du plan) et pas de
+  recherche : seulement les catégories.
+- Les **catégories de produits** et les **lieux de vente** sont d'autres notions : ils ne sont pas touchés.
+
+### Vérifié
+- Tests de données (`categorie_note_repository_test`, `note_repository_test`, `schema_test`, `migration_schema_test`,
+  `service_sauvegarde_test`, `domain/notes_test`) et d'écrans (`notes_ecrans_test` : liste, filtres, création, modification,
+  suppression d'une note ; catégories : ajouter, renommer, supprimer avec déplacement des notes).
+
+## [0.15.0] — Lieux de vente
 
 ### Ajouté
 - **Un lieu sur chaque vente** : marché, salon, boutique, vente en ligne, ou un lieu à soi. Quatre lieux sont créés au départ

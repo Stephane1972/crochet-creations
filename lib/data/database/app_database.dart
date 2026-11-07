@@ -5,6 +5,7 @@ import '../../core/constants/app_constants.dart';
 import '../../domain/categories_produit.dart';
 import '../../domain/enums.dart';
 import '../../domain/lieux_vente.dart';
+import '../../domain/notes.dart';
 import 'tables.dart';
 
 // Fichier généré par `dart run build_runner build` (la CI le fait automatiquement).
@@ -31,6 +32,8 @@ part 'app_database.g.dart';
     Cours,
     InscriptionsCours,
     Depenses,
+    CategoriesNote,
+    Notes,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -41,7 +44,7 @@ class AppDatabase extends _$AppDatabase {
 
   /// Version du schéma. **À augmenter à chaque modification de `tables.dart`**,
   /// avec l'étape de migration correspondante dans [migration] (voir ARCHITECTURE.md).
-  static const int versionSchema = 4;
+  static const int versionSchema = 5;
 
   @override
   int get schemaVersion => versionSchema;
@@ -69,6 +72,17 @@ class AppDatabase extends _$AppDatabase {
     }
   }
 
+  /// Crée les deux catégories de notes de départ (celle qui existe déjà, par nom, est laissée telle quelle).
+  /// Sert à la première installation, à la mise à jour vers le schéma 5 et à la restauration d'une sauvegarde ancienne.
+  Future<void> insererCategoriesNoteDeDepart() async {
+    for (int i = 0; i < categoriesNoteDeDepart.length; i++) {
+      await into(categoriesNote).insert(
+        CategoriesNoteCompanion.insert(nom: categoriesNoteDeDepart[i].nom, position: Value(i)),
+        mode: InsertMode.insertOrIgnore,
+      );
+    }
+  }
+
   @override
   MigrationStrategy get migration => MigrationStrategy(
     // Première installation : création de toutes les tables et index.
@@ -76,6 +90,7 @@ class AppDatabase extends _$AppDatabase {
       await m.createAll();
       await insererCategoriesDeDepart();
       await insererLieuxDeDepart();
+      await insererCategoriesNoteDeDepart();
     },
 
     // Mise à jour de l'application avec un schéma plus récent.
@@ -103,6 +118,15 @@ class AppDatabase extends _$AppDatabase {
         await m.addColumn(ventes, ventes.lieuId);
         await customStatement('CREATE INDEX IF NOT EXISTS idx_ventes_lieu_id ON ventes (lieu_id)');
         await insererLieuxDeDepart();
+      }
+      // Version 5 : le bloc-notes (catégories de notes et notes). Deux nouvelles tables, aucune donnée existante touchée.
+      // Les index sont créés en SQL pour ne pas dépendre du nom que Drift donne aux objets générés.
+      if (from < 5) {
+        await m.createTable(categoriesNote);
+        await m.createTable(notes);
+        await customStatement('CREATE INDEX IF NOT EXISTS idx_notes_categorie_id ON notes (categorie_id)');
+        await customStatement('CREATE INDEX IF NOT EXISTS idx_notes_modifie_le ON notes (modifie_le)');
+        await insererCategoriesNoteDeDepart();
       }
     },
 

@@ -51,12 +51,18 @@ abstract final class AppRoutes {
   // Statistiques (étape 10)
   static const String statistiques = '/statistiques';
 
+  // Bloc-notes. La modification d'une note reçoit l'identifiant de la note (un entier) dans `arguments`.
+  static const String notes = '/notes';
+  static const String noteNouvelle = '/notes/nouvelle';
+  static const String noteModifier = '/notes/modifier';
+
   // Réglages
   static const String reglages = '/reglages';
   static const String monEntreprise = '/reglages/entreprise';
   static const String sauvegarde = '/reglages/sauvegarde';
   static const String categories = '/reglages/categories';
   static const String lieuxVente = '/reglages/lieux-de-vente';
+  static const String categoriesNote = '/reglages/categories-notes';
 }
 
 /// Ce que reçoit l'écran d'inscription à un cours : le cours, et (pour confirmer une personne en liste d'attente)

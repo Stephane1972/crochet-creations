@@ -56,6 +56,7 @@ crochet-creations/
 │   │   ├── enums.dart                        listes de choix (statuts, modes de paiement…)
 │   │   ├── categories_produit.dart           clés et noms des catégories de départ, règles du nom d'une catégorie
 │   │   ├── lieux_vente.dart                  lieux de départ, « Non renseigné », règles du nom d'un lieu de vente
+│   │   ├── notes.dart                        catégories de notes de départ, « Sans catégorie », règles du nom, du titre et du texte d'une note
 │   │   ├── erreurs.dart                      erreurs métier à message clair
 │   │   ├── usage_historique.dart             « où apparaît cet élément » (ventes, factures, devis, inscriptions), en phrase
 │   │   ├── regles_client.dart                règles de saisie d'une fiche client (e-mail, téléphone, code postal, SIRET)
@@ -74,7 +75,7 @@ crochet-creations/
 │   │       └── numero_document.dart          FACT-2026-0001, DEVIS-2026-0001, PRD-0001
 │   ├── data/
 │   │   ├── database/
-│   │   │   ├── tables.dart                   les 17 tables (contraintes, index)
+│   │   │   ├── tables.dart                   les 19 tables (contraintes, index)
 │   │   │   ├── app_database.dart             base, version du schéma, migrations
 │   │   │   ├── flux_en_direct.dart           lecture « en direct » de plusieurs tables (observerTables)
 │   │   │   └── app_database.g.dart           (généré par build_runner, non versionné)
@@ -85,6 +86,8 @@ crochet-creations/
 │   │   │   ├── produit_vues.dart             ce que lisent les écrans : ProduitResume, ProduitDetail, historique
 │   │   │   ├── categorie_repository.dart     catégories de produits : lister, créer, renommer, supprimer (en déplaçant les produits)
 │   │   │   ├── lieu_vente_repository.dart    lieux de vente : lister, créer, renommer, supprimer (en déplaçant les ventes), ventes par lieu
+│   │   │   ├── categorie_note_repository.dart catégories de notes : lister, créer, renommer, supprimer (en déplaçant les notes), notes par catégorie
+│   │   │   ├── note_repository.dart          notes : lister, créer, modifier, supprimer, en direct
 │   │   │   ├── client_repository.dart        clients : créer, modifier, archiver, supprimer, fiche et historique en direct
 │   │   │   ├── client_vues.dart              nom affiché, initiales, historique d'un client (ventes, paiements, cours…)
 │   │   │   ├── vente_repository.dart         ventes : valider, annuler, encaisser, changer le lieu, détail en direct
@@ -167,6 +170,13 @@ crochet-creations/
 │       │   ├── lieux_providers.dart          lieux en direct, nombre de ventes par lieu, recherche d'un lieu par identifiant
 │       │   └── choix_lieu.dart               carte « Lieu de vente » et feuille de choix (panier, détail d'une vente)
 │       ├── more/more_screen.dart             onglet « Plus »
+│       ├── notes/                            bloc-notes (voir « Bloc-notes »)
+│       │   ├── notes_screen.dart             Plus › Bloc-notes : liste, filtres par catégorie, « Nouvelle note »
+│       │   ├── note_form_screen.dart         une note : titre, catégorie, texte ; enregistrer, supprimer, abandonner
+│       │   ├── categories_note_screen.dart   Réglages › Catégories de notes : ajouter, renommer, supprimer (en déplaçant les notes)
+│       │   ├── categorie_note_dialogues.dart boîte « nom de catégorie de notes » (création et renommage)
+│       │   ├── choix_categorie_note.dart     carte « Catégorie » et feuille de choix du formulaire d'une note
+│       │   └── notes_providers.dart          notes en direct, catégories en direct, nombre de notes par catégorie
 │       ├── produits/                         onglet Produits et ses écrans (voir « Produits et stock »)
 │       │   ├── produits_screen.dart          liste, recherche, filtres (écran 3)
 │       │   ├── produit_fiche_screen.dart     fiche d'un produit (écran 4)
@@ -246,6 +256,8 @@ les produits : `domain/produits/`, `data/produits/`, `presentation/produits/`.
   `nomsCategoriesProvider` (nom par clé), `nombreProduitsParCategorieProvider` (écran Catégories) ;
 - lieux de vente (`presentation/lieux/lieux_providers.dart`) : `lieuxVenteProvider` (liste en direct, dans l'ordre),
   `nombreVentesParLieuProvider` (écran Lieux de vente) ; `venteEnCoursProvider` porte aussi le lieu choisi dans le panier ;
+- bloc-notes (`presentation/notes/notes_providers.dart`) : `notesProvider` (notes en direct, la dernière modifiée en premier),
+  `categoriesNoteProvider` (catégories en direct, dans l'ordre), `nombreNotesParCategorieProvider` (écran Catégories de notes) ;
 - `filtresProduitsProvider` : recherche, catégorie (clé), « Archivés », « À réapprovisionner ». Il vit au-dessus des écrans :
   le filtre choisi depuis l'accueil (« Stock faible ») s'applique à l'ouverture de l'onglet Produits ;
 - clients (`presentation/clients/clients_providers.dart`) : `clientsProvider` (tous les clients, archivés compris, en
@@ -305,7 +317,7 @@ Navigation Flutter standard (`Navigator` + routes nommées), sans bibliothèque 
 
 Un fichier `crochet_creations.sqlite` dans le stockage privé de l'application. Aucun serveur.
 
-### Les 17 tables
+### Les 19 tables
 
 | Table | Rôle |
 |-------|------|
@@ -326,6 +338,8 @@ Un fichier `crochet_creations.sqlite` dans le stockage privé de l'application. 
 | `cours` | Titre, date, durée, lieu, prix, places, niveau, matériel inclus, photo |
 | `inscriptions_cours` | Inscription d'un client à un cours : confirmée ou en liste d'attente, vente qui l'encaisse |
 | `depenses` | Date, catégorie, montant, fournisseur, photo du ticket, produit concerné |
+| `categories_note` | Catégories du bloc-notes (Futures commandes, Documents entreprise, les vôtres) : nom modifiable, ordre d'affichage |
+| `notes` | Une note : titre, texte, catégorie (vide = « Sans catégorie »), dates de création et de modification |
 
 Relations principales :
 
@@ -335,6 +349,7 @@ clients ──< ventes ──< lignes_vente >── produits ──< variantes_p
               ├──< factures                        ▲
 devis ───────┘ (devis.vente_id)           depenses ┘ (produit concerné)
 cours ──< inscriptions_cours >── clients       lignes_vente / lignes_devis >── cours
+categories_note ──< notes
 ```
 
 ### Garanties apportées par la base elle-même
@@ -386,7 +401,7 @@ Les valeurs des listes de choix sont enregistrées sous leur **nom Dart** : ne j
 Après une migration, `PRAGMA foreign_key_check` vérifie qu'aucune liaison n'a été cassée.
 
 Historique des versions du schéma : **1** (étapes 2 à 12), **2** (`ventes.client_nom` et `devis.client_nom`, pour garder le nom
-d'un client supprimé), **3** (table `categories_produit`, remplie avec les cinq catégories de départ), **4** (table `lieux_vente`, remplie avec les quatre lieux de départ, et colonne `ventes.lieu_id` vide pour toutes les ventes existantes). Une sauvegarde d'un schéma plus ancien se restaure sans changement : la restauration n'écrit que les
+d'un client supprimé), **3** (table `categories_produit`, remplie avec les cinq catégories de départ), **4** (table `lieux_vente`, remplie avec les quatre lieux de départ, et colonne `ventes.lieu_id` vide pour toutes les ventes existantes), **5** (tables `categories_note`, remplie avec les deux catégories de départ, et `notes`). Une sauvegarde d'un schéma plus ancien se restaure sans changement : la restauration n'écrit que les
 colonnes présentes dans l'archive (voir « Restaurer »).
 
 ## Produits et stock (étape 3)
@@ -511,6 +526,40 @@ différentes ne se confondent plus (test `test/data/flux_en_direct_test.dart`).
 - **Sauvegarde et exports.** `lieux_vente` est la 17e table de l'archive, placée **avant** `ventes` (`FormatSauvegarde.tables`) ;
   l'export CSV des ventes gagne une colonne « Lieu de vente » (le nom, « Non renseigné » si vide). Les statistiques par lieu viennent
   à une étape suivante : cette étape ne change aucun calcul.
+
+### Bloc-notes
+
+- **Une note** (`notes`) : un titre (obligatoire, 120 caractères au plus, espaces superflus retirés), un texte (facultatif ; seuls les
+  blancs du début et de la fin sont retirés, les retours à la ligne du milieu restent) et une catégorie (facultative). `creeLe` et
+  `modifieLe` viennent de la trace commune des tables ; **`modifieLe` n'est mis à jour que si quelque chose a changé** : ouvrir une note
+  puis enregistrer sans rien changer ne la fait pas remonter dans la liste. Les notes sont lues `modifieLe` décroissant, puis `id`
+  décroissant.
+- **Une vraie clé étrangère.** Contrairement aux catégories de produits et aux lieux (qui touchent une table existante), `notes` est une
+  table neuve : `notes.categorie_id` référence `categories_note.id` avec `ON DELETE RESTRICT`. Vide, il signifie « Sans catégorie »
+  (`libelleSansCategorieNote`). La base refuse donc elle-même de supprimer une catégorie qui a encore des notes ; le code
+  (`CategorieNoteRepository.supprimer`) déplace les notes **avant** de supprimer, dans la même transaction (tout ou rien).
+  Les index `idx_notes_categorie_id` et `idx_notes_modifie_le` sont créés avec la table (et en SQL dans la migration).
+- **Départ.** `AppDatabase.insererCategoriesNoteDeDepart()` crée « Futures commandes » et « Documents entreprise » (`INSERT OR IGNORE`,
+  par nom) à la création de la base, à la migration 4 → 5 et à la restauration d'une sauvegarde sans la table. Une base déjà au
+  schéma 5 ne les recrée jamais : une catégorie de départ supprimée ou renommée le reste.
+- **Règles du nom d'une catégorie** (`domain/notes.dart`) : non vide, 60 caractères au plus, espaces superflus retirés, pas deux
+  catégories de même nom (sans tenir compte des majuscules, des accents ni des espaces), et pas « Sans catégorie » (libellé d'une note
+  sans catégorie). La boîte de saisie est la même que pour les catégories de produits et les lieux (`core/widgets/dialogue_nom.dart`,
+  enveloppée par `demanderNomCategorieNote`) : un nom refusé reste affiché dans la boîte, avec son explication.
+- **Supprimer une catégorie.** Sans note : une confirmation. Avec des notes : une liste de destinations **sans choix par défaut** (les
+  autres catégories, et « Sans catégorie »), le bouton « Déplacer et supprimer » reste inactif tant qu'on n'a pas choisi ; le nombre de
+  notes est relu en base au moment de supprimer. Déplacer des notes ne change pas leur date de modification. Aucune note n'est jamais
+  supprimée par la suppression d'une catégorie. On peut supprimer toutes les catégories : les notes passent alors en « Sans catégorie ».
+- **Supprimer une note** est **définitif** (confirmation dans l'écran de la note) : il n'y a pas de corbeille.
+- **Trois notions à ne pas confondre** : le *lieu de vente* (où une vente a eu lieu), la *catégorie de produit* (le rangement du
+  catalogue) et la *catégorie de note* (le rangement du bloc-notes) sont trois listes indépendantes, avec chacune son écran.
+- **L'écran Bloc-notes** (`NotesScreen`) : filtres Toutes / chaque catégorie / Sans catégorie ; si la catégorie choisie comme filtre est
+  supprimée, la liste revient à « Toutes ». Le formulaire (`NoteFormScreen`) suit le modèle des autres formulaires : champs validés,
+  « Enregistrer » en haut, confirmation avant d'abandonner une saisie, catégorie choisie dans une feuille du bas qui propose aussi
+  « Nouvelle catégorie » (créée et choisie aussitôt).
+- **Sauvegarde et exports.** `categories_note` puis `notes` sont les deux dernières tables de l'archive (`FormatSauvegarde.tables`,
+  ordre des clés étrangères). Les notes ne font pas partie des exports CSV pour l'instant. Pièces jointes et recherche : étapes
+  suivantes du plan, rien n'est prévu dans cette étape.
 
 ## Clients (étape 4)
 
@@ -821,9 +870,9 @@ aux statistiques. Les chiffres clés portent des `Key` (`stat-ca`, `stat-marge`�
 
 Un `.zip` avec `donnees.json` et les fichiers. `donnees.json` contient un **manifeste** (`application`, `format` = version de
 l'organisation du fichier, `versionSchema` = `AppDatabase.versionSchema`, `versionApplication`, `creeLe`, `nombreFichiers`,
-`lignes` par table) puis `tables` : pour chacune des 17 tables, ses lignes lues par `SELECT * … ORDER BY id`, **telles que
+`lignes` par table) puis `tables` : pour chacune des 19 tables, ses lignes lues par `SELECT * … ORDER BY id`, **telles que
 SQLite les stocke** (dates en secondes, booléens 0/1, énumérations en texte). Rien n'est recalculé : une sauvegarde restaurée
-redonne exactement les mêmes lignes (un test le vérifie table par table). Les 17 lectures se font dans **une transaction** :
+redonne exactement les mêmes lignes (un test le vérifie table par table). Les 19 lectures se font dans **une transaction** :
 l'instantané est cohérent même si l'application écrit en même temps. Les fichiers sont rangés sous
 `fichiers/<dossier>/<nom>` (`photos_produits`, `factures`, `devis`) ; la base ne garde que des noms relatifs, ils retrouvent
 donc leur place.
@@ -956,6 +1005,12 @@ Le cahier des charges ne tranchait pas ces points ; voici ce qui a été retenu 
   migration 3 → 4, anciennes ventes « Non renseigné », lieux de départ non recréés), `service_sauvegarde_test` (ancienne archive sans lieux,
   aller-retour), `export_csv_test` (colonne « Lieu de vente ») et `lieux_ecrans_test` (écran Lieux de vente, choix dans le panier, création depuis
   la feuille, lieu supprimé pendant la vente, correction dans le détail d'une vente).
+- Bloc-notes : `domain/notes_test` (catégories de départ, règles du nom, du titre et du texte), `categorie_note_repository_test` (créer,
+  renommer, supprimer avec déplacement vers une catégorie ou « Sans catégorie », refus sans rien changer, dates des notes inchangées,
+  flux en direct), `note_repository_test` (créer, modifier, supprimer, ordre, date de modification seulement si quelque chose change),
+  `schema_test` et `migration_schema_test` (version 5, migration 4 → 5, anciennes bases sans notes, catégories de départ non recréées),
+  `service_sauvegarde_test` (aller-retour des catégories et des notes, archive d'avant le bloc-notes) et `notes_ecrans_test` (liste,
+  filtres, nouvelle note, modification, suppression, écran Catégories de notes, déplacement des notes à la suppression d'une catégorie).
 - Suppression d'un client ou d'un produit : `suppression_repository_test` (historique conservé, noms copiés, lignes détachées,
   inscriptions refusées), `migration_schema_test` (base du schéma 1 mise à jour sans perte), `service_sauvegarde_test`
   (archive du schéma 1), `export_csv_test` et `devis_repository_test` (client supprimé), `domain/usage_historique_test`.
@@ -998,7 +1053,7 @@ Sauvegarde et export (étape 11) : `csv_test` (protection des cellules, montants
 téléphone et sur le même, copie de sécurité qui permet de revenir en arrière, archives refusées sans rien changer, restauration
 annulée en cas de colonne inconnue / contrainte / liaison cassée, écrans prévenus, sauvegarde automatique et rotation, export
 JSON), `export_csv_test` (contenu de chaque fichier, archive, BOM) et `sauvegarde_ecran_test` (parcours de l'écran).
-`test/data/aide_donnees.dart` remplit **les 17 tables** et compare deux états de la base ligne à ligne.
+`test/data/aide_donnees.dart` remplit **les 19 tables** et compare deux états de la base ligne à ligne.
 
 Finitions (étape 12) : `photo_retrouvee_test` (la photo retrouvée est proposée par les formulaires des produits, des cours et
 des dépenses, utilisée une seule fois, oubliée quand une autre photo est choisie, ignorée si son fichier a disparu).

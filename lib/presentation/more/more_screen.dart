@@ -38,6 +38,12 @@ class MoreScreen extends StatelessWidget {
       Icons.insights_outlined,
       'Chiffre d’affaires, meilleures ventes, marge estimée, alerte de franchise de TVA.',
     ),
+    const _Entree(
+      AppRoutes.notes,
+      'Bloc-notes',
+      Icons.sticky_note_2_outlined,
+      'Futures commandes, documents de l’entreprise, idées : vos notes rangées par catégorie.',
+    ),
   ];
 
   @override

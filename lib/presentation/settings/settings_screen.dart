@@ -7,8 +7,8 @@ import '../../core/theme/theme_mode_provider.dart';
 import '../../core/widgets/app_logo.dart';
 import '../common/menu_tile.dart';
 
-/// Réglages : choix du thème (automatique / jour / nuit) et accès aux écrans « Mon entreprise », « Catégories » et
-/// « Sauvegarde et export ».
+/// Réglages : choix du thème (automatique / jour / nuit) et accès aux écrans « Mon entreprise », « Catégories »,
+/// « Lieux de vente », « Catégories de notes » et « Sauvegarde et export ».
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
@@ -92,6 +92,13 @@ class SettingsScreen extends ConsumerWidget {
                   titre: 'Lieux de vente',
                   description: 'Marché, salon, boutique, vente en ligne... : ajouter, renommer ou supprimer.',
                   route: AppRoutes.lieuxVente,
+                ),
+                Divider(indent: 56),
+                MenuTile(
+                  icone: Icons.label_outline,
+                  titre: 'Catégories de notes',
+                  description: 'Futures commandes, documents... : ajouter, renommer ou supprimer.',
+                  route: AppRoutes.categoriesNote,
                 ),
                 Divider(indent: 56),
                 MenuTile(

@@ -1,4 +1,4 @@
-/// Schéma de la base de données (SQLite, via Drift) : 17 tables.
+/// Schéma de la base de données (SQLite, via Drift) : 19 tables.
 ///
 /// Conventions (détail dans ARCHITECTURE.md) :
 /// - **Montants** : nombres entiers de centimes (`1250` = 12,50 €). Jamais de décimaux.
@@ -618,4 +618,50 @@ class Depenses extends Table with Tracabilite, Archivable {
   /// Produit concerné par la dépense, s'il y en a un.
   IntColumn get produitId =>
       integer().nullable().references(Produits, #id, onDelete: KeyAction.restrict)();
+}
+
+// -----------------------------------------------------------------------------
+// Bloc-notes
+// -----------------------------------------------------------------------------
+
+/// Catégorie de notes (« Futures commandes », « Documents entreprise », ou une catégorie à soi), créée et modifiée par
+/// l'utilisatrice. Deux catégories de départ sont créées avec la base (voir `categoriesNoteDeDepart`).
+///
+/// À ne pas confondre avec les catégories de produits (`categories_produit`) ni avec les lieux de vente (`lieux_vente`).
+@DataClassName('CategorieNote')
+class CategoriesNote extends Table with Tracabilite {
+  IntColumn get id => integer().autoIncrement()();
+
+  /// Nom affiché, modifiable.
+  TextColumn get nom => text().withLength(min: 1, max: 60).unique()();
+
+  /// Ordre d'affichage (croissant).
+  IntColumn get position => integer().withDefault(const Constant(0))();
+
+  @override
+  List<String> get customConstraints => ['CHECK (length(trim(nom)) > 0)'];
+}
+
+/// Une note du bloc-notes : un titre, un texte, et une catégorie (vide = « Sans catégorie »).
+///
+/// Une note enregistre l'**identifiant** de sa catégorie, jamais son nom : renommer une catégorie ne touche à aucune
+/// note. Clé étrangère `RESTRICT` : la base refuse de supprimer une catégorie qui a encore des notes ;
+/// `CategorieNoteRepository` les déplace d'abord (vers une autre catégorie, ou « Sans catégorie »).
+@DataClassName('Note')
+@TableIndex(name: 'idx_notes_categorie_id', columns: {#categorieId})
+@TableIndex(name: 'idx_notes_modifie_le', columns: {#modifieLe})
+class Notes extends Table with Tracabilite {
+  IntColumn get id => integer().autoIncrement()();
+
+  TextColumn get titre => text().withLength(min: 1, max: 120)();
+
+  /// Le texte de la note (peut être vide : une note peut n'avoir qu'un titre).
+  TextColumn get contenu => text().withDefault(const Constant(''))();
+
+  /// Catégorie de la note ; vide = « Sans catégorie ».
+  IntColumn get categorieId =>
+      integer().nullable().references(CategoriesNote, #id, onDelete: KeyAction.restrict)();
+
+  @override
+  List<String> get customConstraints => ['CHECK (length(trim(titre)) > 0)'];
 }

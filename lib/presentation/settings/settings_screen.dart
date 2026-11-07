@@ -88,6 +88,13 @@ class SettingsScreen extends ConsumerWidget {
                 ),
                 Divider(indent: 56),
                 MenuTile(
+                  icone: Icons.place_outlined,
+                  titre: 'Lieux de vente',
+                  description: 'Marché, salon, boutique, vente en ligne... : ajouter, renommer ou supprimer.',
+                  route: AppRoutes.lieuxVente,
+                ),
+                Divider(indent: 56),
+                MenuTile(
                   icone: Icons.backup_outlined,
                   titre: 'Sauvegarde et export',
                   description: 'Sauvegarder, exporter et restaurer vos données.',

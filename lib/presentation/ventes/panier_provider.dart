@@ -7,24 +7,32 @@ import '../../domain/calculs/stock.dart';
 import '../../domain/enums.dart';
 import '../../domain/erreurs.dart';
 
-/// La vente en cours de préparation : le panier et le client choisi.
+/// La vente en cours de préparation : le panier, le client et le lieu choisis.
 /// Immuable : chaque modification crée un nouvel état.
 class VenteEnCours {
-  const VenteEnCours({this.panier = const Panier(), this.client, this.notes = ''});
+  const VenteEnCours({this.panier = const Panier(), this.client, this.lieuId, this.notes = ''});
 
   final Panier panier;
 
   /// `null` = « client de passage » (vente rapide, sans fiche).
   final Client? client;
 
+  /// Identifiant du lieu de vente choisi ; `null` = « Non renseigné ».
+  final int? lieuId;
+
   /// Note facultative saisie dans le panier.
   final String notes;
 
-  VenteEnCours avecPanier(Panier nouveau) => VenteEnCours(panier: nouveau, client: client, notes: notes);
+  VenteEnCours avecPanier(Panier nouveau) =>
+      VenteEnCours(panier: nouveau, client: client, lieuId: lieuId, notes: notes);
 
-  VenteEnCours avecClient(Client? nouveau) => VenteEnCours(panier: panier, client: nouveau, notes: notes);
+  VenteEnCours avecClient(Client? nouveau) =>
+      VenteEnCours(panier: panier, client: nouveau, lieuId: lieuId, notes: notes);
 
-  VenteEnCours avecNotes(String nouvelles) => VenteEnCours(panier: panier, client: client, notes: nouvelles);
+  VenteEnCours avecLieu(int? nouveau) => VenteEnCours(panier: panier, client: client, lieuId: nouveau, notes: notes);
+
+  VenteEnCours avecNotes(String nouvelles) =>
+      VenteEnCours(panier: panier, client: client, lieuId: lieuId, notes: nouvelles);
 }
 
 /// Panier de la vente en cours. Il est conservé tant que l'application est ouverte : on peut
@@ -96,6 +104,9 @@ class VenteEnCoursNotifier extends Notifier<VenteEnCours> {
 
   /// `null` = client de passage.
   void choisirClient(Client? client) => state = state.avecClient(client);
+
+  /// `null` = « Non renseigné ».
+  void choisirLieu(int? lieuId) => state = state.avecLieu(lieuId);
 
   void definirNotes(String notes) => state = state.avecNotes(notes);
 

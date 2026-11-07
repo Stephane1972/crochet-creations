@@ -14,6 +14,7 @@ import '../../data/repositories/vente_vues.dart';
 import '../../domain/enums.dart';
 import '../../domain/erreurs.dart';
 import '../entreprise/profil_incomplet.dart';
+import '../lieux/choix_lieu.dart';
 import '../shell/nav_provider.dart';
 import 'recap_widgets.dart';
 import 'ventes_providers.dart';
@@ -54,6 +55,14 @@ class _VenteConfirmationScreenState extends ConsumerState<VenteConfirmationScree
           .read(venteRepositoryProvider)
           .encaisser(venteId: widget.venteId, mode: saisie.mode, montantCentimes: saisie.montantCentimes);
       if (mounted) afficherMessage(context, 'Paiement enregistré.');
+    });
+  }
+
+  /// Précise ou corrige le lieu de la vente : rien d'autre n'est modifié (ni montants, ni stock, ni facture).
+  Future<void> _changerLieu(int? lieuId) async {
+    await _executer(() async {
+      await ref.read(venteRepositoryProvider).changerLieu(widget.venteId, lieuId);
+      if (mounted) afficherMessage(context, lieuId == null ? 'Lieu retiré : « Non renseigné ».' : 'Lieu enregistré.');
     });
   }
 
@@ -141,6 +150,7 @@ class _VenteConfirmationScreenState extends ConsumerState<VenteConfirmationScree
           return _Contenu(
             detail: d,
             onEncaisser: () => _encaisser(d),
+            onChangerLieu: _changerLieu,
             onAnnuler: () => _annuler(d),
             onNouvelleVente: _nouvelleVente,
             creationFactureEnCours: _creationFacture,
@@ -157,6 +167,7 @@ class _Contenu extends StatelessWidget {
   const _Contenu({
     required this.detail,
     required this.onEncaisser,
+    required this.onChangerLieu,
     required this.onAnnuler,
     required this.onNouvelleVente,
     required this.creationFactureEnCours,
@@ -166,6 +177,7 @@ class _Contenu extends StatelessWidget {
 
   final VenteDetail detail;
   final VoidCallback onEncaisser;
+  final void Function(int? lieuId) onChangerLieu;
   final VoidCallback onAnnuler;
   final VoidCallback onNouvelleVente;
   final bool creationFactureEnCours;
@@ -210,6 +222,9 @@ class _Contenu extends StatelessWidget {
         const SizedBox(height: 10),
         Align(alignment: Alignment.centerLeft, child: _EtiquettePaiement(detail: detail)),
         const SizedBox(height: 16),
+        // Le lieu se précise ou se corrige à tout moment, même sur une vente annulée : c'est un simple classement.
+        LigneChoixLieu(lieu: detail.lieu, onChoisi: onChangerLieu),
+        const SizedBox(height: 12),
         CarteRubrique(
           titre: 'Articles',
           child: Column(

@@ -4,6 +4,7 @@ import 'package:drift_flutter/drift_flutter.dart';
 import '../../core/constants/app_constants.dart';
 import '../../domain/categories_produit.dart';
 import '../../domain/enums.dart';
+import '../../domain/lieux_vente.dart';
 import 'tables.dart';
 
 // Fichier généré par `dart run build_runner build` (la CI le fait automatiquement).
@@ -20,6 +21,7 @@ part 'app_database.g.dart';
     VariantesProduit,
     PhotosProduit,
     Clients,
+    LieuxVente,
     Ventes,
     LignesVente,
     Paiements,
@@ -39,7 +41,7 @@ class AppDatabase extends _$AppDatabase {
 
   /// Version du schéma. **À augmenter à chaque modification de `tables.dart`**,
   /// avec l'étape de migration correspondante dans [migration] (voir ARCHITECTURE.md).
-  static const int versionSchema = 3;
+  static const int versionSchema = 4;
 
   @override
   int get schemaVersion => versionSchema;
@@ -56,12 +58,24 @@ class AppDatabase extends _$AppDatabase {
     }
   }
 
+  /// Crée les quatre lieux de vente de départ (celui qui existe déjà, par nom, est laissé tel quel).
+  /// Sert à la première installation, à la mise à jour vers le schéma 4 et à la restauration d'une sauvegarde ancienne.
+  Future<void> insererLieuxDeDepart() async {
+    for (int i = 0; i < lieuxDeDepart.length; i++) {
+      await into(lieuxVente).insert(
+        LieuxVenteCompanion.insert(nom: lieuxDeDepart[i].nom, position: Value(i)),
+        mode: InsertMode.insertOrIgnore,
+      );
+    }
+  }
+
   @override
   MigrationStrategy get migration => MigrationStrategy(
     // Première installation : création de toutes les tables et index.
     onCreate: (Migrator m) async {
       await m.createAll();
       await insererCategoriesDeDepart();
+      await insererLieuxDeDepart();
     },
 
     // Mise à jour de l'application avec un schéma plus récent.
@@ -81,6 +95,14 @@ class AppDatabase extends _$AppDatabase {
       if (from < 3) {
         await m.createTable(categoriesProduit);
         await insererCategoriesDeDepart();
+      }
+      // Version 4 : les lieux de vente. Toutes les ventes existantes gardent `lieu_id` vide : « Non renseigné ».
+      // L'index est créé en SQL pour ne pas dépendre du nom que Drift donne à l'objet généré.
+      if (from < 4) {
+        await m.createTable(lieuxVente);
+        await m.addColumn(ventes, ventes.lieuId);
+        await customStatement('CREATE INDEX IF NOT EXISTS idx_ventes_lieu_id ON ventes (lieu_id)');
+        await insererLieuxDeDepart();
       }
     },
 

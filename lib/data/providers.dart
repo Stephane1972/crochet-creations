@@ -14,6 +14,7 @@ import 'repositories/cours_repository.dart';
 import 'repositories/depense_repository.dart';
 import 'repositories/devis_repository.dart';
 import 'repositories/facture_repository.dart';
+import 'repositories/lieu_vente_repository.dart';
 import 'repositories/numerotation_repository.dart';
 import 'repositories/parametres_repository.dart';
 import 'repositories/produit_repository.dart';
@@ -51,6 +52,10 @@ final produitRepositoryProvider = Provider<ProduitRepository>(
 
 final categorieRepositoryProvider = Provider<CategorieRepository>(
   (ref) => CategorieRepository(ref.watch(appDatabaseProvider)),
+);
+
+final lieuVenteRepositoryProvider = Provider<LieuVenteRepository>(
+  (ref) => LieuVenteRepository(ref.watch(appDatabaseProvider)),
 );
 
 final clientRepositoryProvider = Provider<ClientRepository>(

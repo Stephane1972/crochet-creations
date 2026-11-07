@@ -342,6 +342,8 @@ class ServiceSauvegarde {
       fichiers: fichiers,
       // Une sauvegarde du schéma 1 ou 2 n'a pas de catégories : les produits y portent les clés des cinq de départ.
       sansCategories: tablesBrutes['categories_produit'] == null,
+      // Une sauvegarde d'avant le schéma 4 n'a pas de lieux de vente : ses ventes sont « Non renseigné ».
+      sansLieux: tablesBrutes['lieux_vente'] == null,
     );
   }
 
@@ -413,6 +415,9 @@ class ServiceSauvegarde {
 
       // Une sauvegarde faite avant les catégories modifiables : on recrée les cinq catégories de départ.
       if (contenu.sansCategories) await _base.insererCategoriesDeDepart();
+
+      // Une sauvegarde faite avant les lieux de vente : on crée les lieux de départ (les ventes restent « Non renseigné »).
+      if (contenu.sansLieux) await _base.insererLieuxDeDepart();
     });
   }
 
@@ -530,6 +535,7 @@ class _Contenu {
     required this.tables,
     required this.fichiers,
     required this.sansCategories,
+    required this.sansLieux,
   });
 
   final ManifesteSauvegarde manifeste;
@@ -538,6 +544,9 @@ class _Contenu {
 
   /// L'archive ne contient pas la table des catégories (sauvegarde d'un schéma antérieur au 3).
   final bool sansCategories;
+
+  /// L'archive ne contient pas la table des lieux de vente (sauvegarde d'un schéma antérieur au 4).
+  final bool sansLieux;
 }
 
 class _FichierArchive {

@@ -6,6 +6,7 @@ import 'package:archive/archive.dart' show Archive, ArchiveFile, ZipDecoder, Zip
 import 'package:crochet_creations/data/database/app_database.dart';
 import 'package:crochet_creations/data/repositories/categorie_repository.dart';
 import 'package:crochet_creations/data/repositories/client_repository.dart';
+import 'package:crochet_creations/data/repositories/lieu_vente_repository.dart';
 import 'package:crochet_creations/data/sauvegarde/format_sauvegarde.dart';
 import 'package:crochet_creations/data/sauvegarde/service_sauvegarde.dart';
 import 'package:crochet_creations/domain/categories_produit.dart';
@@ -368,7 +369,7 @@ void main() {
       expect(await banc.contenuDe(banc.photos), containsPair('photo_3.jpg', 'photo 3'));
     });
 
-    test('une sauvegarde faite avec le schéma 1 (sans « client_nom » ni catégories) est restaurée telle quelle', () async {
+    test('une sauvegarde faite avec le schéma 1 (sans « client_nom », catégories ni lieux) est restaurée telle quelle', () async {
       await remplirBase(banc.db);
       await banc.ecrireFichiers();
       final Uint8List actuelle = await banc.service.fabriquerArchive();
@@ -379,10 +380,14 @@ void main() {
         (d['manifeste'] as Map<String, dynamic>)['versionSchema'] = 1;
         final Map<String, dynamic> tables = d['tables'] as Map<String, dynamic>;
         tables.remove('categories_produit');
+        tables.remove('lieux_vente');
         for (final String table in <String>['ventes', 'devis']) {
           for (final dynamic ligne in tables[table] as List<dynamic>) {
             (ligne as Map<String, dynamic>).remove('client_nom');
           }
+        }
+        for (final dynamic ligne in tables['ventes'] as List<dynamic>) {
+          (ligne as Map<String, dynamic>).remove('lieu_id');
         }
       });
 
@@ -391,11 +396,22 @@ void main() {
       await banc.service.restaurer(ancienne);
 
       // Tout revient à l'identique ; les catégories, absentes de l'archive, sont recréées (les cinq de départ).
+      // Les lieux de départ sont recréés, et la vente, qui n'avait pas de lieu dans l'archive, est « Non renseigné ».
       final Map<String, List<Map<String, Object?>>> apres = await instantane(banc.db);
       expect(apres.remove('categories_produit'), hasLength(5));
       avant.remove('categories_produit');
+      expect(apres.remove('lieux_vente'), hasLength(4));
+      avant.remove('lieux_vente');
+      for (final Map<String, Object?> vente in avant['ventes']!) {
+        vente['lieu_id'] = null;
+      }
       expect(apres, avant);
       expect((await banc.db.select(banc.db.ventes).get()).every((Vente v) => v.clientNom == null), isTrue);
+      expect((await banc.db.select(banc.db.ventes).get()).every((Vente v) => v.lieuId == null), isTrue);
+      expect(
+        (await LieuVenteRepository(banc.db).lister()).map((LieuVente l) => l.nom),
+        <String>['Marché', 'Salon', 'Boutique', 'Vente en ligne'],
+      );
       final List<CategorieProduit> categories = await CategorieRepository(banc.db).lister();
       expect(categories.map((CategorieProduit c) => c.cle), <String>[
         CleCategorie.crochet,
@@ -434,6 +450,34 @@ void main() {
         'Peluches',
       ]);
       expect((await autre.db.select(autre.db.produits).get()).every((Produit p) => p.categorie == peluches.cle), isTrue);
+    });
+
+    test('les lieux créés, renommés ou supprimés, et le lieu de chaque vente, font partie de la sauvegarde', () async {
+      await remplirBase(banc.db);
+      final LieuVenteRepository lieux = LieuVenteRepository(banc.db);
+      final LieuVente fete = await lieux.creer('Fête du village');
+      final LieuVente marche = (await lieux.lister()).firstWhere((LieuVente l) => l.nom == 'Marché');
+      await lieux.renommer(marche.id, 'Marché du samedi');
+      final LieuVente salon = (await lieux.lister()).firstWhere((LieuVente l) => l.nom == 'Salon');
+      await lieux.supprimer(salon.id);
+      await (banc.db.update(banc.db.ventes)).write(VentesCompanion(lieuId: Value(fete.id)));
+      final Uint8List archive = await banc.service.fabriquerArchive();
+      final Map<String, List<Map<String, Object?>>> avant = await instantane(banc.db);
+
+      final _Banc autre = await _Banc.creer();
+      addTearDown(autre.fermer);
+      await autre.service.restaurer(archive);
+
+      expect(await instantane(autre.db), avant);
+      final LieuVenteRepository restaures = LieuVenteRepository(autre.db);
+      expect((await restaures.lister()).map((LieuVente l) => l.nom), <String>[
+        'Marché du samedi',
+        'Boutique',
+        'Vente en ligne',
+        'Fête du village',
+      ]);
+      expect((await autre.db.select(autre.db.ventes).get()).every((Vente v) => v.lieuId == fete.id), isTrue);
+      expect(await restaures.nombreVentes(fete.id), 1);
     });
 
     test('une sauvegarde faite après la suppression d’un client garde le nom copié', () async {

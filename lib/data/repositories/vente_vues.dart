@@ -1,13 +1,14 @@
 import '../../domain/enums.dart';
 import '../database/app_database.dart';
 
-/// Tout ce qu'affiche le détail d'une vente : lignes, client, paiements.
+/// Tout ce qu'affiche le détail d'une vente : lignes, client, lieu, paiements.
 class VenteDetail {
   const VenteDetail({
     required this.vente,
     required this.lignes,
     required this.paiements,
     this.client,
+    this.lieu,
     this.factures = const <Facture>[],
   });
 
@@ -21,6 +22,9 @@ class VenteDetail {
 
   /// `null` pour un client de passage.
   final Client? client;
+
+  /// Le lieu de la vente ; `null` = « Non renseigné » (aussi si le lieu n'existe plus, ce qui ne devrait pas arriver).
+  final LieuVente? lieu;
 
   /// Factures établies pour cette vente, la plus récente d'abord (les annulées comprises).
   final List<Facture> factures;

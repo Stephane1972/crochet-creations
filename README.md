@@ -99,6 +99,24 @@ Le développement se fait en 12 étapes validées une par une (détail dans [ROA
 - Le schéma de la base passe en **version 4** (table `lieux_vente`, colonne `ventes.lieu_id`, migration automatique) ; les
   anciennes sauvegardes se restaurent normalement.
 
+### Bloc-notes (après l'étape 12)
+
+- **Un bloc-notes** (*Plus → Bloc-notes*) : des notes avec un **titre** (obligatoire), un **texte** (facultatif) et une
+  **catégorie** (facultative). La note modifiée en dernier est en haut de la liste.
+- **Deux catégories au départ** : **Futures commandes** et **Documents entreprise** ; vous créez les vôtres. Une note sans
+  catégorie est rangée dans **« Sans catégorie »**. En haut de la liste, des **filtres** : Toutes, chaque catégorie, Sans catégorie.
+- **Écrire une note** : bouton **Nouvelle note**, puis titre, catégorie (**+ Nouvelle catégorie** la crée et la choisit tout de
+  suite) et texte, puis **Enregistrer**. Appuyer sur une note l'ouvre pour la modifier ; son menu **Plus d'actions** la **supprime**
+  (après confirmation, définitivement).
+- **Écran « Catégories de notes »** (*Plus → Réglages → Catégories de notes*, ou l'icône d'étiquette du bloc-notes) : la liste avec
+  le nombre de notes de chaque catégorie, **Nouvelle catégorie**, **Renommer** et **Supprimer**. Une catégorie qui a des notes ne
+  se supprime qu'en choisissant **où les déplacer** (une autre catégorie, ou « Sans catégorie ») : aucune note n'est jamais supprimée.
+- Deux catégories ne peuvent pas porter le même nom (sans tenir compte des majuscules, des accents ni des espaces) ; 60 caractères
+  au plus ; « Sans catégorie » est réservé.
+- Les **pièces jointes** (photos, vidéos, documents) viendront à l'étape 4 du plan.
+- Le schéma de la base passe en **version 5** (tables `categories_note` et `notes`, migration automatique) ; la **sauvegarde**
+  contient aussi le bloc-notes, et les anciennes sauvegardes se restaurent normalement.
+
 ### Ce que contient l'étape 11 : sauvegarde et export
 
 - **Écran « Sauvegarde et export »** (écran 23, *Plus → Réglages → Sauvegarde et export*) : sauvegarder, partager, restaurer

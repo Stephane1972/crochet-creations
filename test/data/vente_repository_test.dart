@@ -4,6 +4,7 @@ import 'package:crochet_creations/core/utils/money.dart';
 import 'package:crochet_creations/data/database/app_database.dart';
 import 'package:crochet_creations/data/repositories/client_repository.dart';
 import 'package:crochet_creations/data/repositories/client_vues.dart';
+import 'package:crochet_creations/data/repositories/lieu_vente_repository.dart';
 import 'package:crochet_creations/data/repositories/numerotation_repository.dart';
 import 'package:crochet_creations/data/repositories/produit_repository.dart';
 import 'package:crochet_creations/data/repositories/vente_repository.dart';
@@ -516,6 +517,119 @@ void main() {
       await ventes.encaisser(venteId: v.id, mode: ModePaiement.cheque, montantCentimes: 1000);
       await prochain.future.timeout(const Duration(seconds: 5));
       expect(encaisse.last, 1000);
+
+      await abonnement.cancel();
+    });
+  });
+
+  group('lieu de vente', () {
+    late LieuVenteRepository lieux;
+    late LieuVente marche;
+    late LieuVente salon;
+
+    setUp(() async {
+      lieux = LieuVenteRepository(db);
+      final List<LieuVente> tous = await lieux.lister();
+      marche = tous.firstWhere((LieuVente l) => l.nom == 'Marché');
+      salon = tous.firstWhere((LieuVente l) => l.nom == 'Salon');
+    });
+
+    test('une vente sans lieu est « Non renseigné » : lieu_id vide, pas de lieu dans le détail', () async {
+      final Produit p = await produits.creer(doudou);
+      final Vente v = await ventes.valider(panier: panierDe(p));
+      expect(v.lieuId, isNull);
+      expect((await ventes.detail(v.id))!.lieu, isNull);
+    });
+
+    test('une vente enregistre son lieu, et le détail le restitue', () async {
+      final Produit p = await produits.creer(doudou);
+      final Vente v = await ventes.valider(lieuId: marche.id, panier: panierDe(p));
+      expect(v.lieuId, marche.id);
+      expect((await ventes.detail(v.id))!.lieu!.nom, 'Marché');
+    });
+
+    test('un lieu inexistant est refusé et la vente n’est pas enregistrée (le stock non plus ne bouge pas)', () async {
+      final Produit p = await produits.creer(doudou);
+      await expectLater(
+        ventes.valider(lieuId: 999, panier: panierDe(p)),
+        throwsA(isA<ElementIntrouvable>()),
+      );
+      expect(await nombreDeVentes(), 0);
+      expect(await stockDe(p.id), 5);
+    });
+
+    test('changerLieu précise puis corrige le lieu, sans toucher à rien d’autre', () async {
+      final Produit p = await produits.creer(doudou);
+      final Vente v = await ventes.valider(
+        panier: panierDe(p, quantite: 2),
+        paiement: const PaiementSaisi(mode: ModePaiement.carte, montantCentimes: 1000),
+      );
+      final VenteDetail avant = (await ventes.detail(v.id))!;
+
+      await ventes.changerLieu(v.id, marche.id);
+      expect((await ventes.obtenir(v.id))!.lieuId, marche.id);
+      await ventes.changerLieu(v.id, salon.id);
+      expect((await ventes.detail(v.id))!.lieu!.nom, 'Salon');
+      await ventes.changerLieu(v.id, null);
+      expect((await ventes.detail(v.id))!.lieu, isNull);
+
+      final VenteDetail apres = (await ventes.detail(v.id))!;
+      expect(apres.vente.totalCentimes, avant.vente.totalCentimes);
+      expect(apres.vente.statutPaiement, avant.vente.statutPaiement);
+      expect(apres.paiements, hasLength(avant.paiements.length));
+      expect(apres.lignes, hasLength(avant.lignes.length));
+      expect(await stockDe(p.id), 3);
+    });
+
+    test('changerLieu fonctionne aussi sur une vente annulée (simple classement)', () async {
+      final Produit p = await produits.creer(doudou);
+      final Vente v = await ventes.valider(panier: panierDe(p));
+      await ventes.annuler(v.id);
+      await ventes.changerLieu(v.id, marche.id);
+      expect((await ventes.detail(v.id))!.lieu!.nom, 'Marché');
+      expect((await ventes.detail(v.id))!.estAnnulee, isTrue);
+    });
+
+    test('changerLieu refuse une vente ou un lieu inconnu, sans rien modifier', () async {
+      final Produit p = await produits.creer(doudou);
+      final Vente v = await ventes.valider(lieuId: marche.id, panier: panierDe(p));
+      await expectLater(ventes.changerLieu(999, marche.id), throwsA(isA<ElementIntrouvable>()));
+      await expectLater(ventes.changerLieu(v.id, 999), throwsA(isA<ElementIntrouvable>()));
+      expect((await ventes.obtenir(v.id))!.lieuId, marche.id);
+    });
+
+    test('une vente qui a une facture garde son lieu : le lieu est celui de la vente, jamais de la facture', () async {
+      final Produit p = await produits.creer(doudou);
+      final Vente v = await ventes.valider(lieuId: marche.id, panier: panierDe(p));
+      await ventes.changerLieu(v.id, salon.id);
+      // Aucune colonne « lieu » côté factures : l'argent d'une vente n'est jamais compté deux fois, par lieu.
+      final colonnes = await db.customSelect('PRAGMA table_info("factures")').get();
+      expect(colonnes.map((r) => r.read<String>('name')), isNot(contains('lieu_id')));
+      expect((await ventes.obtenir(v.id))!.lieuId, salon.id);
+    });
+
+    test('le détail suit le changement de lieu en direct', () async {
+      final Produit p = await produits.creer(doudou);
+      final Vente v = await ventes.valider(panier: panierDe(p));
+
+      final List<String?> noms = <String?>[];
+      Completer<void> prochain = Completer<void>();
+      final StreamSubscription<VenteDetail?> abonnement = ventes.observerDetail(v.id).listen((VenteDetail? d) {
+        noms.add(d!.lieu?.nom);
+        if (!prochain.isCompleted) prochain.complete();
+      });
+      await prochain.future.timeout(const Duration(seconds: 5));
+      expect(noms, <String?>[null]);
+
+      prochain = Completer<void>();
+      await ventes.changerLieu(v.id, marche.id);
+      await prochain.future.timeout(const Duration(seconds: 5));
+      expect(noms.last, 'Marché');
+
+      prochain = Completer<void>();
+      await lieux.renommer(marche.id, 'Marché du samedi');
+      await prochain.future.timeout(const Duration(seconds: 5));
+      expect(noms.last, 'Marché du samedi');
 
       await abonnement.cancel();
     });

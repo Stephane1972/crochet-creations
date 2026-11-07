@@ -97,6 +97,9 @@ Future<void> remplirBase(AppDatabase db) async {
         ),
       );
 
+  // Un lieu de départ (« Marché ») : la vente de la boutique y est rattachée.
+  final int lieuId = (await (db.select(db.lieuxVente)..where((t) => t.nom.equals('Marché'))).getSingle()).id;
+
   final int venteId = await db
       .into(db.ventes)
       .insert(
@@ -104,6 +107,7 @@ Future<void> remplirBase(AppDatabase db) async {
           sousTotalCentimes: 5000,
           totalCentimes: 5000,
           clientId: Value(clientId),
+          lieuId: Value(lieuId),
           dateVente: Value(DateTime(2026, 10, 20, 14, 30)),
           statutPaiement: const Value(StatutPaiement.payee),
         ),

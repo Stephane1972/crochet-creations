@@ -13,6 +13,7 @@ import 'package:crochet_creations/data/repositories/cours_vues.dart';
 import 'package:crochet_creations/data/repositories/depense_repository.dart';
 import 'package:crochet_creations/data/repositories/devis_repository.dart';
 import 'package:crochet_creations/data/repositories/facture_repository.dart';
+import 'package:crochet_creations/data/repositories/lieu_vente_repository.dart';
 import 'package:crochet_creations/data/repositories/numerotation_repository.dart';
 import 'package:crochet_creations/data/repositories/parametres_repository.dart';
 import 'package:crochet_creations/data/repositories/produit_repository.dart';
@@ -150,6 +151,7 @@ class EnvironnementTest {
   final ProduitRepository produits;
   final ClientRepository clients;
   late final CategorieRepository categories = CategorieRepository(db);
+  late final LieuVenteRepository lieux = LieuVenteRepository(db);
   late final VenteRepository ventes = VenteRepository(db, produits);
   late final CoursRepository cours = CoursRepository(db, ventes);
   late final DepenseRepository depenses = DepenseRepository(db);
@@ -396,12 +398,14 @@ class EnvironnementTest {
     required Produit produit,
     int quantite = 1,
     int? clientId,
+    int? lieuId,
     ModePaiement? paiement,
   }) {
     return travailler(
       tester,
       () => ventes.valider(
         clientId: clientId,
+        lieuId: lieuId,
         panier: const Panier().ajouter(
           produitId: produit.id,
           designation: produit.nom,

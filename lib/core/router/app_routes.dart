@@ -56,6 +56,7 @@ abstract final class AppRoutes {
   static const String monEntreprise = '/reglages/entreprise';
   static const String sauvegarde = '/reglages/sauvegarde';
   static const String categories = '/reglages/categories';
+  static const String lieuxVente = '/reglages/lieux-de-vente';
 }
 
 /// Ce que reçoit l'écran d'inscription à un cours : le cours, et (pour confirmer une personne en liste d'attente)

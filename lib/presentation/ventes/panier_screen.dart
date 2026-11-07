@@ -15,6 +15,7 @@ import 'panier_provider.dart';
 import 'recap_widgets.dart';
 import 'saisie_paiement.dart';
 import 'selecteur_client.dart';
+import 'selecteur_lieu.dart';
 
 /// Panier et récapitulatif (écran 9) : articles et quantités, remise, frais de port, paiement,
 /// puis validation de la vente.
@@ -128,10 +129,16 @@ class _PanierScreenState extends ConsumerState<PanierScreen> {
 
     setState(() => _enCours = true);
     try {
+      // Un lieu supprimé entre-temps (depuis les Réglages) ne bloque pas la vente : elle passe en « Non renseigné ».
+      final int? lieuChoisi = vente.lieuId;
+      final int? lieuId = lieuChoisi == null
+          ? null
+          : (await ref.read(lieuVenteRepositoryProvider).obtenir(lieuChoisi))?.id;
       final Vente validee = await ref
           .read(venteRepositoryProvider)
           .valider(
             clientId: vente.client?.id,
+            lieuId: lieuId,
             panier: vente.panier,
             paiement: paiement,
             notes: vente.notes,
@@ -174,6 +181,8 @@ class _PanierScreenState extends ConsumerState<PanierScreen> {
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: <Widget>[
           const SelecteurClient(),
+          const SizedBox(height: 8),
+          const SelecteurLieu(),
           const SizedBox(height: 16),
           Text('Articles', style: theme.textTheme.titleMedium),
           const SizedBox(height: 8),

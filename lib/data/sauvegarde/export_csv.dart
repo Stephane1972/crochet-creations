@@ -6,6 +6,7 @@ import 'package:archive/archive.dart' show Archive, ArchiveFile, ZipEncoder;
 
 import '../../core/utils/date_fr.dart';
 import '../../domain/csv.dart';
+import '../../domain/lieux_vente.dart';
 import '../database/app_database.dart';
 import '../repositories/client_vues.dart' show nomClientOuCopie;
 import '../repositories/produit_vues.dart' show nomClientAffiche;
@@ -188,6 +189,9 @@ class ExportCsv {
       return parDate != 0 ? parDate : a.id.compareTo(b.id);
     });
     final Map<int, String> noms = await _nomsClients();
+    final Map<int, String> lieux = <int, String>{
+      for (final LieuVente l in await _base.select(_base.lieuxVente).get()) l.id: l.nom,
+    };
 
     final List<LigneVente> lignes = await _base.select(_base.lignesVente).get();
     lignes.sort((LigneVente a, LigneVente b) {
@@ -209,6 +213,7 @@ class ExportCsv {
         'N° de vente',
         'Date',
         'Client',
+        'Lieu de vente',
         'Statut',
         'Paiement',
         'Articles',
@@ -225,6 +230,7 @@ class ExportCsv {
             '${v.id}',
             _date(v.dateVente),
             _clientOuPassage(noms, v.clientId, v.clientNom),
+            lieux[v.lieuId] ?? libelleLieuNonRenseigne,
             v.statut.libelle,
             v.statutPaiement.libelle,
             (articlesDe[v.id] ?? const <String>[]).join(' ; '),

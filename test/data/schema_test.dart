@@ -34,7 +34,7 @@ void main() {
   );
 
   group('structure', () {
-    test('les 16 tables du schéma existent', () async {
+    test('les 17 tables du schéma existent', () async {
       final List<String> tables = (await noms(
         'table',
       )).where((n) => !n.startsWith('sqlite_')).toList();
@@ -46,6 +46,7 @@ void main() {
         'devis',
         'factures',
         'inscriptions_cours',
+        'lieux_vente',
         'lignes_devis',
         'lignes_vente',
         'numerotation_documents',
@@ -69,6 +70,7 @@ void main() {
           'idx_clients_telephone',
           'idx_ventes_date_vente',
           'idx_ventes_client_id',
+          'idx_ventes_lieu_id',
           'idx_lignes_vente_vente_id',
           'idx_paiements_vente_id',
           'idx_factures_date_emission',
@@ -84,7 +86,27 @@ void main() {
     test('la version du schéma est enregistrée dans le fichier', () async {
       final row = await db.customSelect('PRAGMA user_version').getSingle();
       expect(row.read<int>('user_version'), AppDatabase.versionSchema);
-      expect(AppDatabase.versionSchema, 3);
+      expect(AppDatabase.versionSchema, 4);
+    });
+
+    test('les quatre lieux de vente de départ existent dès la création, dans l’ordre', () async {
+      final List<LieuVente> lieux = await (db.select(
+        db.lieuxVente,
+      )..orderBy([(t) => OrderingTerm.asc(t.position)])).get();
+      expect(lieux.map((LieuVente l) => l.nom), <String>['Marché', 'Salon', 'Boutique', 'Vente en ligne']);
+    });
+
+    test('une vente a une colonne « lieu_id », vide par défaut (« Non renseigné »)', () async {
+      final colonnes = await db.customSelect('PRAGMA table_info("ventes")').get();
+      final lieu = colonnes.firstWhere((r) => r.read<String>('name') == 'lieu_id');
+      expect(lieu.read<int>('notnull'), 0);
+      await venteBrute();
+      expect((await db.select(db.ventes).get()).single.lieuId, isNull);
+    });
+
+    test('deux lieux ne peuvent pas porter le même nom, et un nom vide est refusé', () async {
+      await expectLater(sql("INSERT INTO lieux_vente (nom) VALUES ('Marché')"), throwsA(anything));
+      await expectLater(sql("INSERT INTO lieux_vente (nom) VALUES ('   ')"), throwsA(anything));
     });
 
     test('ventes et devis ont une colonne pour le nom d’un client supprimé', () async {

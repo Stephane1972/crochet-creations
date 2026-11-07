@@ -1,4 +1,4 @@
-/// Schéma de la base de données (SQLite, via Drift) : 16 tables.
+/// Schéma de la base de données (SQLite, via Drift) : 17 tables.
 ///
 /// Conventions (détail dans ARCHITECTURE.md) :
 /// - **Montants** : nombres entiers de centimes (`1250` = 12,50 €). Jamais de décimaux.
@@ -263,12 +263,35 @@ class Clients extends Table with Tracabilite, Archivable {
 // Ventes, lignes et paiements
 // -----------------------------------------------------------------------------
 
+/// Lieu de vente (marché, salon, boutique, vente en ligne...), créé et modifié par l'utilisatrice. Quatre lieux de
+/// départ sont créés avec la base (voir `lieuxDeDepart`). Une vente enregistre l'**identifiant** de son lieu
+/// (`ventes.lieu_id`) : renommer un lieu ne touche donc à aucune vente. Une vente sans lieu (`lieu_id` vide) est
+/// « Non renseigné ».
+///
+/// Pas de clé étrangère entre `ventes.lieu_id` et `id`, comme pour les catégories de produits : `LieuVenteRepository`
+/// déplace les ventes avant de supprimer un lieu, et la restauration d'une sauvegarde remplit les lieux avant les
+/// ventes. Un identifiant qui ne correspondrait plus à aucun lieu s'afficherait « Non renseigné ».
+@DataClassName('LieuVente')
+class LieuxVente extends Table with Tracabilite {
+  IntColumn get id => integer().autoIncrement()();
+
+  /// Nom affiché, modifiable.
+  TextColumn get nom => text().withLength(min: 1, max: 60).unique()();
+
+  /// Ordre d'affichage (croissant).
+  IntColumn get position => integer().withDefault(const Constant(0))();
+
+  @override
+  List<String> get customConstraints => ['CHECK (length(trim(nom)) > 0)'];
+}
+
 /// Une vente. Le total est toujours : sous-total − remise + frais de port.
 /// Le statut de paiement est recalculé à chaque paiement (voir `calculerStatutPaiement`).
 @DataClassName('Vente')
 @TableIndex(name: 'idx_ventes_client_id', columns: {#clientId})
 @TableIndex(name: 'idx_ventes_date_vente', columns: {#dateVente})
 @TableIndex(name: 'idx_ventes_statut_paiement', columns: {#statutPaiement})
+@TableIndex(name: 'idx_ventes_lieu_id', columns: {#lieuId})
 class Ventes extends Table with Tracabilite {
   IntColumn get id => integer().autoIncrement()();
 
@@ -279,6 +302,10 @@ class Ventes extends Table with Tracabilite {
   /// Nom du client, copié quand sa fiche est supprimée (`client_id` est alors vidé) : l'historique garde le nom.
   /// Vide tant que le client existe, et pour un client de passage.
   TextColumn get clientNom => text().nullable()();
+
+  /// Lieu où la vente a été faite (`lieux_vente.id`). Vide = « Non renseigné » (anciennes ventes, ou aucun choix).
+  /// Le lieu se rattache à la **vente**, jamais à la facture : une vente qui a une facture n'est comptée qu'une fois.
+  IntColumn get lieuId => integer().nullable()();
   DateTimeColumn get dateVente => dateTime().withDefault(currentDateAndTime)();
   TextColumn get statut => textEnum<StatutVente>().withDefault(const Constant('validee'))();
 

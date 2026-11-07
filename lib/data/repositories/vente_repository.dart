@@ -17,7 +17,8 @@ import 'vente_vues.dart';
 ///
 /// Une vente validée est définitive : on ne la modifie pas et on ne la supprime jamais.
 /// Une erreur se corrige en l'**annulant** (le stock est remis et un remboursement est
-/// enregistré si elle était payée).
+/// enregistré si elle était payée). Seule exception : le **lieu de vente**, un simple classement
+/// qui peut se préciser ou se corriger après coup ([changerLieu]) sans toucher aux montants.
 class VenteRepository {
   VenteRepository(this._db, this._produits);
 
@@ -30,6 +31,8 @@ class VenteRepository {
   /// - [clientId] vide = « client de passage » ;
   /// - [clientNom] n'a de sens que sans [clientId] : le nom d'un client dont la fiche a été supprimée (cas d'un
   ///   devis converti en commande) ;
+  /// - [lieuId] vide = lieu « Non renseigné » (une vente issue d'un devis ou d'une inscription à un cours n'en a pas
+  ///   au départ : on le précise ensuite avec [changerLieu]) ;
   /// - [paiement] vide = vente impayée (paiement différé) ;
   /// - désignations et prix des lignes sont ceux du panier ; le coût matière est relevé au catalogue.
   ///
@@ -38,6 +41,7 @@ class VenteRepository {
   Future<Vente> valider({
     int? clientId,
     String? clientNom,
+    int? lieuId,
     required Panier panier,
     PaiementSaisi? paiement,
     String? notes,
@@ -45,6 +49,8 @@ class VenteRepository {
   }) {
     return _db.transaction(() async {
       if (panier.estVide) throw const DonneeInvalide('Le panier est vide.');
+
+      if (lieuId != null) await _verifierLieu(lieuId);
 
       if (clientId != null) {
         final Client? client = await (_db.select(
@@ -84,6 +90,7 @@ class VenteRepository {
               totalCentimes: totaux.totalCentimes,
               clientId: Value(clientId),
               clientNom: Value(clientId == null ? nullSiVide(clientNom) : null),
+              lieuId: Value(lieuId),
               dateVente: date == null ? const Value.absent() : Value(date),
               remiseType: Value(panier.remiseType),
               remiseValeur: Value(panier.remiseType == RemiseType.aucune ? 0 : panier.remiseValeur),
@@ -229,6 +236,23 @@ class VenteRepository {
     });
   }
 
+  /// Précise ou corrige le lieu d'une vente ([lieuId] vide = « Non renseigné »). Ne touche à rien d'autre : ni les
+  /// montants, ni le stock, ni les paiements, ni la facture. Possible aussi sur une vente annulée (simple classement).
+  ///
+  /// Lance [ElementIntrouvable] si la vente ou le lieu n'existe pas ; la base n'est alors pas modifiée.
+  Future<Vente> changerLieu(int venteId, int? lieuId) {
+    return _db.transaction(() async {
+      final Vente vente = await _vente(venteId);
+      if (lieuId != null) await _verifierLieu(lieuId);
+      if (vente.lieuId != lieuId) {
+        await (_db.update(_db.ventes)..where((t) => t.id.equals(venteId))).write(
+          VentesCompanion(lieuId: Value(lieuId), modifieLe: Value(DateTime.now())),
+        );
+      }
+      return _vente(venteId);
+    });
+  }
+
   Future<Vente?> obtenir(int id) =>
       (_db.select(_db.ventes)..where((t) => t.id.equals(id))).getSingleOrNull();
 
@@ -245,6 +269,10 @@ class VenteRepository {
     final Client? client = clientId == null
         ? null
         : await (_db.select(_db.clients)..where((t) => t.id.equals(clientId))).getSingleOrNull();
+    final int? lieuId = vente.lieuId;
+    final LieuVente? lieu = lieuId == null
+        ? null
+        : await (_db.select(_db.lieuxVente)..where((t) => t.id.equals(lieuId))).getSingleOrNull();
     final List<Facture> factures =
         await (_db.select(_db.factures)
               ..where((t) => t.venteId.equals(id))
@@ -255,18 +283,25 @@ class VenteRepository {
       lignes: lignes,
       paiements: await _paiements(id),
       client: client,
+      lieu: lieu,
       factures: factures,
     );
   }
 
-  /// Détail d'une vente, mis à jour automatiquement (paiement, annulation, facture, modification du client).
+  /// Détail d'une vente, mis à jour automatiquement (paiement, annulation, facture, modification du client ou du lieu).
   Stream<VenteDetail?> observerDetail(int id) => observerTables(
     _db,
-    <ResultSetImplementation>{_db.ventes, _db.lignesVente, _db.paiements, _db.clients, _db.factures},
+    <ResultSetImplementation>{_db.ventes, _db.lignesVente, _db.paiements, _db.clients, _db.factures, _db.lieuxVente},
     () => detail(id),
   );
 
   // --- Interne --------------------------------------------------------------
+
+  /// Le lieu existe-t-il ? Sinon [ElementIntrouvable].
+  Future<void> _verifierLieu(int lieuId) async {
+    final LieuVente? lieu = await (_db.select(_db.lieuxVente)..where((t) => t.id.equals(lieuId))).getSingleOrNull();
+    if (lieu == null) throw const ElementIntrouvable('Ce lieu de vente n’existe plus.');
+  }
 
   /// Vérifie qu'un article du catalogue peut être vendu et retourne son coût matière unitaire.
   Future<int> _controlerArticle(LignePanier ligne, int produitId) async {

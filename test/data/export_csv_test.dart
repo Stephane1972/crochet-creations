@@ -54,6 +54,7 @@ void main() {
     }
     expect(_lignes(textes['produits.csv']!).single, startsWith('Référence;Nom;Catégorie;Statut;Prix de vente (€);'));
     expect(_lignes(textes['depenses.csv']!).single, 'Date;Catégorie;Montant (€);Fournisseur;Description;Produit concerné;Archivée le');
+    expect(_lignes(textes['ventes.csv']!).single, startsWith('N° de vente;Date;Client;Lieu de vente;Statut;Paiement;'));
   });
 
   group('avec des données', () {
@@ -85,8 +86,22 @@ void main() {
     test('ventes : par date, avec les articles, le client (ou « de passage ») et l’argent encaissé', () {
       final List<String> lignes = _lignes(textes['ventes.csv']!);
       expect(lignes, hasLength(3));
-      expect(lignes[1], '1;20/10/2026;Marie Dupont;Validée;Payée;2 × Doudou lapin « Noisette »;50,00;0,00;0,00;50,00;50,00;');
-      expect(lignes[2], '2;25/10/2026;Client de passage;Validée;Partiellement payée;;12,00;0,00;0,00;12,00;5,00;"Marché; stand 3"');
+      expect(lignes[1], '1;20/10/2026;Marie Dupont;Marché;Validée;Payée;2 × Doudou lapin « Noisette »;50,00;0,00;0,00;50,00;50,00;');
+      expect(
+        lignes[2],
+        '2;25/10/2026;Client de passage;Non renseigné;Validée;Partiellement payée;;12,00;0,00;0,00;12,00;5,00;"Marché; stand 3"',
+      );
+    });
+
+    test('ventes : le lieu de vente porte son nom actuel, ou « Non renseigné » sans lieu', () async {
+      final LieuVente marche = (await db.select(db.lieuxVente).get()).firstWhere((LieuVente l) => l.nom == 'Marché');
+      await (db.update(db.lieuxVente)..where((t) => t.id.equals(marche.id))).write(
+        const LieuxVenteCompanion(nom: Value('Marché; du "samedi"')),
+      );
+      final Map<String, String> apres = await export.fabriquerTextes();
+      final List<String> lignes = _lignes(apres['ventes.csv']!);
+      expect(lignes[1], startsWith('1;20/10/2026;Marie Dupont;"Marché; du ""samedi""";Validée;'));
+      expect(lignes[2], contains(';Non renseigné;'));
     });
 
     test('factures : numéro, dates, client recopié, statut, mention de TVA', () {

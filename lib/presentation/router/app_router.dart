@@ -18,6 +18,9 @@ import '../entreprise/mon_entreprise_screen.dart';
 import '../factures/facture_detail_screen.dart';
 import '../factures/factures_screen.dart';
 import '../lieux/lieux_screen.dart';
+import '../notes/categories_note_screen.dart';
+import '../notes/note_form_screen.dart';
+import '../notes/notes_screen.dart';
 import '../produits/categories_screen.dart';
 import '../produits/produit_fiche_screen.dart';
 import '../produits/produit_form_screen.dart';
@@ -51,6 +54,18 @@ abstract final class AppRouter {
         return _page(settings, const CategoriesScreen());
       case AppRoutes.lieuxVente:
         return _page(settings, const LieuxScreen());
+      case AppRoutes.categoriesNote:
+        return _page(settings, const CategoriesNoteScreen());
+      case AppRoutes.notes:
+        return _page(settings, const NotesScreen());
+      case AppRoutes.noteNouvelle:
+        return _page(settings, const NoteFormScreen());
+      case AppRoutes.noteModifier:
+        final int? idNote = _identifiant(settings);
+        return _page(
+          settings,
+          idNote == null ? const _PageIntrouvable() : NoteFormScreen(noteId: idNote),
+        );
       case AppRoutes.factures:
         return _page(settings, const FacturesScreen());
       case AppRoutes.factureDetail:

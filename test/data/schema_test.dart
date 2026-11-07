@@ -34,11 +34,12 @@ void main() {
   );
 
   group('structure', () {
-    test('les 17 tables du schéma existent', () async {
+    test('les 19 tables du schéma existent', () async {
       final List<String> tables = (await noms(
         'table',
       )).where((n) => !n.startsWith('sqlite_')).toList();
       expect(tables, <String>[
+        'categories_note',
         'categories_produit',
         'clients',
         'cours',
@@ -49,6 +50,7 @@ void main() {
         'lieux_vente',
         'lignes_devis',
         'lignes_vente',
+        'notes',
         'numerotation_documents',
         'paiements',
         'parametres_entreprise',
@@ -79,6 +81,8 @@ void main() {
           'idx_cours_debut_le',
           'idx_inscriptions_cours_id',
           'idx_depenses_date_depense',
+          'idx_notes_categorie_id',
+          'idx_notes_modifie_le',
         ]),
       );
     });
@@ -86,7 +90,7 @@ void main() {
     test('la version du schéma est enregistrée dans le fichier', () async {
       final row = await db.customSelect('PRAGMA user_version').getSingle();
       expect(row.read<int>('user_version'), AppDatabase.versionSchema);
-      expect(AppDatabase.versionSchema, 4);
+      expect(AppDatabase.versionSchema, 5);
     });
 
     test('les quatre lieux de vente de départ existent dès la création, dans l’ordre', () async {
@@ -107,6 +111,36 @@ void main() {
     test('deux lieux ne peuvent pas porter le même nom, et un nom vide est refusé', () async {
       await expectLater(sql("INSERT INTO lieux_vente (nom) VALUES ('Marché')"), throwsA(anything));
       await expectLater(sql("INSERT INTO lieux_vente (nom) VALUES ('   ')"), throwsA(anything));
+    });
+
+    test('les deux catégories de notes de départ existent dès la création, dans l’ordre', () async {
+      final List<CategorieNote> categories = await (db.select(
+        db.categoriesNote,
+      )..orderBy([(t) => OrderingTerm.asc(t.position)])).get();
+      expect(categories.map((CategorieNote c) => c.nom), <String>['Futures commandes', 'Documents entreprise']);
+      expect(await db.select(db.notes).get(), isEmpty);
+    });
+
+    test('deux catégories de notes ne peuvent pas porter le même nom, et un nom vide est refusé', () async {
+      await expectLater(sql("INSERT INTO categories_note (nom) VALUES ('Futures commandes')"), throwsA(anything));
+      await expectLater(sql("INSERT INTO categories_note (nom) VALUES ('   ')"), throwsA(anything));
+    });
+
+    test('une note a un titre non vide, un texte vide par défaut et une catégorie facultative', () async {
+      await expectLater(sql("INSERT INTO notes (titre) VALUES ('')"), throwsA(anything));
+      await expectLater(sql("INSERT INTO notes (titre) VALUES ('   ')"), throwsA(anything));
+      await sql("INSERT INTO notes (titre) VALUES ('Idée de bonnet')");
+      final Note note = (await db.select(db.notes).get()).single;
+      expect(note.contenu, '');
+      expect(note.categorieId, isNull);
+    });
+
+    test('la base refuse de supprimer une catégorie de notes qui a encore des notes, et une catégorie inconnue', () async {
+      final int categorie = (await db.select(db.categoriesNote).get()).first.id;
+      await sql('INSERT INTO notes (titre, categorie_id) VALUES (?, ?)', <Object?>['Doudou pour Léa', categorie]);
+      await expectLater(sql('DELETE FROM categories_note WHERE id = ?', <Object?>[categorie]), throwsA(anything));
+      await expectLater(sql("INSERT INTO notes (titre, categorie_id) VALUES ('Orpheline', 9999)"), throwsA(anything));
+      expect(await db.select(db.notes).get(), hasLength(1));
     });
 
     test('ventes et devis ont une colonne pour le nom d’un client supprimé', () async {

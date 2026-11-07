@@ -91,18 +91,34 @@ void main() {
     expect(lieux.map((LieuVente l) => l.nom), <String>['Marché', 'Salon', 'Boutique', 'Vente en ligne']);
   }
 
-  /// Ramène une base du schéma actuel à l'état d'une base du schéma 3 : sans les lieux de vente.
+  Future<void> verifierCategoriesNoteDeDepart(AppDatabase db) async {
+    final List<CategorieNote> categories = await (db.select(
+      db.categoriesNote,
+    )..orderBy([(t) => OrderingTerm.asc(t.position)])).get();
+    expect(categories.map((CategorieNote c) => c.nom), <String>['Futures commandes', 'Documents entreprise']);
+  }
+
+  /// Ramène une base du schéma actuel à l'état d'une base du schéma 4 : sans le bloc-notes.
+  void retirerLeBlocNotes(dynamic raw) {
+    raw.execute('DROP INDEX idx_notes_categorie_id');
+    raw.execute('DROP INDEX idx_notes_modifie_le');
+    raw.execute('DROP TABLE notes');
+    raw.execute('DROP TABLE categories_note');
+  }
+
+  /// Ramène une base du schéma actuel à l'état d'une base du schéma 3 : sans les lieux de vente (ni le bloc-notes).
   void retirerLesLieux(dynamic raw) {
+    retirerLeBlocNotes(raw);
     raw.execute('DROP INDEX idx_ventes_lieu_id');
     raw.execute('ALTER TABLE ventes DROP COLUMN lieu_id');
     raw.execute('DROP TABLE lieux_vente');
   }
 
-  test('du schéma 1 au schéma 4 : les données restent, « client_nom », les catégories et les lieux apparaissent', () async {
+  test('du schéma 1 au schéma 5 : les données restent, « client_nom », les catégories, les lieux et le bloc-notes apparaissent', () async {
     // 1. Une base créée avec le schéma actuel, remplie de quelques lignes.
     final int clientId = await remplirBase();
 
-    // 2. On la ramène à l'état d'une base du schéma 1 : sans les deux colonnes, sans les catégories ni les lieux, version 1.
+    // 2. On la ramène à l'état d'une base du schéma 1 : sans les deux colonnes, sans les catégories, les lieux ni le bloc-notes, version 1.
     final AppDatabase rouverte = AppDatabase(
       NativeDatabase(
         fichier,
@@ -117,7 +133,7 @@ void main() {
     );
     // La première requête déclenche la mise à jour, puis le test relit le résultat.
     final int version = (await rouverte.customSelect('PRAGMA user_version').getSingle()).read<int>('user_version');
-    expect(version, 4);
+    expect(version, 5);
     for (final String table in <String>['ventes', 'devis']) {
       expect(await colonnes(rouverte, table), contains('client_nom'), reason: table);
     }
@@ -136,6 +152,8 @@ void main() {
     // 4. Les catégories et les lieux de départ sont là, et le produit existant est toujours dans sa catégorie.
     await verifierCategoriesDeDepart(rouverte);
     await verifierLieuxDeDepart(rouverte);
+    await verifierCategoriesNoteDeDepart(rouverte);
+    expect(await rouverte.select(rouverte.notes).get(), isEmpty);
     expect((await rouverte.select(rouverte.produits).get()).single.categorie, CleCategorie.doudou);
 
     // 5. Et l'application sait s'en servir : supprimer le client copie son nom.
@@ -144,7 +162,7 @@ void main() {
     await rouverte.close();
   });
 
-  test('du schéma 2 au schéma 4 : les catégories et les lieux apparaissent avec ceux de départ, rien d’autre ne bouge', () async {
+  test('du schéma 2 au schéma 5 : catégories, lieux et bloc-notes apparaissent avec ceux de départ, rien d’autre ne bouge', () async {
     await remplirBase();
 
     final AppDatabase rouverte = AppDatabase(
@@ -158,8 +176,9 @@ void main() {
       ),
     );
     final int version = (await rouverte.customSelect('PRAGMA user_version').getSingle()).read<int>('user_version');
-    expect(version, 4);
+    expect(version, 5);
     await verifierLieuxDeDepart(rouverte);
+    await verifierCategoriesNoteDeDepart(rouverte);
 
     await verifierCategoriesDeDepart(rouverte);
     final Produit produit = (await rouverte.select(rouverte.produits).get()).single;
@@ -170,7 +189,7 @@ void main() {
     await rouverte.close();
   });
 
-  test('du schéma 3 au schéma 4 : les lieux de vente apparaissent, toutes les ventes restent « Non renseigné »', () async {
+  test('du schéma 3 au schéma 5 : les lieux de vente apparaissent, toutes les ventes restent « Non renseigné »', () async {
     final int clientId = await remplirBase();
     // Une deuxième vente, pour vérifier qu'aucune n'est touchée.
     final AppDatabase preparee = AppDatabase(NativeDatabase(fichier));
@@ -189,7 +208,8 @@ void main() {
       ),
     );
     final int version = (await rouverte.customSelect('PRAGMA user_version').getSingle()).read<int>('user_version');
-    expect(version, 4);
+    expect(version, 5);
+    await verifierCategoriesNoteDeDepart(rouverte);
 
     // Les quatre lieux de départ sont là, la colonne et son index aussi.
     await verifierLieuxDeDepart(rouverte);
@@ -216,7 +236,7 @@ void main() {
     await rouverte.close();
   });
 
-  test('rouvrir une base déjà au schéma 4 ne recrée pas les lieux supprimés ou renommés', () async {
+  test('rouvrir une base déjà au schéma 5 ne recrée pas les lieux supprimés ou renommés', () async {
     final AppDatabase premiere = AppDatabase(NativeDatabase(fichier));
     await (premiere.update(premiere.lieuxVente)..where((t) => t.nom.equals('Marché'))).write(
       const LieuxVenteCompanion(nom: Value('Marché de Noël')),
@@ -230,7 +250,7 @@ void main() {
     await deuxieme.close();
   });
 
-  test('rouvrir une base déjà au schéma 4 ne recrée pas les catégories de départ supprimées ou renommées', () async {
+  test('rouvrir une base déjà au schéma 5 ne recrée pas les catégories de départ supprimées ou renommées', () async {
     final AppDatabase premiere = AppDatabase(NativeDatabase(fichier));
     await (premiere.update(premiere.categoriesProduit)..where((t) => t.cle.equals(CleCategorie.crochet))).write(
       const CategoriesProduitCompanion(nom: Value('Mes créations')),
@@ -243,6 +263,70 @@ void main() {
     expect(categories, hasLength(4));
     expect(categories.firstWhere((CategorieProduit c) => c.cle == CleCategorie.crochet).nom, 'Mes créations');
     expect(categories.any((CategorieProduit c) => c.cle == CleCategorie.surMesure), isFalse);
+    await deuxieme.close();
+  });
+
+  test('du schéma 4 au schéma 5 : le bloc-notes apparaît avec ses deux catégories de départ, rien d’autre ne bouge', () async {
+    final int clientId = await remplirBase();
+
+    final AppDatabase rouverte = AppDatabase(
+      NativeDatabase(
+        fichier,
+        setup: (raw) {
+          retirerLeBlocNotes(raw);
+          raw.execute('PRAGMA user_version = 4');
+        },
+      ),
+    );
+    final int version = (await rouverte.customSelect('PRAGMA user_version').getSingle()).read<int>('user_version');
+    expect(version, 5);
+
+    // Deux catégories de départ, aucune note, et les index.
+    await verifierCategoriesNoteDeDepart(rouverte);
+    expect(await rouverte.select(rouverte.notes).get(), isEmpty);
+    final List<String> index = (await rouverte
+            .customSelect("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'notes'")
+            .get())
+        .map((r) => r.read<String>('name'))
+        .toList();
+    expect(index, containsAll(<String>['idx_notes_categorie_id', 'idx_notes_modifie_le']));
+
+    // Tout le reste est intact : ventes (avec leur lieu), devis, client, produit, lieux de vente.
+    final Vente vente = (await rouverte.select(rouverte.ventes).get()).single;
+    expect(vente.clientId, clientId);
+    expect(vente.totalCentimes, 1000);
+    expect(vente.lieuId, isNotNull);
+    expect((await rouverte.select(rouverte.devis).get()).single.numero, 'DEVIS-2026-0001');
+    expect((await rouverte.select(rouverte.produits).get()).single.nom, 'Doudou lapin');
+    await verifierLieuxDeDepart(rouverte);
+
+    // Et l'application sait s'en servir : une note peut être rangée dans une catégorie.
+    final int categorie = (await rouverte.select(rouverte.categoriesNote).get()).first.id;
+    await rouverte
+        .into(rouverte.notes)
+        .insert(NotesCompanion.insert(titre: 'Doudou pour Léa', categorieId: Value(categorie)));
+    expect((await rouverte.select(rouverte.notes).get()).single.categorieId, categorie);
+    await rouverte.close();
+  });
+
+  test('rouvrir une base déjà au schéma 5 ne recrée pas les catégories de notes supprimées ou renommées, et garde les notes', () async {
+    final AppDatabase premiere = AppDatabase(NativeDatabase(fichier));
+    final CategorieNote futures = (await premiere.select(premiere.categoriesNote).get()).firstWhere(
+      (CategorieNote c) => c.nom == 'Futures commandes',
+    );
+    await (premiere.update(premiere.categoriesNote)..where((t) => t.id.equals(futures.id))).write(
+      const CategoriesNoteCompanion(nom: Value('À faire')),
+    );
+    await (premiere.delete(premiere.categoriesNote)..where((t) => t.nom.equals('Documents entreprise'))).go();
+    await premiere.into(premiere.notes).insert(NotesCompanion.insert(titre: 'Bonnet', categorieId: Value(futures.id)));
+    await premiere.close();
+
+    final AppDatabase deuxieme = AppDatabase(NativeDatabase(fichier));
+    final List<CategorieNote> categories = await deuxieme.select(deuxieme.categoriesNote).get();
+    expect(categories.map((CategorieNote c) => c.nom), <String>['À faire']);
+    final Note note = (await deuxieme.select(deuxieme.notes).get()).single;
+    expect(note.titre, 'Bonnet');
+    expect(note.categorieId, futures.id);
     await deuxieme.close();
   });
 }

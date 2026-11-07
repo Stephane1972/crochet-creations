@@ -233,6 +233,21 @@ Future<void> remplirBase(AppDatabase db) async {
           produitId: Value(produitId),
         ),
       );
+
+  // Le bloc-notes : une catégorie de départ (« Futures commandes »), une note rangée dedans, une note sans catégorie.
+  final int futuresCommandes = (await (db.select(
+    db.categoriesNote,
+  )..where((t) => t.nom.equals('Futures commandes'))).getSingle()).id;
+  await db
+      .into(db.notes)
+      .insert(
+        NotesCompanion.insert(
+          titre: 'Doudou pour Léa',
+          contenu: const Value('Lapin rose, 30 cm.\nPour le 12 décembre, « sans boutons ».'),
+          categorieId: Value(futuresCommandes),
+        ),
+      );
+  await db.into(db.notes).insert(NotesCompanion.insert(titre: 'Idée de bonnet'));
 }
 
 /// Toutes les lignes de toutes les tables, telles que la base les contient : sert à vérifier qu'une

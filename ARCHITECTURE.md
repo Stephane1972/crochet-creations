@@ -55,6 +55,7 @@ crochet-creations/
 │   ├── domain/
 │   │   ├── enums.dart                        listes de choix (statuts, modes de paiement…)
 │   │   ├── categories_produit.dart           clés et noms des catégories de départ, règles du nom d'une catégorie
+│   │   ├── lieux_vente.dart                  lieux de départ, « Non renseigné », règles du nom d'un lieu de vente
 │   │   ├── erreurs.dart                      erreurs métier à message clair
 │   │   ├── usage_historique.dart             « où apparaît cet élément » (ventes, factures, devis, inscriptions), en phrase
 │   │   ├── regles_client.dart                règles de saisie d'une fiche client (e-mail, téléphone, code postal, SIRET)
@@ -73,7 +74,7 @@ crochet-creations/
 │   │       └── numero_document.dart          FACT-2026-0001, DEVIS-2026-0001, PRD-0001
 │   ├── data/
 │   │   ├── database/
-│   │   │   ├── tables.dart                   les 16 tables (contraintes, index)
+│   │   │   ├── tables.dart                   les 17 tables (contraintes, index)
 │   │   │   ├── app_database.dart             base, version du schéma, migrations
 │   │   │   ├── flux_en_direct.dart           lecture « en direct » de plusieurs tables (observerTables)
 │   │   │   └── app_database.g.dart           (généré par build_runner, non versionné)
@@ -83,10 +84,11 @@ crochet-creations/
 │   │   │   ├── produit_repository.dart       catalogue : créer, modifier, dupliquer, archiver, supprimer, stock, historique
 │   │   │   ├── produit_vues.dart             ce que lisent les écrans : ProduitResume, ProduitDetail, historique
 │   │   │   ├── categorie_repository.dart     catégories de produits : lister, créer, renommer, supprimer (en déplaçant les produits)
+│   │   │   ├── lieu_vente_repository.dart    lieux de vente : lister, créer, renommer, supprimer (en déplaçant les ventes), ventes par lieu
 │   │   │   ├── client_repository.dart        clients : créer, modifier, archiver, supprimer, fiche et historique en direct
 │   │   │   ├── client_vues.dart              nom affiché, initiales, historique d'un client (ventes, paiements, cours…)
-│   │   │   ├── vente_repository.dart         ventes : valider, annuler, encaisser, détail en direct
-│   │   │   ├── vente_vues.dart               VenteDetail : vente, lignes, paiements, client, factures, solde dû
+│   │   │   ├── vente_repository.dart         ventes : valider, annuler, encaisser, changer le lieu, détail en direct
+│   │   │   ├── vente_vues.dart               VenteDetail : vente, lignes, paiements, client, lieu, factures, solde dû
 │   │   │   ├── facture_repository.dart       factures : créer (numéro + PDF), annuler, lister, obtenir le PDF
 │   │   │   ├── devis_repository.dart         devis : créer, modifier, statuts, expiration, convertir, PDF
 │   │   │   ├── devis_vues.dart               DevisResume, DevisDetail (statut affiché, actions possibles), ResultatConversion
@@ -159,6 +161,11 @@ crochet-creations/
 │       │   ├── facture_detail_screen.dart    aperçu et détail : partager, imprimer, annuler (écran 12)
 │       │   └── factures_providers.dart       flux Riverpod, PDF, aperçu remplaçable en test
 │       ├── home/home_screen.dart             accueil / tableau de bord
+│       ├── lieux/                            lieux de vente (voir « Lieux de vente »)
+│       │   ├── lieux_screen.dart             Réglages › Lieux de vente : ajouter, renommer, supprimer (en déplaçant les ventes)
+│       │   ├── lieu_dialogues.dart           boîte « nom de lieu de vente » (création et renommage)
+│       │   ├── lieux_providers.dart          lieux en direct, nombre de ventes par lieu, recherche d'un lieu par identifiant
+│       │   └── choix_lieu.dart               carte « Lieu de vente » et feuille de choix (panier, détail d'une vente)
 │       ├── more/more_screen.dart             onglet « Plus »
 │       ├── produits/                         onglet Produits et ses écrans (voir « Produits et stock »)
 │       │   ├── produits_screen.dart          liste, recherche, filtres (écran 3)
@@ -237,6 +244,8 @@ les produits : `domain/produits/`, `data/produits/`, `presentation/produits/`.
   `nombreAReapprovisionnerProvider` (pastille de l'accueil et du filtre) ;
 - catégories (`presentation/produits/categories_providers.dart`) : `categoriesProduitProvider` (liste en direct, dans l'ordre),
   `nomsCategoriesProvider` (nom par clé), `nombreProduitsParCategorieProvider` (écran Catégories) ;
+- lieux de vente (`presentation/lieux/lieux_providers.dart`) : `lieuxVenteProvider` (liste en direct, dans l'ordre),
+  `nombreVentesParLieuProvider` (écran Lieux de vente) ; `venteEnCoursProvider` porte aussi le lieu choisi dans le panier ;
 - `filtresProduitsProvider` : recherche, catégorie (clé), « Archivés », « À réapprovisionner ». Il vit au-dessus des écrans :
   le filtre choisi depuis l'accueil (« Stock faible ») s'applique à l'ouverture de l'onglet Produits ;
 - clients (`presentation/clients/clients_providers.dart`) : `clientsProvider` (tous les clients, archivés compris, en
@@ -296,7 +305,7 @@ Navigation Flutter standard (`Navigator` + routes nommées), sans bibliothèque 
 
 Un fichier `crochet_creations.sqlite` dans le stockage privé de l'application. Aucun serveur.
 
-### Les 16 tables
+### Les 17 tables
 
 | Table | Rôle |
 |-------|------|
@@ -307,7 +316,8 @@ Un fichier `crochet_creations.sqlite` dans le stockage privé de l'application. 
 | `variantes_produit` | Couleur / taille d'un produit, avec stock et prix propres |
 | `photos_produit` | Photos secondaires (la principale est dans `produits`) |
 | `clients` | Particuliers et professionnels (civilité, coordonnées, SIREN/SIRET, notes) |
-| `ventes` | Une vente : client (vide = « client de passage »), remise, frais de port, total, statut de paiement |
+| `lieux_vente` | Lieux de vente (marché, salon, boutique, vente en ligne…) : nom modifiable, ordre d'affichage |
+| `ventes` | Une vente : client (vide = « client de passage »), lieu (vide = « Non renseigné »), remise, frais de port, total, statut de paiement |
 | `lignes_vente` | Produits, cours ou lignes libres d'une vente, avec nature `bien` / `service` pour les deux compteurs de chiffre d'affaires |
 | `paiements` | Encaissements et remboursements (montant négatif) d'une vente, avec leur mode |
 | `factures` | Facture émise à partir d'une vente : numéro `FACT-AAAA-NNNN`, coordonnées client et mention TVA recopiées |
@@ -376,7 +386,7 @@ Les valeurs des listes de choix sont enregistrées sous leur **nom Dart** : ne j
 Après une migration, `PRAGMA foreign_key_check` vérifie qu'aucune liaison n'a été cassée.
 
 Historique des versions du schéma : **1** (étapes 2 à 12), **2** (`ventes.client_nom` et `devis.client_nom`, pour garder le nom
-d'un client supprimé), **3** (table `categories_produit`, remplie avec les cinq catégories de départ). Une sauvegarde d'un schéma plus ancien se restaure sans changement : la restauration n'écrit que les
+d'un client supprimé), **3** (table `categories_produit`, remplie avec les cinq catégories de départ), **4** (table `lieux_vente`, remplie avec les quatre lieux de départ, et colonne `ventes.lieu_id` vide pour toutes les ventes existantes). Une sauvegarde d'un schéma plus ancien se restaure sans changement : la restauration n'écrit que les
 colonnes présentes dans l'archive (voir « Restaurer »).
 
 ## Produits et stock (étape 3)
@@ -469,6 +479,38 @@ différentes ne se confondent plus (test `test/data/flux_en_direct_test.dart`).
 - **Statistiques.** Les catégories rentables sont classées par marge ; à marge égale, l'ordre de la liste des catégories est conservé
   (`ordreCategories`), une clé qui n'y figure plus passe après, par clé. Une vente est comptée dans la catégorie **actuelle** du
   produit.
+
+### Lieux de vente
+
+- **Un lieu par vente, pas par document.** `ventes.lieu_id` enregistre l'**identifiant** du lieu, jamais son nom : renommer un lieu ne
+  touche à aucune vente. Le lieu appartient à la **vente** ; ni la facture ni le devis n'en portent, donc une vente facturée n'est
+  comptée qu'une fois dans un classement par lieu. Vide, il signifie « Non renseigné » (`libelleLieuNonRenseigne`) : c'est le cas
+  de toutes les ventes d'avant la version 0.15.0 et de celles où l'on n'a rien choisi. Les anciennes ventes ne sont jamais
+  rattachées à un lieu d'office.
+- **Pas de clé étrangère SQL**, comme pour les catégories : ajouter une colonne `REFERENCES` à une table existante (`ventes`)
+  obligerait à la reconstruire. L'intégrité est assurée par le code : `LieuVenteRepository.supprimer` déplace les ventes **avant**
+  de supprimer, dans la même transaction (tout ou rien) ; le panier relit le lieu en base au moment de valider (un lieu supprimé
+  entre-temps donne « Non renseigné », la vente n'est jamais bloquée) ; un identifiant orphelin s'affiche « Non renseigné ». La
+  table impose elle-même un nom non vide, unique, de 60 caractères au plus.
+- **Départ.** `AppDatabase.insererLieuxDeDepart()` crée Marché, Salon, Boutique et Vente en ligne (`INSERT OR IGNORE`, par nom) à
+  la création de la base, à la migration 3 → 4 et à la restauration d'une sauvegarde sans la table. Une base déjà au schéma 4
+  ne les recrée jamais : un lieu de départ supprimé ou renommé le reste. L'index `idx_ventes_lieu_id` est créé en SQL dans la
+  migration.
+- **Règles du nom** (`domain/lieux_vente.dart`) : non vide, 60 caractères au plus, espaces superflus retirés, pas deux lieux de même
+  nom (sans tenir compte des majuscules, des accents ni des espaces), et pas « Non renseigné » (libellé d'une vente sans lieu).
+  La boîte de saisie est partagée avec les catégories (`core/widgets/dialogue_nom.dart`) : l'enregistrement se fait **dans** la
+  boîte, un nom refusé reste affiché avec son explication.
+- **Supprimer un lieu.** Sans vente : une confirmation. Avec des ventes (annulées comprises) : une liste de destinations **sans choix
+  par défaut** (les autres lieux, et « Non renseigné »), le bouton reste inactif tant qu'on n'a pas choisi ; le nombre de ventes
+  est relu en base au moment de supprimer. Aucune vente n'est jamais supprimée ni modifiée autrement que par son lieu. On peut
+  supprimer tous les lieux : les ventes passent alors en « Non renseigné ».
+- **Où se choisit le lieu.** Dans le **panier**, avant de valider (`SelecteurLieu`, carte « Lieu de vente » → feuille du bas avec
+  « Non renseigné », les lieux et « Nouveau lieu de vente », le lieu créé étant choisi aussitôt) ; et **après coup**, dans le détail
+  d'une vente, même annulée (`VenteRepository.changerLieu` ne modifie que le lieu : ni montants, ni stock, ni paiements, ni
+  facture).
+- **Sauvegarde et exports.** `lieux_vente` est la 17e table de l'archive, placée **avant** `ventes` (`FormatSauvegarde.tables`) ;
+  l'export CSV des ventes gagne une colonne « Lieu de vente » (le nom, « Non renseigné » si vide). Les statistiques par lieu viennent
+  à une étape suivante : cette étape ne change aucun calcul.
 
 ## Clients (étape 4)
 
@@ -779,9 +821,9 @@ aux statistiques. Les chiffres clés portent des `Key` (`stat-ca`, `stat-marge`�
 
 Un `.zip` avec `donnees.json` et les fichiers. `donnees.json` contient un **manifeste** (`application`, `format` = version de
 l'organisation du fichier, `versionSchema` = `AppDatabase.versionSchema`, `versionApplication`, `creeLe`, `nombreFichiers`,
-`lignes` par table) puis `tables` : pour chacune des 16 tables, ses lignes lues par `SELECT * … ORDER BY id`, **telles que
+`lignes` par table) puis `tables` : pour chacune des 17 tables, ses lignes lues par `SELECT * … ORDER BY id`, **telles que
 SQLite les stocke** (dates en secondes, booléens 0/1, énumérations en texte). Rien n'est recalculé : une sauvegarde restaurée
-redonne exactement les mêmes lignes (un test le vérifie table par table). Les 16 lectures se font dans **une transaction** :
+redonne exactement les mêmes lignes (un test le vérifie table par table). Les 17 lectures se font dans **une transaction** :
 l'instantané est cohérent même si l'application écrit en même temps. Les fichiers sont rangés sous
 `fichiers/<dossier>/<nom>` (`photos_produits`, `factures`, `devis`) ; la base ne garde que des noms relatifs, ils retrouvent
 donc leur place.
@@ -908,6 +950,12 @@ Le cahier des charges ne tranchait pas ces points ; voici ce qui a été retenu 
   (version 3, migrations 1→3 et 2→3, catégories d'origine non recréées), `service_sauvegarde_test` (ancienne archive sans catégories,
   aller-retour des catégories), `produit_repository_test` (catégorie inconnue refusée), `categories_ecrans_test` (écran
   Catégories, filtre) et « + Nouvelle catégorie » dans `produit_form_test`.
+- Lieux de vente : `domain/lieux_vente_test` (lieux de départ, règles du nom), `lieu_vente_repository_test` (créer, renommer, supprimer avec
+  déplacement vers un lieu ou « Non renseigné », ventes annulées comptées, refus sans rien changer, flux en direct),
+  `vente_repository_test` (lieu à la validation, `changerLieu` sans autre effet), `schema_test` et `migration_schema_test` (version 4,
+  migration 3 → 4, anciennes ventes « Non renseigné », lieux de départ non recréés), `service_sauvegarde_test` (ancienne archive sans lieux,
+  aller-retour), `export_csv_test` (colonne « Lieu de vente ») et `lieux_ecrans_test` (écran Lieux de vente, choix dans le panier, création depuis
+  la feuille, lieu supprimé pendant la vente, correction dans le détail d'une vente).
 - Suppression d'un client ou d'un produit : `suppression_repository_test` (historique conservé, noms copiés, lignes détachées,
   inscriptions refusées), `migration_schema_test` (base du schéma 1 mise à jour sans perte), `service_sauvegarde_test`
   (archive du schéma 1), `export_csv_test` et `devis_repository_test` (client supprimé), `domain/usage_historique_test`.
@@ -950,7 +998,7 @@ Sauvegarde et export (étape 11) : `csv_test` (protection des cellules, montants
 téléphone et sur le même, copie de sécurité qui permet de revenir en arrière, archives refusées sans rien changer, restauration
 annulée en cas de colonne inconnue / contrainte / liaison cassée, écrans prévenus, sauvegarde automatique et rotation, export
 JSON), `export_csv_test` (contenu de chaque fichier, archive, BOM) et `sauvegarde_ecran_test` (parcours de l'écran).
-`test/data/aide_donnees.dart` remplit **les 16 tables** et compare deux états de la base ligne à ligne.
+`test/data/aide_donnees.dart` remplit **les 17 tables** et compare deux états de la base ligne à ligne.
 
 Finitions (étape 12) : `photo_retrouvee_test` (la photo retrouvée est proposée par les formulaires des produits, des cours et
 des dépenses, utilisée une seule fois, oubliée quand une autre photo est choisie, ignorée si son fichier a disparu).

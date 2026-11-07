@@ -6,7 +6,43 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
 
 ## [Non publié]
 
-## [0.14.3] — Signature stable de l'APK (en attente de validation)
+## [0.15.0] — Lieux de vente (en attente de validation)
+
+### Ajouté
+- **Un lieu sur chaque vente** : marché, salon, boutique, vente en ligne, ou un lieu à soi. Quatre lieux sont créés au départ
+  (**Marché, Salon, Boutique, Vente en ligne**) ; ils se renomment et se suppriment comme les autres.
+- **Dans le panier**, une carte « Lieu de vente » : un appui ouvre la liste des lieux, avec « Non renseigné » et **+ Nouveau lieu de
+  vente** (le lieu créé est choisi tout de suite). On peut valider sans rien choisir : la vente est alors « Non renseigné ».
+  Un lieu supprimé pendant que le panier est ouvert ne bloque pas la vente : elle passe en « Non renseigné ».
+- **Dans le détail d'une vente**, la même carte permet de **préciser ou corriger le lieu après coup**, y compris sur une vente annulée.
+  Seul le lieu change : ni les montants, ni le stock, ni les paiements, ni la facture.
+- **Réglages › Lieux de vente** : la liste avec le nombre de ventes de chaque lieu, **Nouveau lieu**, **Renommer** (le nom change
+  partout, les ventes restent dans le lieu) et **Supprimer**. Un lieu qui a des ventes (annulées comprises) ne se supprime qu'en
+  choisissant **où les déplacer** : un autre lieu, ou « Non renseigné » ; rien n'est présélectionné. **Aucune vente n'est jamais supprimée.**
+- Règles du nom : obligatoire, 60 caractères au plus, pas deux lieux de même nom (sans tenir compte des majuscules, des accents
+  ni des espaces), et pas « Non renseigné » (c'est le libellé d'une vente sans lieu).
+- **Export CSV** des ventes : nouvelle colonne « Lieu de vente ».
+
+### Modifié
+- Le schéma de la base passe en **version 4** : table `lieux_vente` et colonne `ventes.lieu_id`. La mise à jour est automatique ;
+  **toutes les ventes déjà enregistrées restent « Non renseigné »** (aucune n'est rattachée à un lieu d'office).
+- **Sauvegarde** : elle contient désormais 17 tables (`lieux_vente` avant `ventes`). Une sauvegarde faite avant cette version se
+  restaure normalement : les ventes restent « Non renseigné » et les quatre lieux de départ sont créés.
+- La boîte « nom » (création et renommage) est maintenant commune aux catégories de produits et aux lieux de vente ; les
+  catégories fonctionnent exactement comme avant.
+
+### Inchangé volontairement
+- Le lieu appartient à la **vente**, pas à la facture ni au devis : une vente facturée n'est comptée qu'une fois.
+- Les **statistiques** ne changent pas : le classement par lieu viendra avec l'étape « Statistiques » (argent encaissé, par mois,
+  année, lieu et catégorie).
+- Le « lieu » d'un **cours** (l'endroit où il se donne) est une autre notion : il n'est pas touché.
+
+### Vérifié
+- Tests de données (`lieu_vente_repository_test`, `vente_repository_test`, `schema_test`, `migration_schema_test`,
+  `service_sauvegarde_test`, `export_csv_test`, `domain/lieux_vente_test`) et d'écrans (`lieux_ecrans_test` : Réglages, panier,
+  création depuis la feuille, lieu supprimé pendant la vente, correction dans le détail d'une vente).
+
+## [0.14.3] — Signature stable de l'APK
 
 ### Ajouté
 - **L'APK est maintenant signé avec une clé stable** : une fois la clé installée dans les « secrets » du dépôt GitHub

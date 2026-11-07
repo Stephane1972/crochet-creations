@@ -81,6 +81,24 @@ Le développement se fait en 12 étapes validées une par une (détail dans [ROA
 - Le schéma de la base passe en **version 3** (nouvelle table `categories_produit`, migration automatique, aucun produit modifié) ;
   les anciennes sauvegardes se restaurent normalement.
 
+### Lieux de vente (après l'étape 12)
+
+- **Un lieu sur chaque vente** (marché, salon, boutique, vente en ligne, ou un lieu à vous). Quatre lieux sont créés au départ
+  (Marché, Salon, Boutique, Vente en ligne) ; ils se renomment ou se suppriment comme les autres.
+- **Dans le panier** : la carte **Lieu de vente** ouvre la liste ; **+ Nouveau lieu de vente** en crée un et le choisit aussitôt.
+  On peut valider sans choisir : la vente est alors **« Non renseigné »**.
+- **Après coup** : dans le détail d'une vente (même annulée), la même carte permet de préciser ou de corriger le lieu. Seul le lieu
+  change : ni montants, ni stock, ni facture.
+- **Écran « Lieux de vente »** (*Plus → Réglages → Lieux de vente*) : la liste avec le nombre de ventes de chaque lieu, **Nouveau
+  lieu**, **Renommer** (le nom change partout) et **Supprimer**. Un lieu qui a des ventes ne se supprime qu'en choisissant **où les
+  déplacer** (un autre lieu, ou « Non renseigné ») : aucune vente n'est jamais supprimée.
+- **Les ventes déjà enregistrées restent « Non renseigné »** : rien n'est rattaché à un lieu sans que vous l'ayez choisi.
+- Deux lieux ne peuvent pas porter le même nom (sans tenir compte des majuscules, des accents ni des espaces) ; 60 caractères au plus ;
+  « Non renseigné » est réservé.
+- L'**export CSV** des ventes a une colonne « Lieu de vente ». Les **statistiques par lieu** viendront à l'étape suivante du plan.
+- Le schéma de la base passe en **version 4** (table `lieux_vente`, colonne `ventes.lieu_id`, migration automatique) ; les
+  anciennes sauvegardes se restaurent normalement.
+
 ### Ce que contient l'étape 11 : sauvegarde et export
 
 - **Écran « Sauvegarde et export »** (écran 23, *Plus → Réglages → Sauvegarde et export*) : sauvegarder, partager, restaurer

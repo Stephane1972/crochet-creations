@@ -11,6 +11,7 @@ import 'core/theme/theme_mode_provider.dart';
 import 'data/database/app_database.dart';
 import 'data/providers.dart';
 import 'data/repositories/parametres_repository.dart';
+import 'data/sauvegarde/espace_libre.dart';
 import 'data/sauvegarde/service_sauvegarde.dart';
 import 'data/stockage/selecteur_photo.dart';
 import 'data/stockage/stockage_pdf.dart';
@@ -50,6 +51,7 @@ Future<void> main() async {
       dossierPhotos: photos.dossier,
       dossierFactures: factures.dossier,
       dossierDevis: devis.dossier,
+      espaceLibre: const ControleEspaceLibreSysteme(),
     );
 
     // Photo prise juste avant qu'Android ferme l'application (rare) : retrouvée une seule fois, ici, puis proposée

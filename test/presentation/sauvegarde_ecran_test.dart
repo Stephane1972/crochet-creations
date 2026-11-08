@@ -338,7 +338,8 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     expect(await nomsDesProduits(tester, env), <String>['Doudou lapin']);
     final File copie = env.selecteurFichier.derniereCopie!;
-    expect(await env.travailler(tester, () => copie.exists()), isFalse, reason: 'la copie de travail est supprimée');
+    await attendreJusqua(tester, () => !copie.existsSync()); // la suppression se fait juste après le dernier écran
+    expect(copie.existsSync(), isFalse, reason: 'la copie de travail est supprimée');
 
     await env.fermer(tester);
   });
@@ -360,7 +361,8 @@ void main() {
     expect(find.textContaining('pas une sauvegarde'), findsOneWidget);
     expect(find.byType(AlertDialog), findsNothing);
     final File copie = env.selecteurFichier.derniereCopie!;
-    expect(await env.travailler(tester, () => copie.exists()), isFalse, reason: 'la copie de travail est supprimée');
+    await attendreJusqua(tester, () => !copie.existsSync()); // la suppression se fait juste après le dernier écran
+    expect(copie.existsSync(), isFalse, reason: 'la copie de travail est supprimée');
 
     await tester.pumpWidget(const SizedBox());
     expect(await nomsDesProduits(tester, env), <String>['Doudou lapin']);

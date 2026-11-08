@@ -226,6 +226,72 @@ void main() {
     await env.fermer(tester);
   });
 
+  testWidgets('une photo introuvable : la sauvegarde est faite, mais annoncée incomplète', (
+    WidgetTester tester,
+  ) async {
+    final EnvironnementTest env = await EnvironnementTest.creer(tester);
+    await env.creerProduit(tester, photo: 'photo_9.jpg'); // citée par les données, absente du téléphone
+    await ouvrirEcran(tester, env);
+
+    await toucher(tester, dansEcran(find.text('Sauvegarder maintenant')));
+    await attendre(tester, find.textContaining('Sauvegarde créée, mais incomplète'));
+    expect(find.textContaining('1 photo citée par vos données est introuvable'), findsOneWidget);
+    await attendre(tester, dansEcran(find.text('Incomplète : des photos manquaient')));
+
+    final List<SauvegardeLocale> liste = await env.travailler(tester, () => env.sauvegarde.lister());
+    expect(liste.single.complete, isFalse);
+    expect(liste.single.nom, 'crochet-creations-manuelle-2026-10-31-150000-incomplete.zip');
+
+    await env.fermer(tester);
+  });
+
+  testWidgets('restaurer une sauvegarde incomplète : l’avertissement avant, le compte rendu après', (
+    WidgetTester tester,
+  ) async {
+    final EnvironnementTest env = await EnvironnementTest.creer(tester);
+    env.maintenant = _maintenant;
+    await env.creerProduit(tester, photo: 'photo_9.jpg');
+    await env.travailler(tester, () => env.sauvegarde.creer(TypeSauvegarde.manuelle));
+    await ouvrirEcran(tester, env);
+
+    await choisirDansMenu(tester, 'crochet-creations-manuelle-2026-10-31-150000-incomplete.zip', 'Restaurer');
+    expect(dansDialogue(find.textContaining('ATTENTION, cette sauvegarde est incomplète')), findsOneWidget);
+    expect(dansDialogue(find.textContaining('1 photo manquait déjà')), findsOneWidget);
+
+    await toucher(tester, dansDialogue(find.text('Restaurer')));
+    await attendre(tester, find.text('Restauration terminée'));
+    expect(dansDialogue(find.textContaining('1 photo manquait dans la sauvegarde')), findsOneWidget);
+    await toucher(tester, dansDialogue(find.text('Retour à l’accueil')));
+
+    await env.fermer(tester);
+  });
+
+  testWidgets('la carte de progression dit l’étape et compte les fichiers', (WidgetTester tester) async {
+    Future<void> montrer(ProgressionSauvegarde progression) => tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: CarteProgressionSauvegarde(progression: progression)),
+      ),
+    );
+
+    await montrer(const ProgressionSauvegarde(EtapeSauvegarde.empreintes, 12, 340));
+    expect(find.text('Étape 2 sur 4 : Contrôle de vos photos et PDF'), findsOneWidget);
+    expect(find.text('12 sur 340 fichiers'), findsOneWidget);
+    expect(find.text('Ne fermez pas l’application avant la fin.'), findsOneWidget);
+
+    await montrer(const ProgressionSauvegarde(EtapeSauvegarde.controleFichiers, 3, 8));
+    expect(find.text('Étape 1 sur 3 : Contrôle des fichiers de la sauvegarde'), findsOneWidget);
+    expect(find.text('3 sur 8 fichiers'), findsOneWidget);
+
+    // La copie de sécurité compte en millièmes : on ne les montre pas comme des fichiers.
+    await montrer(const ProgressionSauvegarde(EtapeSauvegarde.copieDeSecurite, 500, 1000));
+    expect(find.text('Étape 2 sur 3 : Copie de sécurité de vos données actuelles'), findsOneWidget);
+    expect(find.textContaining('fichiers'), findsNothing);
+
+    await montrer(const ProgressionSauvegarde(EtapeSauvegarde.verification, 0, 1));
+    expect(find.text('Étape 4 sur 4 : Vérification de la sauvegarde'), findsOneWidget);
+    expect(find.textContaining('sur 1 fichiers'), findsNothing);
+  });
+
   testWidgets('renoncer à la restauration ne change rien', (WidgetTester tester) async {
     final EnvironnementTest env = await EnvironnementTest.creer(tester);
     env.maintenant = _maintenant;
@@ -251,7 +317,13 @@ void main() {
     final EnvironnementTest env = await EnvironnementTest.creer(tester);
     env.maintenant = _maintenant;
     await env.creerProduit(tester);
-    env.selecteurFichier.contenu = await env.travailler(tester, () => env.sauvegarde.fabriquerArchive());
+    // Une sauvegarde « reçue par e-mail » : on prend le fichier d'une sauvegarde faite ici, puis on le retire de la liste.
+    env.selecteurFichier.contenu = await env.travailler(tester, () async {
+      final SauvegardeLocale faite = await env.sauvegarde.creer(TypeSauvegarde.manuelle);
+      final Uint8List octets = await faite.fichier.readAsBytes();
+      await env.sauvegarde.supprimer(faite);
+      return octets;
+    });
     await env.creerProduit(tester, nom: 'Bonnet');
     await ouvrirEcran(tester, env);
 
@@ -265,6 +337,8 @@ void main() {
 
     await tester.pumpWidget(const SizedBox());
     expect(await nomsDesProduits(tester, env), <String>['Doudou lapin']);
+    final File copie = env.selecteurFichier.derniereCopie!;
+    expect(await env.travailler(tester, () => copie.exists()), isFalse, reason: 'la copie de travail est supprimée');
 
     await env.fermer(tester);
   });
@@ -285,6 +359,8 @@ void main() {
     expect(env.selecteurFichier.appels, 2);
     expect(find.textContaining('pas une sauvegarde'), findsOneWidget);
     expect(find.byType(AlertDialog), findsNothing);
+    final File copie = env.selecteurFichier.derniereCopie!;
+    expect(await env.travailler(tester, () => copie.exists()), isFalse, reason: 'la copie de travail est supprimée');
 
     await tester.pumpWidget(const SizedBox());
     expect(await nomsDesProduits(tester, env), <String>['Doudou lapin']);

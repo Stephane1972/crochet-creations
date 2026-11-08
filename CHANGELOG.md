@@ -6,7 +6,54 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
 
 ## [Non publié]
 
-## [0.16.0] — Bloc-notes (en attente de validation)
+## [0.17.0] — Sauvegarde locale fiable (en attente de validation)
+
+### Ajouté
+- **Une sauvegarde qui ne passe plus par la mémoire** : l'archive `.zip` est écrite **fichier après fichier** directement sur le
+  téléphone. Avant, toute l'archive (photos et PDF compris) était fabriquée en mémoire : cela ne serait pas passé avec des vidéos.
+  Les photos et PDF sont rangés tels quels dans l'archive (ils sont déjà compressés), pas recompressés.
+- **La liste des fichiers avec leur empreinte** : un nouveau fichier `fichiers.json` dans l'archive donne, pour chaque photo et
+  chaque PDF, sa **taille** et son **empreinte SHA-256**. À la restauration, chaque fichier est relu et comparé **avant de
+  toucher à quoi que ce soit** : une archive abîmée est refusée, et rien n'est modifié (ni les données, ni les photos, ni les PDF,
+  et aucune copie de sécurité inutile).
+- **Sauvegarde « complète » ou « incomplète »** : une sauvegarde est **incomplète** quand une **photo** citée par les données
+  (photo d'un produit, d'un cours, d'un ticket de dépense, logo) **manque ou est illisible** sur le téléphone. Elle est faite quand
+  même, mais :
+  - son nom se termine par **`-incomplete`** ;
+  - la liste des sauvegardes l'indique (**« Incomplète : des photos manquaient »**, icône d'avertissement) ;
+  - l'application le dit en fin de sauvegarde, et **avant** une restauration (« ATTENTION, cette sauvegarde est incomplète… ») ;
+  - le compte rendu d'une restauration dit combien de photos n'ont pas pu être remises.
+  Un **PDF** de facture manquant ne rend **pas** la sauvegarde incomplète : il se refabrique à la demande.
+  Le même contrôle s'applique à **toutes les archives à restaurer**, même celles faites avec une version précédente.
+- **Une progression** pendant une sauvegarde ou une restauration : « Étape 2 sur 4 : Contrôle de vos photos et PDF — 12 sur 340
+  fichiers », avec une barre qui avance.
+- **Un contrôle de la place libre** avant d'écrire une sauvegarde ou de restaurer : s'il n'y en a pas assez, un message dit combien il
+  faut et combien il reste, et rien n'est écrit. Si le téléphone se remplit quand même en route, le fichier provisoire est effacé et
+  un message clair explique ce qui s'est passé (jamais de sauvegarde à moitié écrite).
+- **Une vérification après l'écriture** : l'archive qui vient d'être écrite est relue (elle s'ouvre, contient exactement les fichiers
+  annoncés, avec les bonnes tailles) avant de prendre son nom définitif.
+
+### Modifié
+- **Restaurer depuis un fichier** : le fichier choisi est recopié **en flux** dans le dossier temporaire (il n'est plus lu d'un
+  bloc en mémoire), puis cette copie de travail est supprimée.
+- **Ordre de la restauration** : les fichiers sont d'abord extraits et contrôlés dans un dossier provisoire, **puis** la copie de
+  sécurité est faite, puis les données sont remplacées. Une archive abîmée ne laisse donc aucune copie de sécurité inutile.
+- Une sauvegarde et une restauration ne se font plus **en même temps** (la sauvegarde automatique du démarrage et un appui sur
+  « Sauvegarder maintenant » se mettent à la suite l'une de l'autre).
+- Le format de l'archive passe en **version 2** (`fichiers.json`, et dans le manifeste `complete` et `fichiersAbsents`). Les
+  archives du **format 1** (toutes celles faites jusqu'ici) se restaurent toujours ; leurs fichiers ne peuvent simplement pas être
+  contrôlés par empreinte.
+- Nouvelles dépendances, gratuites : `crypto` (SHA-256) et `disk_space_plus` (place libre du téléphone) ; `archive` demande
+  désormais la version 4.6.0 au moins.
+- Le numéro de version de l'application passe à 0.17.0 (build 20). La mention « en attente de validation » de l'étape 2 est
+  retirée : elle a été validée (PR #19).
+
+### Inchangé volontairement
+- Les sauvegardes automatiques sont toujours au nombre de 7 (les copies de sécurité, 3) : avec des vidéos (étape 4), ces nombres
+  seront à revoir.
+- Aucune sauvegarde sur Google Drive pour l'instant : c'est l'objet des étapes 6 et 7.
+
+## [0.16.0] — Bloc-notes
 
 ### Ajouté
 - **Un bloc-notes** (*Plus → Bloc-notes*) : des notes avec un **titre** (obligatoire, 120 caractères au plus), un **texte**

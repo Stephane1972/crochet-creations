@@ -109,10 +109,11 @@ crochet-creations/
 │   │   │   └── ressources_pdf.dart           polices Poppins et logo lus dans les ressources
 │   │   ├── partage/service_documents.dart    partage (share_plus) et impression (printing), remplaçables en test
 │   │   ├── sauvegarde/
-│   │   │   ├── format_sauvegarde.dart        contenu d'une archive, liste des tables dans l'ordre, nommage, types de sauvegarde
-│   │   │   ├── service_sauvegarde.dart       sauvegarder, lister, sauvegarde automatique, restaurer, export JSON
+│   │   │   ├── format_sauvegarde.dart        contenu d'une archive (format 2), tables dans l'ordre, colonnes qui citent des fichiers, modèles de progression
+│   │   │   ├── service_sauvegarde.dart       sauvegarder (en flux, avec empreintes), lister, sauvegarde automatique, restaurer (avec contrôle), export JSON
+│   │   │   ├── espace_libre.dart             place libre du téléphone (interface + mesure Android par disk_space_plus)
 │   │   │   ├── export_csv.dart               export CSV : un .zip, un fichier par type de données
-│   │   │   └── selecteur_fichier.dart        choix du fichier à restaurer (interface + sélecteur Android)
+│   │   │   └── selecteur_fichier.dart        choix du fichier à restaurer : copie de travail en flux (interface + sélecteur Android)
 │   │   ├── partage/
 │   │   │   └── service_partage_fichiers.dart partage d'un fichier quelconque (sauvegarde, export) par la feuille de partage
 │   │   ├── stockage/
@@ -868,41 +869,85 @@ aux statistiques. Les chiffres clés portent des `Key` (`stat-ca`, `stat-marge`�
 
 ### L'archive (`ServiceSauvegarde`, `FormatSauvegarde`)
 
-Un `.zip` avec `donnees.json` et les fichiers. `donnees.json` contient un **manifeste** (`application`, `format` = version de
-l'organisation du fichier, `versionSchema` = `AppDatabase.versionSchema`, `versionApplication`, `creeLe`, `nombreFichiers`,
-`lignes` par table) puis `tables` : pour chacune des 19 tables, ses lignes lues par `SELECT * … ORDER BY id`, **telles que
+Un `.zip` avec `donnees.json`, `fichiers.json` (format 2) et les fichiers. `donnees.json` contient un **manifeste**
+(`application`, `format` = version de l'organisation du fichier (2), `versionSchema` = `AppDatabase.versionSchema`,
+`versionApplication`, `creeLe`, `nombreFichiers`, `lignes` par table, et depuis le format 2 `complete` et `fichiersAbsents`)
+puis `tables` : pour chacune des 19 tables, ses lignes lues par `SELECT * … ORDER BY id`, **telles que
 SQLite les stocke** (dates en secondes, booléens 0/1, énumérations en texte). Rien n'est recalculé : une sauvegarde restaurée
 redonne exactement les mêmes lignes (un test le vérifie table par table). Les 19 lectures se font dans **une transaction** :
 l'instantané est cohérent même si l'application écrit en même temps. Les fichiers sont rangés sous
 `fichiers/<dossier>/<nom>` (`photos_produits`, `factures`, `devis`) ; la base ne garde que des noms relatifs, ils retrouvent
 donc leur place.
 
+`fichiers.json` donne, pour chaque fichier de l'archive, `{chemin: "dossier/nom", octets, sha256}`. Les fichiers sont ajoutés
+à l'archive **sans compression** (`ZipFileEncoder.store` : photos et PDF sont déjà compressés), `donnees.json` et `fichiers.json`
+sont compressés. Le format 1 (archive fabriquée en mémoire, sans `fichiers.json`) se lit toujours : voir « Restaurer ».
+
 `FormatSauvegarde.tables` donne les tables **dans l'ordre où on peut les remplir** (une table après celles qu'elle
 référence) ; on les vide dans l'ordre inverse. Un test compare cette liste à `allTables` de la base **et** vérifie l'ordre avec
 `PRAGMA foreign_key_list` : une nouvelle table oubliée ou mal placée fait échouer la CI.
 
+`FormatSauvegarde.colonnesFichiers` liste les colonnes de la base qui contiennent un **nom de fichier** (`produits.photo_principale_chemin`,
+`photos_produit.chemin`, `cours.photo_chemin`, `depenses.photo_ticket_chemin`, `parametres_entreprise.logo_chemin`, et
+`factures.pdf_chemin` marquée **remplaçable** : un PDF se refabrique). Un test vérifie que ces colonnes existent **et** qu'aucune
+colonne dont le nom contient « chemin » n'a été oubliée : une future pièce jointe (étape 4) devra y être ajoutée, sinon la sauvegarde
+ne pourrait pas dire qu'un fichier manque. Une sauvegarde est **incomplète** quand une photo (fichier irremplaçable) citée par les
+données n'est pas dans l'archive ; les fichiers qui ne suivent pas le modèle de nom accepté à la restauration, ou qui ne se lisent
+pas, ne sont pas archivés (et comptent comme manquants s'ils sont cités).
+
 ### Où et quand
 
 Les sauvegardes sont dans `<documents>/sauvegardes/`, nommées `crochet-creations-<type>-AAAA-MM-JJ-HHMMSS.zip`
-(`auto`, `manuelle`, `avant-restauration`, suffixe `-2`, `-3`… si deux tombent dans la même seconde). La date vient du nom,
-sans changement de schéma ; les fichiers qui ne suivent pas ce modèle (provisoires `.tmp`, fichiers étrangers) sont ignorés.
-Les écritures passent par un fichier provisoire renommé ensuite (`ecrireAtomiquement`) : jamais d'archive à moitié écrite.
+(`auto`, `manuelle`, `avant-restauration`, suffixe `-2`, `-3`… si deux tombent dans la même seconde, et `-incomplete` juste avant
+`.zip` pour une sauvegarde incomplète). La date et le caractère complet viennent du nom, sans changement de schéma (la liste ne
+lit donc aucune archive) ; les fichiers qui ne suivent pas ce modèle (provisoires `.tmp`, fichiers étrangers) sont ignorés.
+Les écritures passent par un fichier provisoire (`….zip.tmp`) renommé ensuite : jamais d'archive à moitié écrite ; un provisoire
+laissé par une interruption est effacé à la sauvegarde suivante. L'export JSON utilise `ecrireAtomiquement`.
 `main()` lance `sauvegarderAutomatiquementSiBesoin()` **après** `runApp`, sans l'attendre : une sauvegarde automatique est
 faite si la dernière (automatique ou manuelle, pas une copie de sécurité) date d'un jour ou plus. Rotation : 7 automatiques, 3
 copies de sécurité ; les manuelles ne sont supprimées que par la personne.
 
+### Créer une sauvegarde (`creer`)
+
+Une seule sauvegarde ou restauration à la fois (`_enSerie` : file d'attente interne) : sinon l'une effacerait les fichiers
+provisoires de l'autre (la sauvegarde automatique du démarrage peut tomber pendant un appui sur « Sauvegarder maintenant »).
+
+1. **Lire la base** : les 19 tables dans une transaction.
+2. **Lister les fichiers** présents (`photos_produits`, `factures`, `devis`) et calculer pour chacun sa **taille et son SHA-256 en
+   flux** (`sha256.bind(fichier.openRead())`, jamais le fichier entier en mémoire). Un fichier illisible n'est pas archivé. Les
+   photos citées par les données mais absentes de cette liste donnent `fichiersAbsents` : la sauvegarde est **incomplète**.
+3. **Contrôler la place** : `ControleEspaceLibre.octetsLibres` (somme des fichiers + JSON + marge de 10 Mo). Mesure inconnue (`null`) :
+   on tente quand même. Trop peu de place : `DonneeInvalide` qui dit combien il faut et combien il reste, avant d'avoir écrit.
+4. **Écrire** `….zip.tmp` avec `ZipFileEncoder` : `donnees.json`, `fichiers.json`, puis chaque fichier lu en flux.
+5. **Relire** l'archive écrite (`ZipDecoder.decodeStream` sur un `InputFileStream` : seul l'annuaire central est lu) : elle doit
+   contenir `donnees.json`, `fichiers.json` et **exactement** les fichiers annoncés, avec les bonnes tailles (un fichier qui a changé
+   pendant la copie est détecté ici).
+6. Renommer le provisoire (avec `-incomplete` si besoin), puis purger les plus anciennes sauvegardes du même type.
+
+À la moindre erreur, le provisoire est effacé. Un refus du système d'écrire faute de place (`FileSystemException`, code ENOSPC) est
+traduit en message clair. La progression est annoncée à chaque pas par un rappel `SurProgression` (`ProgressionSauvegarde` :
+étape, fait, total) ; l'écran n'en redessine que toutes les 100 ms.
+
 ### Restaurer
 
-1. `examiner` (sans effet) : décode le zip, vérifie le manifeste (`application`, `format` et `versionSchema` pas plus récents que
-   ceux de l'application), le type des valeurs et les noms de fichiers (**uniquement** `fichiers/<dossier connu>/<nom>`, sans
-   `..`, `\` ni `:`). Une archive refusée n'a produit aucune copie de sécurité ni aucun fichier.
-2. Copie de sécurité (`avant-restauration`) de l'état actuel.
-3. Les fichiers de l'archive sont écrits dans des dossiers provisoires `….restauration`.
-4. **Une transaction** vide les tables (ordre inverse) puis les remplit (ordre direct) avec des `INSERT` paramétrés ; chaque
+1. `examiner(File)` (sans effet) : ouvre le zip **en flux** (`InputFileStream` : seul l'annuaire central et `donnees.json` /
+   `fichiers.json` sont lus), vérifie le manifeste (`application`, `format` et `versionSchema` pas plus récents que ceux de
+   l'application), le type des valeurs et les noms de fichiers (**uniquement** `fichiers/<dossier connu>/<nom>`, sans `..`, `\`
+   ni `:`). Pour le **format 2**, la liste `fichiers.json` doit être bien formée et **correspondre exactement** au contenu de
+   l'archive (aucun fichier absent, aucun fichier non annoncé, mêmes tailles). Les photos citées mais absentes de l'archive sont
+   calculées **à partir des données et du contenu** (pas du manifeste) : vrai aussi pour une archive du format 1. Une archive
+   refusée n'a produit aucune copie de sécurité ni aucun fichier.
+2. **Contrôle de la place** pour les fichiers à extraire.
+3. Les fichiers de l'archive sont **extraits un par un** (`ArchiveFile.writeContent` vers un `OutputFileStream`) dans des dossiers
+   provisoires `….restauration`, et **relus** : taille et SHA-256 doivent être ceux annoncés (format 1 : seulement la taille).
+   Un fichier abîmé arrête tout : dossiers provisoires supprimés, rien n'a été modifié, pas de copie de sécurité.
+4. Copie de sécurité (`avant-restauration`) de l'état actuel. Elle vient **après** l'extraction : si on restaure justement la plus
+   ancienne copie de sécurité, la nouvelle copie peut la supprimer (rotation) sans gêner la restauration en cours (un test le vérifie).
+5. **Une transaction** vide les tables (ordre inverse) puis les remplit (ordre direct) avec des `INSERT` paramétrés ; chaque
    colonne de l'archive est vérifiée contre `PRAGMA table_info`. Les contraintes `CHECK` et les clés étrangères de la base
    jouent leur rôle : une archive incohérente fait échouer la transaction, qui est annulée (`DonneeInvalide`, dossiers
    provisoires supprimés, fichiers intacts).
-5. `markTablesUpdated` prévient Drift (les écrans qui lisent en direct se rafraîchissent), puis chaque dossier de fichiers est
+6. `markTablesUpdated` prévient Drift (les écrans qui lisent en direct se rafraîchissent), puis chaque dossier de fichiers est
    échangé avec son dossier provisoire (renommages).
 L'écran relit ensuite le mode jour / nuit restauré, remet à zéro la vente en cours et renvoie à l'accueil.
 
@@ -918,8 +963,10 @@ autant de cellules que d'en-têtes ; `echapperCsv` protège les cellules qui con
 
 `SauvegardeScreen` n'a pas de logique propre : il appelle `ServiceSauvegarde`, `ExportCsv`, `ServicePartageFichiers` (partage
 d'un fichier par `share_plus`) et `SelecteurFichierSauvegarde` (`file_picker`), tous fournis par des providers que les tests
-remplacent (faux partage, faux sélecteur, dossiers temporaires). Une opération en cours désactive les boutons (barre de
-progression) ; une erreur métier s'affiche telle quelle, sinon une phrase générale.
+remplacent (faux partage, faux sélecteur, dossiers temporaires). Une opération en cours désactive les boutons et affiche la
+**progression** (`CarteProgressionSauvegarde` : « Étape n sur N : … », « x sur y fichiers » ; barre en haut de l'écran) ; une erreur
+métier s'affiche telle quelle, sinon une phrase générale. Le sélecteur de fichiers donne une **copie de travail** (recopiée en flux
+dans le dossier temporaire : le sélecteur 13 ne donne plus de chemin) que l'écran supprime après la restauration.
 
 ## Dossier `android/`
 
@@ -961,7 +1008,8 @@ dans Google Cloud pour la connexion à Google Drive (étapes suivantes). Les deu
 | Photos des produits | `image_picker` (galerie et appareil photo, aucune permission à déclarer), copie dans le dossier privé de l'application ; chemin relatif en base | étape 3 |
 | Variantes dans l'étape 3 | L'interface des variantes (couleur / taille, stock propre) fait partie de l'étape 3 : c'est la réalisation du champ « couleur / variante » de la fiche produit | étape 3, à confirmer |
 | Factures PDF | `pdf` (mise en page), `printing` (aperçu et impression), `share_plus` (partage) ; PDF rangés dans le dossier privé, nom du fichier en base | étape 6 |
-| Sauvegarde et export | `archive` (fabriquer et lire les `.zip`, en mémoire) et `file_picker` (choisir un fichier à restaurer, sélecteur du système sans permission) ; partage par `share_plus` | étape 11 |
+| Sauvegarde et export | `archive` (fabriquer et lire les `.zip` ; depuis l'étape 3 du plan d'évolution, **en flux** : `ZipFileEncoder`, `InputFileStream`, `OutputFileStream`) et `file_picker` (choisir un fichier à restaurer, sélecteur du système sans permission) ; partage par `share_plus` | étape 11 |
+| Sauvegarde fiable | `crypto` (SHA-256 des fichiers, en flux) ; `disk_space_plus` (place libre du téléphone, derrière l'interface `ControleEspaceLibre` : une mesure impossible est traitée comme « inconnue » et ne bloque jamais une sauvegarde) | étape 3 du plan d'évolution |
 | Dépendances des étapes suivantes | arriveront avec les étapes qui s'en servent | à venir |
 
 ### Hypothèses du schéma, à confirmer
@@ -1054,6 +1102,13 @@ téléphone et sur le même, copie de sécurité qui permet de revenir en arriè
 annulée en cas de colonne inconnue / contrainte / liaison cassée, écrans prévenus, sauvegarde automatique et rotation, export
 JSON), `export_csv_test` (contenu de chaque fichier, archive, BOM) et `sauvegarde_ecran_test` (parcours de l'écran).
 `test/data/aide_donnees.dart` remplit **les 19 tables** et compare deux états de la base ligne à ligne.
+Sauvegarde fiable (étape 3 du plan d'évolution) : `service_sauvegarde_test` (colonnes qui citent des fichiers, `fichiers.json` avec
+tailles et SHA-256, gros fichier aller-retour, sauvegarde complète / incomplète — nom, liste, manifeste, restauration —, PDF absent non
+bloquant, archives du format 1, progression, place libre insuffisante, provisoire effacé, sauvegardes simultanées, archive abîmée refusée
+avant toute modification : empreinte, taille, fichier absent, non annoncé, liste mal formée, restauration de la plus ancienne copie de
+sécurité) et `sauvegarde_ecran_test` (sauvegarde incomplète annoncée, avertissement avant et compte rendu après restauration, carte
+de progression, copie de travail du sélecteur supprimée). L'interface `ControleEspaceLibre` est remplacée par un faux dans les tests
+(la vraie mesure dépend d'Android).
 
 Finitions (étape 12) : `photo_retrouvee_test` (la photo retrouvée est proposée par les formulaires des produits, des cours et
 des dépenses, utilisée une seule fois, oubliée quand une autre photo est choisie, ignorée si son fichier a disparu).

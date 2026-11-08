@@ -124,6 +124,11 @@ Le développement se fait en 12 étapes validées une par une (détail dans [ROA
 - **Une sauvegarde = un fichier `.zip`** qui contient **toutes les données** (produits, clients, ventes, factures, devis,
   cours, inscriptions, dépenses, réglages, compteurs de numéros) **et les fichiers** : photos des produits et des tickets,
   PDF des factures et des devis. Elle est rangée sur le téléphone, avec sa date et son heure.
+- **Une sauvegarde fiable** (étape 3 du plan d'évolution) : elle est **écrite fichier après fichier** (jamais entièrement en
+  mémoire), avec la **liste des fichiers, leur taille et leur empreinte SHA-256**, puis **relue** avant d'être rangée. Elle est
+  **incomplète** si une **photo** citée par les données manque sur le téléphone : son nom se termine alors par `-incomplete` et la
+  liste l'indique. L'application **contrôle la place libre** avant d'écrire et affiche une **progression** (étape, fichiers faits).
+  À la restauration, **chaque fichier est contrôlé avant de toucher à quoi que ce soit** : une archive abîmée est refusée.
 - **Sauvegarde automatique** : à l'ouverture de l'application, si la dernière sauvegarde date d'**un jour ou plus**, une
   nouvelle est faite en arrière-plan, sans rien demander. Les **7 dernières** sont conservées ; les plus anciennes sont
   supprimées.
@@ -132,9 +137,10 @@ Le développement se fait en 12 étapes validées une par une (détail dans [ROA
   de la **supprimer**.
 - **Restaurer** (depuis la liste, ou **depuis un fichier** `.zip` choisi dans le téléphone, par exemple reçu par e-mail) :
   l'application vérifie d'abord que c'est bien une sauvegarde de l'application, dit ce qu'elle contient et demande
-  confirmation. La restauration **remplace tout** (données, photos, PDF). Juste avant, une **copie de sécurité** de l'état
-  actuel est faite (les 3 dernières sont conservées, dans la même liste). Si la restauration échoue en route, **rien n'est
-  modifié**.
+  confirmation (en avertissant si la sauvegarde est **incomplète**). La restauration **remplace tout** (données, photos, PDF).
+  Juste avant de remplacer, une **copie de sécurité** de l'état actuel est faite (les 3 dernières sont conservées, dans la même
+  liste). Si la restauration échoue en route, **rien n'est modifié**. Les sauvegardes faites avec les versions précédentes se
+  restaurent toujours (leurs fichiers ne peuvent simplement pas être contrôlés par empreinte).
 - **Export CSV** : un `.zip` avec **un tableau par type** — produits, clients, ventes, factures, devis, cours,
   inscriptions, dépenses — à ouvrir dans Excel ou LibreOffice (séparateur point-virgule, montants en euros `12,50`, dates
   `05/03/2026`, accents corrects). Un CSV sert à lire ou à calculer, **pas à restaurer** : pour cela, il faut une sauvegarde.

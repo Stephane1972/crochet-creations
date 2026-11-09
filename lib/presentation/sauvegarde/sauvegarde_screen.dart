@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -217,7 +218,9 @@ class _SauvegardeScreenState extends ConsumerState<SauvegardeScreen> {
       ),
     );
     if (!mounted) return;
-    await Navigator.of(context).pushNamedAndRemoveUntil(AppRoutes.accueil, (Route<dynamic> route) => false);
+    // Pas de « await » : ce futur ne se termine que lorsque la page d'accueil est quittée, et rien ne doit rester
+    // en attente derrière (la copie de travail du sélecteur est supprimée dès que cette fonction se termine).
+    unawaited(Navigator.of(context).pushNamedAndRemoveUntil(AppRoutes.accueil, (Route<dynamic> route) => false));
   }
 
   Future<void> _exporterCsv() {

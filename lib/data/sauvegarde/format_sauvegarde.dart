@@ -4,10 +4,11 @@ import 'dart:io';
 ///
 /// Une sauvegarde est un fichier `.zip` qui contient :
 /// - `donnees.json` : un « manifeste » (application, version du format et du schéma, date, sauvegarde complète
-///   ou non) et **toutes les lignes des 19 tables** de la base, telles qu'elles sont enregistrées ;
+///   ou non) et **toutes les lignes des 20 tables** de la base, telles qu'elles sont enregistrées ;
 /// - `fichiers.json` (format 2) : la **liste des fichiers** de l'archive, avec la taille et l'empreinte SHA-256 de
 ///   chacun, pour vérifier à la restauration que rien n'a été abîmé ;
-/// - `fichiers/photos_produits/…`, `fichiers/factures/…`, `fichiers/devis/…` : les photos et les PDF.
+/// - `fichiers/photos_produits/…`, `fichiers/factures/…`, `fichiers/devis/…`, `fichiers/notes_pieces_jointes/…` : les
+///   photos, les PDF et les pièces jointes des notes (photos, vidéos, documents).
 ///
 /// Le même `donnees.json` sert à l'export JSON complet (sans les fichiers).
 abstract final class FormatSauvegarde {
@@ -29,10 +30,16 @@ abstract final class FormatSauvegarde {
   static const String dossierPhotos = 'photos_produits';
   static const String dossierFactures = 'factures';
   static const String dossierDevis = 'devis';
+  static const String dossierPiecesJointes = 'notes_pieces_jointes';
 
-  static const List<String> dossiersFichiers = <String>[dossierPhotos, dossierFactures, dossierDevis];
+  static const List<String> dossiersFichiers = <String>[
+    dossierPhotos,
+    dossierFactures,
+    dossierDevis,
+    dossierPiecesJointes,
+  ];
 
-  /// Les 19 tables, **dans l'ordre où on peut les remplir** : une table vient après celles qu'elle référence
+  /// Les 20 tables, **dans l'ordre où on peut les remplir** : une table vient après celles qu'elle référence
   /// (une vente après son client, une ligne après sa vente...). On les vide dans l'ordre inverse.
   /// Un test vérifie que cette liste est exactement celle de la base : une nouvelle table doit y être ajoutée.
   static const List<String> tables = <String>[
@@ -55,6 +62,7 @@ abstract final class FormatSauvegarde {
     'depenses',
     'categories_note',
     'notes',
+    'pieces_jointes_note',
   ];
 
   /// Les colonnes de la base qui contiennent un **nom de fichier**. Un test vérifie qu'elles existent : une
@@ -66,6 +74,8 @@ abstract final class FormatSauvegarde {
     ColonneFichier(table: 'cours', colonne: 'photo_chemin', dossier: dossierPhotos),
     ColonneFichier(table: 'depenses', colonne: 'photo_ticket_chemin', dossier: dossierPhotos),
     ColonneFichier(table: 'parametres_entreprise', colonne: 'logo_chemin', dossier: dossierPhotos),
+    // Photos, vidéos et documents joints aux notes : irremplaçables, comme les photos.
+    ColonneFichier(table: 'pieces_jointes_note', colonne: 'nom_fichier', dossier: dossierPiecesJointes),
     // Un PDF de facture se refabrique à la demande : son absence n'est pas une perte. (Un devis ne cite pas
     // son PDF dans la base : il est rangé sous son numéro, et refabriqué de la même façon.)
     ColonneFichier(table: 'factures', colonne: 'pdf_chemin', dossier: dossierFactures, remplacable: true),

@@ -6,6 +6,39 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
 
 ## [Non publié]
 
+## [0.18.0] — Pièces jointes des notes (en attente de validation)
+
+### Ajouté
+- **Des pièces jointes dans les notes** : photos, vidéos et documents. Dans l'écran d'une note, **Ajouter une pièce jointe** propose
+  *Prendre une photo*, *Choisir une photo dans la galerie*, *Filmer une vidéo*, *Choisir une vidéo dans la galerie* et *Choisir un
+  document (PDF, Word, tableur…)*.
+- **Des limites annoncées avant l'ajout** (dans le formulaire et dans la feuille d'ajout) : **25 Mo** par photo et par document,
+  **150 Mo** par vidéo, **20 pièces jointes** par note. Un fichier trop gros ou vide est refusé avec un message clair, **sans rien copier**.
+- **Une copie en flux** : le fichier choisi est copié dans l'application **par morceaux** (une vidéo de 150 Mo ne passe jamais entièrement
+  par la mémoire), dans un fichier provisoire renommé à la fin. En cas d'échec (limite, lecture, téléphone plein), le fichier provisoire
+  est effacé.
+- **Ouvrir une pièce jointe** : une photo s'affiche en plein écran dans l'application (zoom) ; une vidéo ou un document s'ouvre dans
+  l'application du téléphone qui sait le lire. Sans application adaptée, un message le dit.
+- **Retirer une pièce jointe** (bouton de la ligne) : elle n'est effacée du téléphone qu'**à l'enregistrement** de la note ; en abandonnant la
+  saisie, les copies des pièces ajoutées sont effacées et les pièces déjà enregistrées ne bougent pas.
+- **Supprimer une note** supprime aussi ses pièces jointes (en base et dans le téléphone).
+- La **liste des notes** indique le nombre de pièces jointes de chaque note.
+- **Sauvegarde** : les pièces jointes partent dans l'archive (dossier `notes_pieces_jointes`, avec taille et SHA-256 comme les photos) et
+  se restaurent sur un autre téléphone. Une pièce jointe dont le fichier manque rend la sauvegarde **incomplète** (comme une photo
+  manquante). Une archive faite avant cette version se restaure normalement : aucune pièce jointe.
+
+### Modifié
+- Le schéma de la base passe en **version 6** : table `pieces_jointes_note` (la pièce pointe vers sa note, supprimée avec elle ; le nom du
+  fichier rangé est unique). Migration automatique depuis le schéma 5, rien d'autre ne bouge. La sauvegarde contient désormais 20 tables.
+- Nouvelle dépendance gratuite : `open_filex` (ouvrir un fichier avec l'application du téléphone).
+- Le numéro de version de l'application passe à 0.18.0 (build 21).
+
+### Inchangé volontairement
+- Pas de lecteur de vidéo intégré (il alourdirait l'application) : la vidéo s'ouvre dans l'application du téléphone.
+- Les sauvegardes automatiques restent au nombre de 7 (copies de sécurité : 3) : avec des vidéos, ces nombres seront à revoir si l'espace
+  devient un souci.
+- Aucune sauvegarde ni partage sur Google Drive pour l'instant (étapes 6 à 8).
+
 ## [0.17.0] — Sauvegarde locale fiable (en attente de validation)
 
 ### Ajouté

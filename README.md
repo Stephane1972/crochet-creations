@@ -113,9 +113,24 @@ Le développement se fait en 12 étapes validées une par une (détail dans [ROA
   se supprime qu'en choisissant **où les déplacer** (une autre catégorie, ou « Sans catégorie ») : aucune note n'est jamais supprimée.
 - Deux catégories ne peuvent pas porter le même nom (sans tenir compte des majuscules, des accents ni des espaces) ; 60 caractères
   au plus ; « Sans catégorie » est réservé.
-- Les **pièces jointes** (photos, vidéos, documents) viendront à l'étape 4 du plan.
+- Les **pièces jointes** (photos, vidéos, documents) sont décrites plus bas (étape 4 du plan d'évolution).
 - Le schéma de la base passe en **version 5** (tables `categories_note` et `notes`, migration automatique) ; la **sauvegarde**
   contient aussi le bloc-notes, et les anciennes sauvegardes se restaurent normalement.
+
+### Pièces jointes des notes (étape 4 de l'évolution)
+
+- Dans l'écran d'une note, la section **Pièces jointes** : **Ajouter une pièce jointe** propose *Prendre une photo*, *Choisir une
+  photo dans la galerie*, *Filmer une vidéo*, *Choisir une vidéo dans la galerie* et *Choisir un document (PDF, Word, tableur…)*.
+- **Limites, affichées avant l'ajout** : 25 Mo au plus par photo et par document, 150 Mo au plus par vidéo, 20 pièces jointes au plus
+  par note. Un fichier trop gros est refusé avec un message qui dit la limite ; rien n'est copié.
+- Le fichier est **copié dans l'application** (la galerie peut être vidée sans rien perdre). Une **photo** s'ouvre en plein écran dans
+  l'application ; une **vidéo** ou un **document** s'ouvre dans l'application du téléphone qui sait le lire.
+- **Retirer** une pièce jointe, ou **supprimer la note**, efface aussi le fichier du téléphone — mais seulement une fois la note enregistrée :
+  en abandonnant la saisie, rien n'est perdu.
+- La liste des notes indique le **nombre de pièces jointes** de chaque note.
+- Le schéma de la base passe en **version 6** (table `pieces_jointes_note`, migration automatique). La **sauvegarde** emporte les pièces
+  jointes (dossier `notes_pieces_jointes`) ; si l'un de ces fichiers manque sur le téléphone, la sauvegarde est signalée **incomplète**.
+  Les anciennes sauvegardes se restaurent normalement (sans pièce jointe). Nouvelle dépendance gratuite : `open_filex`.
 
 ### Ce que contient l'étape 11 : sauvegarde et export
 

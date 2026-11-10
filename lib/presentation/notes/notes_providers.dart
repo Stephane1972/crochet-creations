@@ -19,6 +19,11 @@ final nombreNotesParCategorieProvider = StreamProvider.autoDispose<Map<int, int>
   (ref) => ref.watch(categorieNoteRepositoryProvider).observerNombreNotesParCategorie(),
 );
 
+/// Nombre de pièces jointes de chaque note, par identifiant. Les notes sans pièce jointe n'y figurent pas.
+final nombrePiecesJointesParNoteProvider = StreamProvider.autoDispose<Map<int, int>>(
+  (ref) => ref.watch(noteRepositoryProvider).observerNombrePiecesJointesParNote(),
+);
+
 /// La catégorie d'identifiant [id] dans [categories], ou `null` (« Sans catégorie ») si [id] est vide ou n'existe plus.
 CategorieNote? categorieNoteParId(List<CategorieNote> categories, int? id) {
   if (id == null) return null;

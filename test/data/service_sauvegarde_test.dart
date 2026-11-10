@@ -3,12 +3,14 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart' show Archive, ArchiveFile, ZipDecoder, ZipEncoder;
+import 'package:crypto/crypto.dart' show sha256;
 import 'package:crochet_creations/data/database/app_database.dart';
 import 'package:crochet_creations/data/repositories/categorie_note_repository.dart';
 import 'package:crochet_creations/data/repositories/categorie_repository.dart';
 import 'package:crochet_creations/data/repositories/client_repository.dart';
 import 'package:crochet_creations/data/repositories/lieu_vente_repository.dart';
 import 'package:crochet_creations/data/repositories/note_repository.dart';
+import 'package:crochet_creations/data/sauvegarde/espace_libre.dart';
 import 'package:crochet_creations/data/sauvegarde/format_sauvegarde.dart';
 import 'package:crochet_creations/data/sauvegarde/service_sauvegarde.dart';
 import 'package:crochet_creations/domain/categories_produit.dart';
@@ -19,6 +21,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'aide_base.dart';
 import 'aide_donnees.dart';
 
+/// Place libre réglable : `null` = « on ne sait pas » (aucun contrôle).
+class _FauxEspaceLibre implements ControleEspaceLibre {
+  int? octets;
+
+  @override
+  Future<int?> octetsLibres(Directory dossier) async => octets;
+}
+
 /// Un « téléphone » de test : une base en mémoire, des dossiers temporaires et une horloge qu'on règle.
 class _Banc {
   _Banc._(this.db, this.racine);
@@ -28,6 +38,8 @@ class _Banc {
   final AppDatabase db;
   final Directory racine;
   DateTime maintenant = DateTime(2026, 10, 31, 13, 49, 12);
+  final _FauxEspaceLibre espace = _FauxEspaceLibre();
+  int _numeroArchive = 0;
 
   Directory get photos => Directory('${racine.path}/photos_produits');
   Directory get factures => Directory('${racine.path}/factures');
@@ -41,7 +53,30 @@ class _Banc {
     dossierFactures: factures,
     dossierDevis: devis,
     horloge: () => maintenant,
+    espaceLibre: espace,
   );
+
+  /// Une sauvegarde du moment, sortie du dossier des sauvegardes comme un fichier reçu d'ailleurs.
+  Future<File> archive() async {
+    final SauvegardeLocale faite = await service.creer(TypeSauvegarde.manuelle);
+    final Directory dossier = await Directory('${racine.path}/archives').create(recursive: true);
+    return faite.fichier.rename('${dossier.path}/archive_${++_numeroArchive}.zip');
+  }
+
+  Future<Uint8List> octetsArchive() async => (await archive()).readAsBytes();
+
+  /// Écrit [octets] dans un fichier (une archive abîmée, par exemple).
+  Future<File> ecrire(Uint8List octets) async {
+    final Directory dossier = await Directory('${racine.path}/archives').create(recursive: true);
+    final File fichier = File('${dossier.path}/archive_${++_numeroArchive}.zip');
+    await fichier.writeAsBytes(octets);
+    return fichier;
+  }
+
+  Future<ResultatRestauration> restaurer(Uint8List octets, {SurProgression? surProgression}) async =>
+      service.restaurer(await ecrire(octets), surProgression: surProgression);
+
+  Future<ManifesteSauvegarde> examiner(Uint8List octets) async => service.examiner(await ecrire(octets));
 
   Future<void> fermer() async {
     await db.close();
@@ -106,6 +141,21 @@ Uint8List _modifierDonnees(Uint8List archive, void Function(Map<String, dynamic>
   return Uint8List.fromList(ZipEncoder().encode(copie));
 }
 
+/// Recopie [archive] en remplaçant (ou ajoutant) des entrées ; une valeur `null` retire l'entrée.
+Uint8List _retoucher(Uint8List archive, Map<String, List<int>?> changements) {
+  final Archive source = ZipDecoder().decodeBytes(archive);
+  final Archive copie = Archive();
+  for (final ArchiveFile f in source) {
+    if (!changements.containsKey(f.name)) copie.add(ArchiveFile.bytes(f.name, f.content));
+  }
+  changements.forEach((String nom, List<int>? contenu) {
+    if (contenu != null) copie.add(ArchiveFile.bytes(nom, contenu));
+  });
+  return Uint8List.fromList(ZipEncoder().encode(copie));
+}
+
+String _empreinteDe(String texte) => sha256.convert(utf8.encode(texte)).toString();
+
 Matcher _erreurAvecMessage(String morceau) =>
     isA<DonneeInvalide>().having((DonneeInvalide e) => e.message, 'message', contains(morceau));
 
@@ -141,15 +191,47 @@ void main() {
     });
   });
 
+  group('les colonnes qui citent des fichiers', () {
+    test('existent toutes dans la base, et aucune colonne « chemin » n’est oubliée', () async {
+      final Set<String> declarees = <String>{};
+      for (final ColonneFichier c in FormatSauvegarde.colonnesFichiers) {
+        declarees.add('${c.table}.${c.colonne}');
+        expect(FormatSauvegarde.dossiersFichiers, contains(c.dossier));
+      }
+      for (final String table in FormatSauvegarde.tables) {
+        final infos = await banc.db.customSelect('PRAGMA table_info("$table")').get();
+        for (final String colonne in infos.map((r) => r.read<String>('name'))) {
+          if (declarees.remove('$table.$colonne')) continue;
+          expect(colonne, isNot(contains('chemin')), reason: '« $table.$colonne » cite-t-elle un fichier ? Ajoutez-la à FormatSauvegarde.colonnesFichiers.');
+        }
+      }
+      expect(declarees, isEmpty, reason: 'colonnes déclarées mais absentes de la base');
+    });
+
+    test('les photos citées par les données de test sont reconnues, pas les PDF', () async {
+      await remplirBase(banc.db);
+      final Set<String> citees = FormatSauvegarde.fichiersIrremplacablesCites(await instantane(banc.db));
+      expect(citees, <String>{'photos_produits/$photoPrincipale', 'photos_produits/$photoSecondaire'});
+    });
+
+    test('un chemin est ramené à son nom de fichier', () {
+      expect(FormatSauvegarde.nomDeFichier('/data/user/0/app/photos_produits/photo_9.jpg'), 'photo_9.jpg');
+      expect(FormatSauvegarde.nomDeFichier(r'C:\photos\photo_9.jpg'), 'photo_9.jpg');
+      expect(FormatSauvegarde.nomDeFichier('photo_9.jpg'), 'photo_9.jpg');
+      expect(FormatSauvegarde.nomDeFichier('  '), '');
+    });
+  });
+
   group('créer une sauvegarde', () {
     test('l’archive contient les données, les photos et les PDF', () async {
       await remplirBase(banc.db);
       await banc.ecrireFichiers();
 
-      final Uint8List octets = await banc.service.fabriquerArchive();
+      final Uint8List octets = await banc.octetsArchive();
       final Archive archive = ZipDecoder().decodeBytes(octets);
       expect(archive.map((ArchiveFile f) => f.name).toSet(), <String>{
         'donnees.json',
+        'fichiers.json',
         'fichiers/photos_produits/$photoPrincipale',
         'fichiers/photos_produits/$photoSecondaire',
         'fichiers/factures/$pdfFacture',
@@ -168,9 +250,9 @@ void main() {
     test('le manifeste se lit sans rien modifier', () async {
       await remplirBase(banc.db);
       await banc.ecrireFichiers();
-      final Uint8List octets = await banc.service.fabriquerArchive();
+      final Uint8List octets = await banc.octetsArchive();
 
-      final ManifesteSauvegarde manifeste = banc.service.examiner(octets);
+      final ManifesteSauvegarde manifeste = await banc.examiner(octets);
       expect(manifeste.creeLe, banc.maintenant);
       expect(manifeste.nombreFichiers, 4);
       expect(manifeste.lignesDe('produits'), 1);
@@ -203,9 +285,316 @@ void main() {
     test('les fichiers provisoires (.tmp) ne partent pas dans l’archive', () async {
       await banc.ecrireFichiers();
       await banc.ajouterFichier(banc.photos, 'photo_3.jpg.tmp', 'à moitié écrite');
-      final Archive archive = ZipDecoder().decodeBytes(await banc.service.fabriquerArchive());
+      final Archive archive = ZipDecoder().decodeBytes(await banc.octetsArchive());
       expect(archive.find('fichiers/photos_produits/photo_3.jpg.tmp'), isNull);
       expect(archive.find('fichiers/photos_produits/$photoPrincipale'), isNotNull);
+    });
+  });
+
+  group('liste des fichiers et empreintes', () {
+    test('fichiers.json donne la taille et l’empreinte SHA-256 de chaque photo et PDF', () async {
+      await remplirBase(banc.db);
+      await banc.ecrireFichiers();
+      final Archive archive = ZipDecoder().decodeBytes(await banc.octetsArchive());
+
+      final Map<String, dynamic> liste =
+          jsonDecode(utf8.decode(archive.find('fichiers.json')!.content)) as Map<String, dynamic>;
+      expect(liste['format'], FormatSauvegarde.version);
+      final List<Map<String, dynamic>> fichiers = (liste['fichiers'] as List<dynamic>).cast<Map<String, dynamic>>();
+      expect(fichiers.map((Map<String, dynamic> f) => f['chemin']).toList(), <String>[
+        'photos_produits/$photoPrincipale',
+        'photos_produits/$photoSecondaire',
+        'factures/$pdfFacture',
+        'devis/$pdfDevis',
+      ]);
+      expect(fichiers.first['octets'], 'photo 1'.length);
+      expect(fichiers.first['sha256'], _empreinteDe('photo 1'));
+      for (final Map<String, dynamic> f in fichiers) {
+        final ArchiveFile entree = archive.find('fichiers/${f['chemin']}')!;
+        expect(f['octets'], entree.size);
+        expect(f['sha256'], sha256.convert(entree.content).toString());
+      }
+    });
+
+    test('un gros fichier est sauvegardé puis restauré à l’identique', () async {
+      final List<int> gros = List<int>.generate(3 * 1024 * 1024, (int i) => (i * 31 + i ~/ 7) % 251);
+      await banc.photos.create(recursive: true);
+      final File photo = File('${banc.photos.path}/gros.jpg');
+      await photo.writeAsBytes(gros);
+
+      final File archive = await banc.archive();
+      expect(await archive.length(), greaterThan(gros.length), reason: 'rangé tel quel, sans recompression');
+      await photo.delete();
+
+      final ResultatRestauration resultat = await banc.service.restaurer(archive);
+      expect(resultat.fichiers, 1);
+      expect(await photo.readAsBytes(), gros);
+    });
+  });
+
+  group('sauvegarde complète ou incomplète', () {
+    test('toutes les photos citées sont là : la sauvegarde est complète', () async {
+      await remplirBase(banc.db);
+      await banc.ecrireFichiers();
+
+      final SauvegardeLocale s = await banc.service.creer(TypeSauvegarde.manuelle);
+      expect(s.complete, isTrue);
+      expect(s.fichiersAbsents, isEmpty);
+      expect(s.nom, 'crochet-creations-manuelle-2026-10-31-134912.zip');
+      expect((await banc.service.examiner(s.fichier)).complete, isTrue);
+      expect((await banc.service.lister()).single.complete, isTrue);
+      final Map<String, dynamic> manifeste = _lireDonnees(await s.fichier.readAsBytes())['manifeste'] as Map<String, dynamic>;
+      expect(manifeste['complete'], isTrue);
+      expect(manifeste['fichiersAbsents'], isEmpty);
+    });
+
+    test('une photo citée mais absente : incomplète, et on le voit au nom, dans la liste et dans le manifeste', () async {
+      await remplirBase(banc.db);
+      await banc.ecrireFichiers();
+      await File('${banc.photos.path}/$photoSecondaire').delete();
+
+      final SauvegardeLocale s = await banc.service.creer(TypeSauvegarde.manuelle);
+      expect(s.complete, isFalse);
+      expect(s.fichiersAbsents, <String>['photos_produits/$photoSecondaire']);
+      expect(s.nom, 'crochet-creations-manuelle-2026-10-31-134912-incomplete.zip');
+
+      final List<SauvegardeLocale> liste = await banc.service.lister();
+      expect(liste.single.complete, isFalse);
+      expect(liste.single.type, TypeSauvegarde.manuelle);
+      expect(liste.single.date, banc.maintenant);
+
+      final ManifesteSauvegarde manifeste = await banc.service.examiner(s.fichier);
+      expect(manifeste.complete, isFalse);
+      expect(manifeste.fichiersAbsents, <String>['photos_produits/$photoSecondaire']);
+      expect(manifeste.nombreFichiers, 3);
+
+      final Map<String, dynamic> dansArchive = _lireDonnees(await s.fichier.readAsBytes())['manifeste'] as Map<String, dynamic>;
+      expect(dansArchive['complete'], isFalse);
+      expect(dansArchive['fichiersAbsents'], <String>['photos_produits/$photoSecondaire']);
+    });
+
+    test('une sauvegarde incomplète reste restaurable, et la restauration dit ce qui manquait', () async {
+      await remplirBase(banc.db);
+      await banc.ecrireFichiers();
+      await File('${banc.photos.path}/$photoSecondaire').delete();
+      final SauvegardeLocale s = await banc.service.creer(TypeSauvegarde.manuelle);
+      final Map<String, List<Map<String, Object?>>> avant = await instantane(banc.db);
+
+      await banc.db.insererClient(nom: 'Martin'); // ajouté depuis la sauvegarde
+      final ResultatRestauration resultat = await banc.service.restaurer(s.fichier);
+      expect(resultat.fichiers, 3);
+      expect(resultat.fichiersAbsents, <String>['photos_produits/$photoSecondaire']);
+      expect(await instantane(banc.db), avant);
+      expect(await banc.contenuDe(banc.photos), <String, String>{photoPrincipale: 'photo 1'});
+    });
+
+    test('un PDF absent n’empêche pas la sauvegarde d’être complète : il se refabrique', () async {
+      await remplirBase(banc.db);
+      await banc.ecrireFichiers();
+      await File('${banc.factures.path}/$pdfFacture').delete();
+      await File('${banc.devis.path}/$pdfDevis').delete();
+
+      final SauvegardeLocale s = await banc.service.creer(TypeSauvegarde.manuelle);
+      expect(s.complete, isTrue);
+      expect((await banc.service.examiner(s.fichier)).nombreFichiers, 2);
+    });
+
+    test('deux sauvegardes dans la même seconde, dont une incomplète, ne s’écrasent pas', () async {
+      final SauvegardeLocale a = await banc.service.creer(TypeSauvegarde.manuelle);
+      await remplirBase(banc.db); // des photos citées, mais aucune sur le téléphone
+      final SauvegardeLocale b = await banc.service.creer(TypeSauvegarde.manuelle);
+      final SauvegardeLocale c = await banc.service.creer(TypeSauvegarde.manuelle);
+
+      expect(a.nom, 'crochet-creations-manuelle-2026-10-31-134912.zip');
+      expect(b.nom, 'crochet-creations-manuelle-2026-10-31-134912-2-incomplete.zip');
+      expect(c.nom, 'crochet-creations-manuelle-2026-10-31-134912-3-incomplete.zip');
+      final List<SauvegardeLocale> liste = await banc.service.lister();
+      expect(liste, hasLength(3));
+      expect(liste.where((SauvegardeLocale s) => !s.complete), hasLength(2));
+    });
+
+    test('une ancienne archive à laquelle il manque une photo est reconnue incomplète', () async {
+      await remplirBase(banc.db);
+      await banc.ecrireFichiers();
+      final Uint8List valide = await banc.octetsArchive();
+      final Uint8List ancienne = _retoucher(
+        _modifierDonnees(valide, (Map<String, dynamic> d) {
+          final Map<String, dynamic> m = d['manifeste'] as Map<String, dynamic>;
+          m['format'] = 1;
+          m.remove('complete');
+          m.remove('fichiersAbsents');
+        }),
+        <String, List<int>?>{'fichiers.json': null, 'fichiers/photos_produits/$photoSecondaire': null},
+      );
+
+      final ManifesteSauvegarde manifeste = await banc.examiner(ancienne);
+      expect(manifeste.format, 1);
+      expect(manifeste.complete, isFalse);
+      expect(manifeste.fichiersAbsents, <String>['photos_produits/$photoSecondaire']);
+    });
+  });
+
+  group('archives du format 1 (avant la liste des empreintes)', () {
+    test('se restaurent toujours, sans contrôle des empreintes', () async {
+      await remplirBase(banc.db);
+      await banc.ecrireFichiers();
+      final Uint8List valide = await banc.octetsArchive();
+      final Map<String, List<Map<String, Object?>>> avant = await instantane(banc.db);
+      final Uint8List ancienne = _retoucher(
+        _modifierDonnees(valide, (Map<String, dynamic> d) {
+          final Map<String, dynamic> m = d['manifeste'] as Map<String, dynamic>;
+          m['format'] = 1;
+          m.remove('complete');
+          m.remove('fichiersAbsents');
+        }),
+        <String, List<int>?>{'fichiers.json': null},
+      );
+
+      final ManifesteSauvegarde manifeste = await banc.examiner(ancienne);
+      expect(manifeste.format, 1);
+      expect(manifeste.empreintesVerifiables, isFalse);
+      expect(manifeste.complete, isTrue);
+      expect(manifeste.nombreFichiers, 4);
+
+      await banc.db.insererClient(nom: 'Martin');
+      await banc.db.delete(banc.db.depenses).go();
+      final ResultatRestauration resultat = await banc.restaurer(ancienne);
+      expect(resultat.fichiers, 4);
+      expect(await instantane(banc.db), avant);
+      expect(await banc.contenuDe(banc.photos), <String, String>{photoPrincipale: 'photo 1', photoSecondaire: 'photo 2'});
+    });
+  });
+
+  group('progression', () {
+    List<EtapeSauvegarde> suite(List<ProgressionSauvegarde> vues) {
+      final List<EtapeSauvegarde> etapes = <EtapeSauvegarde>[];
+      for (final ProgressionSauvegarde p in vues) {
+        if (etapes.isEmpty || etapes.last != p.etape) etapes.add(p.etape);
+      }
+      return etapes;
+    }
+
+    test('la création annonce ses quatre étapes dans l’ordre, chacune menée à son terme', () async {
+      await remplirBase(banc.db);
+      await banc.ecrireFichiers();
+
+      final List<ProgressionSauvegarde> vues = <ProgressionSauvegarde>[];
+      await banc.service.creer(TypeSauvegarde.manuelle, surProgression: vues.add);
+
+      expect(suite(vues), <EtapeSauvegarde>[
+        EtapeSauvegarde.lectureDonnees,
+        EtapeSauvegarde.empreintes,
+        EtapeSauvegarde.ecritureFichiers,
+        EtapeSauvegarde.verification,
+      ]);
+      for (final ProgressionSauvegarde p in vues) {
+        expect(p.fait, inInclusiveRange(0, p.total));
+        expect(p.numeroEtape, inInclusiveRange(1, p.nombreEtapes));
+        expect(p.nombreEtapes, 4);
+        expect(p.fraction, inInclusiveRange(0.0, 1.0));
+      }
+      for (final EtapeSauvegarde etape in EtapeSauvegarde.values.take(4)) {
+        final ProgressionSauvegarde derniere = vues.lastWhere((ProgressionSauvegarde p) => p.etape == etape);
+        expect(derniere.fait, derniere.total, reason: '$etape doit finir');
+      }
+      expect(vues.lastWhere((ProgressionSauvegarde p) => p.etape == EtapeSauvegarde.ecritureFichiers).total, 4);
+    });
+
+    test('la restauration annonce ses trois étapes dans l’ordre', () async {
+      await remplirBase(banc.db);
+      await banc.ecrireFichiers();
+      final Uint8List archive = await banc.octetsArchive();
+
+      final List<ProgressionSauvegarde> vues = <ProgressionSauvegarde>[];
+      await banc.restaurer(archive, surProgression: vues.add);
+
+      expect(suite(vues), <EtapeSauvegarde>[
+        EtapeSauvegarde.controleFichiers,
+        EtapeSauvegarde.copieDeSecurite,
+        EtapeSauvegarde.remplacement,
+      ]);
+      final ProgressionSauvegarde controle = vues.lastWhere(
+        (ProgressionSauvegarde p) => p.etape == EtapeSauvegarde.controleFichiers,
+      );
+      expect((controle.fait, controle.total), (4, 4));
+      expect(vues.every((ProgressionSauvegarde p) => p.nombreEtapes == 3), isTrue);
+      expect(vues.last.etape, EtapeSauvegarde.remplacement);
+      expect(vues.last.fait, vues.last.total);
+    });
+
+    test('sans fichier à compter, la fraction est inconnue (barre sans position)', () {
+      expect(const ProgressionSauvegarde(EtapeSauvegarde.empreintes, 0, 0).fraction, isNull);
+      expect(const ProgressionSauvegarde(EtapeSauvegarde.empreintes, 1, 4).fraction, 0.25);
+    });
+  });
+
+  group('place libre et fichiers provisoires', () {
+    test('pas assez de place : la sauvegarde est refusée avant d’écrire, avec un message clair', () async {
+      await remplirBase(banc.db);
+      await banc.ecrireFichiers();
+      banc.espace.octets = 5 * 1024 * 1024;
+
+      await expectLater(
+        banc.service.creer(TypeSauvegarde.manuelle),
+        throwsA(_erreurAvecMessage('il en reste 5 Mo')),
+      );
+      await expectLater(
+        banc.service.creer(TypeSauvegarde.manuelle),
+        throwsA(_erreurAvecMessage('pas assez de place')),
+      );
+      expect(await banc.service.lister(), isEmpty);
+      expect(await banc.service.dossierSauvegardes.list().toList(), isEmpty, reason: 'pas même un fichier provisoire');
+    });
+
+    test('assez de place, ou place inconnue : la sauvegarde se fait', () async {
+      await remplirBase(banc.db);
+      await banc.ecrireFichiers();
+
+      banc.espace.octets = 1 << 40;
+      await banc.service.creer(TypeSauvegarde.manuelle);
+      banc.espace.octets = null;
+      banc.maintenant = banc.maintenant.add(const Duration(minutes: 1));
+      await banc.service.creer(TypeSauvegarde.manuelle);
+      expect(await banc.service.lister(), hasLength(2));
+    });
+
+    test('restaurer avec trop peu de place : refusé, rien n’est modifié, pas de copie de sécurité', () async {
+      await remplirBase(banc.db);
+      await banc.ecrireFichiers();
+      final Uint8List archive = await banc.octetsArchive();
+      final Map<String, List<Map<String, Object?>>> avant = await instantane(banc.db);
+
+      banc.espace.octets = 1024;
+      await expectLater(banc.restaurer(archive), throwsA(_erreurAvecMessage('pas assez de place')));
+      expect(await instantane(banc.db), avant);
+      expect(await banc.contenuDe(banc.photos), hasLength(2));
+      expect(await banc.service.lister(), isEmpty);
+      await banc.verifierPropre();
+    });
+
+    test('un fichier provisoire laissé par une sauvegarde interrompue est effacé', () async {
+      await banc.service.dossierSauvegardes.create(recursive: true);
+      final File reste = File('${banc.service.dossierSauvegardes.path}/crochet-creations-auto-2026-10-30-080000.zip.tmp');
+      await reste.writeAsString('à moitié écrit');
+
+      await banc.service.creer(TypeSauvegarde.manuelle);
+      expect(await reste.exists(), isFalse);
+      expect(await banc.service.lister(), hasLength(1));
+    });
+
+    test('deux sauvegardes lancées en même temps se font l’une après l’autre', () async {
+      await remplirBase(banc.db);
+      await banc.ecrireFichiers();
+
+      final List<SauvegardeLocale> faites = await Future.wait(<Future<SauvegardeLocale>>[
+        banc.service.creer(TypeSauvegarde.manuelle),
+        banc.service.creer(TypeSauvegarde.manuelle),
+      ]);
+      expect(faites.map((SauvegardeLocale s) => s.nom).toSet(), hasLength(2));
+      for (final SauvegardeLocale s in faites) {
+        expect((await banc.service.examiner(s.fichier)).nombreFichiers, 4);
+      }
+      expect(await banc.service.dossierSauvegardes.list().length, 2, reason: 'aucun fichier provisoire oublié');
     });
   });
 
@@ -307,15 +696,32 @@ void main() {
   });
 
   group('restaurer', () {
+    test('la plus ancienne copie de sécurité se restaure, même si la nouvelle copie la supprime', () async {
+      final List<SauvegardeLocale> copies = <SauvegardeLocale>[];
+      for (final int minute in <int>[1, 2, 3]) {
+        banc.maintenant = DateTime(2026, 10, 31, 13, minute);
+        copies.add(await banc.service.creer(TypeSauvegarde.avantRestauration));
+      }
+      banc.maintenant = DateTime(2026, 10, 31, 14);
+
+      // La restauration fait une 4e copie : au-delà de 3, la plus ancienne (celle qu'on restaure) est supprimée.
+      await banc.service.restaurer(copies.first.fichier);
+
+      expect(await copies.first.fichier.exists(), isFalse);
+      final List<SauvegardeLocale> restantes = await banc.service.lister();
+      expect(restantes, hasLength(3));
+      expect(restantes.first.date, DateTime(2026, 10, 31, 14));
+    });
+
     test('sur un autre téléphone : les données, les photos et les PDF reviennent exactement', () async {
       await remplirBase(banc.db);
       await banc.ecrireFichiers();
-      final Uint8List archive = await banc.service.fabriquerArchive();
+      final Uint8List archive = await banc.octetsArchive();
       final Map<String, List<Map<String, Object?>>> avant = await instantane(banc.db);
 
       final _Banc autre = await _Banc.creer();
       addTearDown(autre.fermer);
-      final ResultatRestauration resultat = await autre.service.restaurer(archive);
+      final ResultatRestauration resultat = await autre.restaurer(archive);
 
       expect(await instantane(autre.db), avant);
       expect(resultat.fichiers, 4);
@@ -332,7 +738,7 @@ void main() {
     test('sur le même téléphone : ce qui a changé depuis est remplacé, les fichiers ajoutés disparaissent', () async {
       await remplirBase(banc.db);
       await banc.ecrireFichiers();
-      final Uint8List archive = await banc.service.fabriquerArchive();
+      final Uint8List archive = await banc.octetsArchive();
       final Map<String, List<Map<String, Object?>>> avant = await instantane(banc.db);
 
       // Depuis la sauvegarde : un client ajouté, une dépense supprimée, une photo ajoutée, un PDF perdu.
@@ -342,7 +748,7 @@ void main() {
       await File('${banc.factures.path}/$pdfFacture').delete();
       expect(await instantane(banc.db), isNot(avant));
 
-      await banc.service.restaurer(archive);
+      await banc.restaurer(archive);
 
       expect(await instantane(banc.db), avant);
       expect(await banc.contenuDe(banc.photos), <String, String>{
@@ -356,19 +762,19 @@ void main() {
     test('une copie de sécurité est faite avant, et la restaurer ramène l’état d’avant la restauration', () async {
       await remplirBase(banc.db);
       await banc.ecrireFichiers();
-      final Uint8List ancienne = await banc.service.fabriquerArchive();
+      final Uint8List ancienne = await banc.octetsArchive();
 
       await banc.db.insererClient(nom: 'Martin');
       await banc.ajouterFichier(banc.photos, 'photo_3.jpg', 'photo 3');
       final Map<String, List<Map<String, Object?>>> etatActuel = await instantane(banc.db);
 
-      await banc.service.restaurer(ancienne);
+      await banc.restaurer(ancienne);
       final List<SauvegardeLocale> liste = await banc.service.lister();
       expect(liste, hasLength(1));
       expect(liste.single.type, TypeSauvegarde.avantRestauration);
       expect(await instantane(banc.db), isNot(etatActuel));
 
-      await banc.service.restaurer(await liste.single.fichier.readAsBytes());
+      await banc.service.restaurer(liste.single.fichier);
       expect(await instantane(banc.db), etatActuel);
       expect(await banc.contenuDe(banc.photos), containsPair('photo_3.jpg', 'photo 3'));
     });
@@ -376,7 +782,7 @@ void main() {
     test('une sauvegarde faite avec le schéma 1 (sans « client_nom », catégories, lieux ni bloc-notes) est restaurée telle quelle', () async {
       await remplirBase(banc.db);
       await banc.ecrireFichiers();
-      final Uint8List actuelle = await banc.service.fabriquerArchive();
+      final Uint8List actuelle = await banc.octetsArchive();
       final Map<String, List<Map<String, Object?>>> avant = await instantane(banc.db);
 
       // On « vieillit » l'archive : version 1 dans le manifeste et plus de colonne « client_nom ».
@@ -399,7 +805,7 @@ void main() {
 
       await banc.db.delete(banc.db.paiements).go();
       await banc.db.delete(banc.db.factures).go();
-      await banc.service.restaurer(ancienne);
+      await banc.restaurer(ancienne);
 
       // Tout revient à l'identique ; les catégories, absentes de l'archive, sont recréées (les cinq de départ).
       // Les lieux de départ sont recréés, et la vente, qui n'avait pas de lieu dans l'archive, est « Non renseigné ».
@@ -444,12 +850,12 @@ void main() {
       );
       await categories.supprimer((await categories.parCle(CleCategorie.surMesure))!.id);
       await (banc.db.update(banc.db.produits)).write(ProduitsCompanion(categorie: Value(peluches.cle)));
-      final Uint8List archive = await banc.service.fabriquerArchive();
+      final Uint8List archive = await banc.octetsArchive();
       final Map<String, List<Map<String, Object?>>> avant = await instantane(banc.db);
 
       final _Banc autre = await _Banc.creer();
       addTearDown(autre.fermer);
-      await autre.service.restaurer(archive);
+      await autre.restaurer(archive);
 
       expect(await instantane(autre.db), avant);
       final List<CategorieProduit> restaurees = await CategorieRepository(autre.db).lister();
@@ -472,12 +878,12 @@ void main() {
       final LieuVente salon = (await lieux.lister()).firstWhere((LieuVente l) => l.nom == 'Salon');
       await lieux.supprimer(salon.id);
       await (banc.db.update(banc.db.ventes)).write(VentesCompanion(lieuId: Value(fete.id)));
-      final Uint8List archive = await banc.service.fabriquerArchive();
+      final Uint8List archive = await banc.octetsArchive();
       final Map<String, List<Map<String, Object?>>> avant = await instantane(banc.db);
 
       final _Banc autre = await _Banc.creer();
       addTearDown(autre.fermer);
-      await autre.service.restaurer(archive);
+      await autre.restaurer(archive);
 
       expect(await instantane(autre.db), avant);
       final LieuVenteRepository restaures = LieuVenteRepository(autre.db);
@@ -507,12 +913,12 @@ void main() {
       );
       await categories.supprimer(documents.id); // aucune note dedans : simple suppression
       await notes.creer(titre: 'Poncho', contenu: 'Laine bleue\n\n2 pelotes', categorieId: modeles.id);
-      final Uint8List archive = await banc.service.fabriquerArchive();
+      final Uint8List archive = await banc.octetsArchive();
       final Map<String, List<Map<String, Object?>>> avant = await instantane(banc.db);
 
       final _Banc autre = await _Banc.creer();
       addTearDown(autre.fermer);
-      await autre.service.restaurer(archive);
+      await autre.restaurer(archive);
 
       expect(await instantane(autre.db), avant);
       final CategorieNoteRepository restaurees = CategorieNoteRepository(autre.db);
@@ -531,7 +937,7 @@ void main() {
     test('une sauvegarde faite avant le bloc-notes (schéma 4) est restaurée : catégories de départ recréées, pas de note', () async {
       await remplirBase(banc.db);
       await banc.ecrireFichiers();
-      final Uint8List actuelle = await banc.service.fabriquerArchive();
+      final Uint8List actuelle = await banc.octetsArchive();
       final Map<String, List<Map<String, Object?>>> avant = await instantane(banc.db);
 
       final Uint8List ancienne = _modifierDonnees(actuelle, (Map<String, dynamic> d) {
@@ -545,7 +951,7 @@ void main() {
       await banc.db.delete(banc.db.categoriesNote).go();
       await banc.db.delete(banc.db.paiements).go();
       await banc.db.delete(banc.db.factures).go();
-      await banc.service.restaurer(ancienne);
+      await banc.restaurer(ancienne);
 
       final Map<String, List<Map<String, Object?>>> apres = await instantane(banc.db);
       expect(apres.remove('categories_note'), hasLength(2));
@@ -564,12 +970,12 @@ void main() {
       await banc.db.delete(banc.db.inscriptionsCours).go();
       final Client client = (await banc.db.select(banc.db.clients).get()).single;
       await ClientRepository(banc.db).supprimer(client.id);
-      final Uint8List archive = await banc.service.fabriquerArchive();
+      final Uint8List archive = await banc.octetsArchive();
       final Map<String, List<Map<String, Object?>>> avant = await instantane(banc.db);
 
       final _Banc autre = await _Banc.creer();
       addTearDown(autre.fermer);
-      await autre.service.restaurer(archive);
+      await autre.restaurer(archive);
 
       expect(await instantane(autre.db), avant);
       final Vente vente = (await autre.db.select(autre.db.ventes).get()).firstWhere((Vente v) => v.clientNom != null);
@@ -578,12 +984,12 @@ void main() {
     });
 
     test('une sauvegarde de base vide vide tout (la ligne des réglages est toujours là)', () async {
-      final Uint8List vide = await banc.service.fabriquerArchive();
+      final Uint8List vide = await banc.octetsArchive();
       final Map<String, List<Map<String, Object?>>> etatVide = await instantane(banc.db);
       await remplirBase(banc.db);
       await banc.ecrireFichiers();
 
-      await banc.service.restaurer(vide);
+      await banc.restaurer(vide);
 
       expect(await instantane(banc.db), etatVide);
       expect((await instantane(banc.db))['parametres_entreprise'], hasLength(1));
@@ -593,7 +999,7 @@ void main() {
 
     test('les écrans qui lisent la base en direct sont prévenus', () async {
       await remplirBase(banc.db);
-      final Uint8List archive = await banc.service.fabriquerArchive();
+      final Uint8List archive = await banc.octetsArchive();
 
       final List<int> nombres = <int>[];
       final subscription = banc.db.select(banc.db.clients).watch().listen((List<Client> l) => nombres.add(l.length));
@@ -603,7 +1009,7 @@ void main() {
       await pumpEventQueue();
       expect(nombres.last, 2);
 
-      await banc.service.restaurer(archive);
+      await banc.restaurer(archive);
       await pumpEventQueue();
       expect(nombres.last, 1);
     });
@@ -616,13 +1022,14 @@ void main() {
     setUp(() async {
       await remplirBase(banc.db);
       await banc.ecrireFichiers();
-      valide = await banc.service.fabriquerArchive();
+      valide = await banc.octetsArchive();
       avant = await instantane(banc.db);
     });
 
-    Future<void> refuser(Uint8List archive, String message) async {
-      expect(() => banc.service.examiner(archive), throwsA(_erreurAvecMessage(message)));
-      await expectLater(banc.service.restaurer(archive), throwsA(_erreurAvecMessage(message)));
+    // [aussiALExamen] : faux quand le défaut ne se voit qu'en relisant le contenu des fichiers (à la restauration).
+    Future<void> refuser(Uint8List archive, String message, {bool aussiALExamen = true}) async {
+      if (aussiALExamen) await expectLater(banc.examiner(archive), throwsA(_erreurAvecMessage(message)));
+      await expectLater(banc.restaurer(archive), throwsA(_erreurAvecMessage(message)));
       expect(await instantane(banc.db), avant);
       expect(await banc.contenuDe(banc.photos), hasLength(2));
       expect(await banc.service.lister(), isEmpty, reason: 'pas de copie de sécurité pour un fichier refusé');
@@ -677,6 +1084,74 @@ void main() {
     });
   });
 
+  group('une archive abîmée est refusée avant de toucher à quoi que ce soit', () {
+    late Uint8List valide;
+    late Map<String, List<Map<String, Object?>>> avant;
+
+    setUp(() async {
+      await remplirBase(banc.db);
+      await banc.ecrireFichiers();
+      valide = await banc.octetsArchive();
+      avant = await instantane(banc.db);
+    });
+
+    Future<void> refuser(Uint8List archive, String message, {bool aussiALExamen = true}) async {
+      if (aussiALExamen) await expectLater(banc.examiner(archive), throwsA(_erreurAvecMessage(message)));
+      await expectLater(banc.restaurer(archive), throwsA(_erreurAvecMessage(message)));
+      expect(await instantane(banc.db), avant);
+      expect(await banc.contenuDe(banc.photos), <String, String>{photoPrincipale: 'photo 1', photoSecondaire: 'photo 2'});
+      expect(await banc.contenuDe(banc.factures), <String, String>{pdfFacture: '%PDF facture'});
+      expect(await banc.service.lister(), isEmpty, reason: 'pas de copie de sécurité pour une archive refusée');
+      await banc.verifierPropre();
+    }
+
+    test('un fichier dont le contenu ne correspond plus à son empreinte (même taille)', () async {
+      await refuser(
+        _retoucher(valide, <String, List<int>?>{'fichiers/photos_produits/$photoPrincipale': utf8.encode('photo X')}),
+        'abîmée',
+        aussiALExamen: false, // seule la relecture du contenu le révèle
+      );
+    });
+
+    test('un fichier d’une autre taille que celle annoncée', () async {
+      await refuser(
+        _retoucher(valide, <String, List<int>?>{'fichiers/photos_produits/$photoPrincipale': utf8.encode('photo 1 plus longue')}),
+        'incompatible',
+      );
+    });
+
+    test('un fichier annoncé mais absent de l’archive', () async {
+      await refuser(_retoucher(valide, <String, List<int>?>{'fichiers/devis/$pdfDevis': null}), 'incompatible');
+    });
+
+    test('un fichier présent mais jamais annoncé', () async {
+      await refuser(
+        _retoucher(valide, <String, List<int>?>{'fichiers/photos_produits/intrus.jpg': utf8.encode('intrus')}),
+        'incompatible',
+      );
+    });
+
+    test('la liste des fichiers manque, n’est pas du JSON ou est mal formée', () async {
+      final String vide = _empreinteDe('');
+      final List<List<int>?> listes = <List<int>?>[
+        null,
+        utf8.encode('{pas du json'),
+        utf8.encode('{"fichiers": "oups"}'),
+        utf8.encode('{"fichiers": [{"chemin": "photos_produits/$photoPrincipale", "octets": 7, "sha256": "pas-une-empreinte"}]}'),
+        utf8.encode('{"fichiers": [{"chemin": "../evil.txt", "octets": 7, "sha256": "$vide"}]}'),
+        utf8.encode('{"fichiers": [{"chemin": "photos_produits/$photoPrincipale", "octets": -1, "sha256": "$vide"}]}'),
+        utf8.encode(
+          '{"fichiers": ['
+          '{"chemin": "photos_produits/$photoPrincipale", "octets": 7, "sha256": "$vide"},'
+          '{"chemin": "photos_produits/$photoPrincipale", "octets": 7, "sha256": "$vide"}]}',
+        ),
+      ];
+      for (final List<int>? liste in listes) {
+        await refuser(_retoucher(valide, <String, List<int>?>{'fichiers.json': liste}), 'incompatible');
+      }
+    });
+  });
+
   group('une restauration qui échoue en route est annulée', () {
     late Uint8List valide;
     late Map<String, List<Map<String, Object?>>> avant;
@@ -684,13 +1159,13 @@ void main() {
     setUp(() async {
       await remplirBase(banc.db);
       await banc.ecrireFichiers();
-      valide = await banc.service.fabriquerArchive();
+      valide = await banc.octetsArchive();
       avant = await instantane(banc.db);
     });
 
     Future<void> echouer(void Function(Map<String, dynamic> tables) abimer) async {
       final Uint8List abimee = _modifierDonnees(valide, (Map<String, dynamic> d) => abimer(d['tables'] as Map<String, dynamic>));
-      await expectLater(banc.service.restaurer(abimee), throwsA(_erreurAvecMessage('rien n’a été modifié')));
+      await expectLater(banc.restaurer(abimee), throwsA(_erreurAvecMessage('rien n’a été modifié')));
       expect(await instantane(banc.db), avant, reason: 'la transaction doit être annulée');
       expect(await banc.contenuDe(banc.photos), <String, String>{photoPrincipale: 'photo 1', photoSecondaire: 'photo 2'});
       await banc.verifierPropre();

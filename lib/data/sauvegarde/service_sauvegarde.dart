@@ -1,33 +1,45 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:archive/archive.dart' show Archive, ArchiveFile, ZipDecoder, ZipEncoder;
+import 'package:archive/archive.dart' show Archive, ArchiveFile, ZipDecoder;
+import 'package:archive/archive_io.dart' show InputFileStream, OutputFileStream, ZipFileEncoder;
+import 'package:crypto/crypto.dart' show sha256;
 import 'package:drift/drift.dart' show QueryRow;
 import 'package:flutter/foundation.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../domain/erreurs.dart';
 import '../database/app_database.dart';
+import 'espace_libre.dart';
 import 'format_sauvegarde.dart';
 
 /// Ce qu'une restauration a remis en place.
 class ResultatRestauration {
-  const ResultatRestauration({required this.lignes, required this.fichiers});
+  const ResultatRestauration({required this.lignes, required this.fichiers, this.fichiersAbsents = const <String>[]});
 
   /// Lignes de la base (produits, clients, ventes...) et fichiers (photos, PDF).
   final int lignes;
   final int fichiers;
+
+  /// Les photos citées par les données mais absentes de la sauvegarde (elle était incomplète) : elles n'ont
+  /// pas pu être remises.
+  final List<String> fichiersAbsents;
 }
 
-/// Sauvegarde et restauration des données (étape 11).
+/// Sauvegarde et restauration des données (étape 11, rendues fiables à l'étape 3 du plan d'évolution).
 ///
 /// - **Sauvegarder** : une archive `.zip` avec toute la base et les fichiers (voir [FormatSauvegarde]), rangée
-///   dans le dossier des sauvegardes de l'application.
+///   dans le dossier des sauvegardes de l'application. L'archive est **écrite en flux** (jamais entièrement en
+///   mémoire : des vidéos pourront s'y ajouter), avec la liste des fichiers et leur empreinte SHA-256, puis
+///   **relue** pour vérifier qu'elle est entière. Elle est dite **incomplète** si des photos citées par les
+///   données manquent sur le téléphone.
 /// - **Sauvegarde automatique** : à l'ouverture de l'application, si la dernière date de plus d'un jour ;
 ///   les 7 dernières sont conservées.
-/// - **Restaurer** : remplace **tout** (données, photos, PDF) par le contenu de l'archive, après une copie de
-///   sécurité de ce qui existait. Si la restauration échoue, rien n'a été modifié.
+/// - **Restaurer** : lit l'archive depuis un fichier, **vérifie l'empreinte de chaque fichier avant de toucher
+///   à quoi que ce soit**, puis remplace **tout** (données, photos, PDF), après une copie de sécurité de ce qui
+///   existait. Si la restauration échoue, rien n'a été modifié.
 ///
 /// Tout est lu et écrit tel quel (lignes SQL → JSON → lignes SQL) : aucun calcul n'est refait, un montant
 /// ou un numéro de facture revient donc exactement comme il était.
@@ -40,13 +52,15 @@ class ServiceSauvegarde {
     required Directory dossierFactures,
     required Directory dossierDevis,
     DateTime Function()? horloge,
+    ControleEspaceLibre? espaceLibre,
   }) : _base = base,
        _dossiers = <String, Directory>{
          FormatSauvegarde.dossierPhotos: dossierPhotos,
          FormatSauvegarde.dossierFactures: dossierFactures,
          FormatSauvegarde.dossierDevis: dossierDevis,
        },
-       _horloge = horloge ?? DateTime.now;
+       _horloge = horloge ?? DateTime.now,
+       _espaceLibre = espaceLibre ?? const ControleEspaceLibreInconnu();
 
   /// Nombre de sauvegardes automatiques conservées.
   static const int sauvegardesAutomatiquesConservees = 7;
@@ -57,9 +71,13 @@ class ServiceSauvegarde {
   /// Une sauvegarde automatique est faite si la dernière date de cette durée ou plus.
   static const Duration delaiSauvegardeAutomatique = Duration(days: 1);
 
+  /// Place laissée libre en plus de ce qu'il faut écrire (le téléphone a besoin de respirer).
+  static const int margeEspaceLibre = 10 * 1024 * 1024;
+
   final AppDatabase _base;
   final Map<String, Directory> _dossiers;
   final DateTime Function() _horloge;
+  final ControleEspaceLibre _espaceLibre;
 
   /// Où sont rangées les sauvegardes (créé à la première).
   final Directory dossierSauvegardes;
@@ -73,19 +91,147 @@ class ServiceSauvegarde {
       'Mettez l’application à jour avant de la restaurer.';
   static const String _messageIncompatible =
       'Cette sauvegarde est abîmée ou incompatible : rien n’a été modifié.';
+  static const String _messageIntrouvable = 'Ce fichier est introuvable sur le téléphone.';
+
+  // Une seule sauvegarde ou restauration à la fois : sinon l'une effacerait les fichiers provisoires de l'autre.
+  Future<void> _derniere = Future<void>.value();
+
+  Future<T> _enSerie<T>(Future<T> Function() travail) {
+    final Completer<T> resultat = Completer<T>();
+    _derniere = _derniere.then((_) async {
+      try {
+        resultat.complete(await travail());
+      } catch (erreur, pile) {
+        resultat.completeError(erreur, pile);
+      }
+    });
+    return resultat.future;
+  }
 
   // ---------------------------------------------------------------------------
   // Créer, lister, supprimer
   // ---------------------------------------------------------------------------
 
   /// Fabrique une sauvegarde du moment et la range dans le dossier des sauvegardes.
-  Future<SauvegardeLocale> creer(TypeSauvegarde type) async {
+  ///
+  /// Dans l'ordre : lecture de la base → liste des photos et PDF avec leur empreinte SHA-256 → contrôle de la
+  /// place libre → écriture de l'archive dans un fichier provisoire → relecture de l'archive → le fichier
+  /// prend son vrai nom. Au moindre problème, le fichier provisoire est effacé : on ne garde jamais une
+  /// sauvegarde à moitié écrite.
+  ///
+  /// [surProgression] est prévenue à chaque avancée (pour la barre de progression de l'écran).
+  Future<SauvegardeLocale> creer(TypeSauvegarde type, {SurProgression? surProgression}) {
+    return _enSerie(() => _creer(type, surProgression));
+  }
+
+  Future<SauvegardeLocale> _creer(TypeSauvegarde type, SurProgression? surProgression) async {
     final DateTime maintenant = _horloge();
-    final Uint8List octets = await fabriquerArchive();
-    final File fichier = await _fichierLibre(type, maintenant);
-    await ecrireAtomiquement(fichier, octets);
+    await dossierSauvegardes.create(recursive: true);
+    await _effacerProvisoires();
+
+    void avancer(EtapeSauvegarde etape, int fait, int total) =>
+        surProgression?.call(ProgressionSauvegarde(etape, fait, total));
+
+    // 1. Les données.
+    avancer(EtapeSauvegarde.lectureDonnees, 0, 1);
+    final _InstantaneBase donnees = await _lireBase();
+    avancer(EtapeSauvegarde.lectureDonnees, 1, 1);
+
+    // 2. Les photos et PDF : la liste, la taille et l'empreinte de chacun.
+    final List<_FichierLocal> presents = await _fichiersPresents();
+    final List<_FichierLocal> lisibles = <_FichierLocal>[];
+    final List<EmpreinteFichier> empreintes = <EmpreinteFichier>[];
+    avancer(EtapeSauvegarde.empreintes, 0, presents.length);
+    for (int i = 0; i < presents.length; i++) {
+      final _FichierLocal f = presents[i];
+      try {
+        // Un nom que la restauration refuserait n'entre pas dans l'archive ; un fichier illisible non plus.
+        if (_lireChemin(f.chemin) != null) {
+          final ({int octets, String sha256}) lu = await _empreinte(f.fichier);
+          empreintes.add(EmpreinteFichier(chemin: f.chemin, octets: lu.octets, sha256: lu.sha256));
+          lisibles.add(f);
+        }
+      } on FileSystemException catch (erreur) {
+        debugPrint('Fichier illisible, il ne sera pas sauvegardé : ${f.chemin} ($erreur)');
+      }
+      avancer(EtapeSauvegarde.empreintes, i + 1, presents.length);
+    }
+
+    // Une sauvegarde est « incomplète » si une photo citée par les données manque (ou est illisible).
+    final Set<String> disponibles = empreintes.map((EmpreinteFichier e) => e.chemin).toSet();
+    final List<String> absents =
+        FormatSauvegarde.fichiersIrremplacablesCites(donnees.tables).difference(disponibles).toList()..sort();
+
+    final List<int> jsonDonnees = _jsonDonnees(
+      donnees,
+      date: maintenant,
+      nombreFichiers: empreintes.length,
+      fichiersAbsents: absents,
+    );
+    final List<int> jsonListe = utf8.encode(
+      const JsonEncoder.withIndent('  ').convert(<String, Object?>{
+        'format': FormatSauvegarde.version,
+        'fichiers': empreintes.map((EmpreinteFichier e) => e.versJson()).toList(),
+      }),
+    );
+
+    final int octetsFichiers = empreintes.fold<int>(0, (int somme, EmpreinteFichier e) => somme + e.octets);
+    await _verifierPlace(octetsFichiers + jsonDonnees.length + jsonListe.length, 'faire la sauvegarde');
+
+    // 3. L'archive, écrite dans un fichier provisoire.
+    final File provisoire = File(
+      '${dossierSauvegardes.path}${Platform.pathSeparator}${_nomFichier(type, maintenant, 1, true)}.tmp',
+    );
+    final File fichier;
+    try {
+      final ZipFileEncoder encodeur = ZipFileEncoder()..create(provisoire.path);
+      try {
+        encodeur.addArchiveFile(ArchiveFile.bytes(FormatSauvegarde.fichierDonnees, jsonDonnees));
+        encodeur.addArchiveFile(ArchiveFile.bytes(FormatSauvegarde.fichierListe, jsonListe));
+        avancer(EtapeSauvegarde.ecritureFichiers, 0, lisibles.length);
+        for (int i = 0; i < lisibles.length; i++) {
+          // Photos et PDF sont déjà compressés : on les range tels quels, sans calcul inutile.
+          await encodeur.addFile(
+            lisibles[i].fichier,
+            '${FormatSauvegarde.prefixeFichiers}${lisibles[i].chemin}',
+            ZipFileEncoder.store,
+          );
+          avancer(EtapeSauvegarde.ecritureFichiers, i + 1, lisibles.length);
+        }
+      } finally {
+        await encodeur.close();
+      }
+
+      // 4. Relecture : l'archive écrite contient bien tout ce qu'elle annonce.
+      avancer(EtapeSauvegarde.verification, 0, 1);
+      await _verifierArchiveEcrite(provisoire, empreintes);
+      avancer(EtapeSauvegarde.verification, 1, 1);
+
+      fichier = await _fichierLibre(type, maintenant, complete: absents.isEmpty);
+      await provisoire.rename(fichier.path);
+    } catch (erreur, pile) {
+      await _effacer(provisoire);
+      if (erreur is ErreurMetier) rethrow;
+      debugPrint('Sauvegarde impossible : $erreur\n$pile');
+      if (_disqueRempli(erreur)) {
+        throw const DonneeInvalide(
+          'Le téléphone est plein : la sauvegarde n’a pas pu être écrite et a été abandonnée. '
+          'Libérez de la place (supprimez d’anciennes sauvegardes de la liste, des photos ou des applications '
+          'inutiles), puis recommencez.',
+        );
+      }
+      rethrow;
+    }
+
     await _purger(type);
-    return SauvegardeLocale(fichier: fichier, type: type, date: maintenant, octets: octets.length);
+    return SauvegardeLocale(
+      fichier: fichier,
+      type: type,
+      date: maintenant,
+      octets: await fichier.length(),
+      complete: absents.isEmpty,
+      fichiersAbsents: absents,
+    );
   }
 
   /// Les sauvegardes conservées sur le téléphone, de la plus récente à la plus ancienne.
@@ -95,10 +241,16 @@ class ServiceSauvegarde {
     await for (final FileSystemEntity entite in dossierSauvegardes.list()) {
       if (entite is! File) continue;
       final String nom = entite.uri.pathSegments.last;
-      final ({TypeSauvegarde type, DateTime date})? lu = _lireNom(nom);
+      final ({TypeSauvegarde type, DateTime date, bool complete})? lu = _lireNom(nom);
       if (lu == null) continue; // fichier provisoire ou étranger : ignoré
       resultat.add(
-        SauvegardeLocale(fichier: entite, type: lu.type, date: lu.date, octets: await entite.length()),
+        SauvegardeLocale(
+          fichier: entite,
+          type: lu.type,
+          date: lu.date,
+          octets: await entite.length(),
+          complete: lu.complete,
+        ),
       );
     }
     resultat.sort((SauvegardeLocale a, SauvegardeLocale b) {
@@ -142,19 +294,12 @@ class ServiceSauvegarde {
   // Contenu des archives
   // ---------------------------------------------------------------------------
 
-  /// L'archive .zip complète : `donnees.json` + photos et PDF.
-  Future<Uint8List> fabriquerArchive() async {
-    final Archive archive = Archive();
-    final List<ArchiveFile> fichiers = await _lireFichiers();
-    final List<int> json = await _fabriquerJson(nombreFichiers: fichiers.length);
-    archive.add(ArchiveFile.bytes(FormatSauvegarde.fichierDonnees, json));
-    fichiers.forEach(archive.add);
-    return Uint8List.fromList(ZipEncoder().encode(archive));
-  }
-
   /// L'export JSON complet : les mêmes données que l'archive, sans les photos ni les PDF.
   Future<Uint8List> fabriquerJson() async {
-    return Uint8List.fromList(await _fabriquerJson(nombreFichiers: await _compterFichiers()));
+    final _InstantaneBase donnees = await _lireBase();
+    return Uint8List.fromList(
+      _jsonDonnees(donnees, date: _horloge(), nombreFichiers: (await _fichiersPresents()).length),
+    );
   }
 
   /// Écrit l'export JSON du jour dans le dossier des exports (`crochet-creations-donnees-2026-10-31.json`) ;
@@ -169,113 +314,252 @@ class ServiceSauvegarde {
   }
 
   /// Lit toute la base d'un seul tenant (un instantané cohérent, même si l'application écrit en même temps).
-  Future<List<int>> _fabriquerJson({required int nombreFichiers}) async {
-    final Map<String, Object?> tables = <String, Object?>{};
-    final Map<String, int> lignes = <String, int>{};
+  Future<_InstantaneBase> _lireBase() async {
+    final Map<String, List<Map<String, Object?>>> tables = <String, List<Map<String, Object?>>>{};
     await _base.transaction(() async {
       for (final String table in FormatSauvegarde.tables) {
         final List<QueryRow> resultat = await _base.customSelect('SELECT * FROM "$table" ORDER BY id').get();
-        tables[table] = resultat.map((QueryRow ligne) => ligne.data).toList();
-        lignes[table] = resultat.length;
+        tables[table] = resultat.map<Map<String, Object?>>((QueryRow ligne) => ligne.data).toList();
       }
     });
+    return _InstantaneBase(tables);
+  }
+
+  /// `donnees.json` : le manifeste et toutes les lignes de toutes les tables. [fichiersAbsents] n'est donné que
+  /// pour une archive (l'export JSON n'a pas de fichiers).
+  List<int> _jsonDonnees(
+    _InstantaneBase donnees, {
+    required DateTime date,
+    required int nombreFichiers,
+    List<String>? fichiersAbsents,
+  }) {
     final Map<String, Object?> document = <String, Object?>{
       'manifeste': <String, Object?>{
         'application': FormatSauvegarde.application,
         'format': FormatSauvegarde.version,
         'versionSchema': AppDatabase.versionSchema,
         'versionApplication': AppConstants.version,
-        'creeLe': _horloge().toIso8601String(),
+        'creeLe': date.toIso8601String(),
         'nombreFichiers': nombreFichiers,
-        'lignes': lignes,
+        'lignes': <String, int>{
+          for (final String table in FormatSauvegarde.tables) table: donnees.tables[table]!.length,
+        },
+        if (fichiersAbsents != null) 'complete': fichiersAbsents.isEmpty,
+        if (fichiersAbsents != null) 'fichiersAbsents': fichiersAbsents,
       },
-      'tables': tables,
+      'tables': donnees.tables,
     };
     return utf8.encode(const JsonEncoder.withIndent('  ').convert(document));
   }
 
-  /// Les photos et PDF présents sur le téléphone (les fichiers provisoires `.tmp` sont ignorés), par dossier.
-  Future<Map<String, List<File>>> _fichiersPresents() async {
-    final Map<String, List<File>> resultat = <String, List<File>>{};
+  /// Les photos et PDF présents sur le téléphone (les fichiers provisoires `.tmp` sont ignorés), dossier par dossier.
+  Future<List<_FichierLocal>> _fichiersPresents() async {
+    final List<_FichierLocal> resultat = <_FichierLocal>[];
     for (final MapEntry<String, Directory> dossier in _dossiers.entries) {
-      final List<File> presents = <File>[];
-      if (await dossier.value.exists()) {
-        await for (final FileSystemEntity entite in dossier.value.list()) {
-          if (entite is File && !entite.path.endsWith('.tmp')) presents.add(entite);
-        }
+      if (!await dossier.value.exists()) continue;
+      final List<_FichierLocal> dansLeDossier = <_FichierLocal>[];
+      await for (final FileSystemEntity entite in dossier.value.list()) {
+        if (entite is! File) continue;
+        final String nom = entite.uri.pathSegments.last;
+        if (nom.endsWith('.tmp')) continue;
+        dansLeDossier.add(_FichierLocal(dossier: dossier.key, nom: nom, fichier: entite));
       }
-      presents.sort((File a, File b) => a.path.compareTo(b.path));
-      resultat[dossier.key] = presents;
+      dansLeDossier.sort((_FichierLocal a, _FichierLocal b) => a.nom.compareTo(b.nom));
+      resultat.addAll(dansLeDossier);
     }
     return resultat;
   }
 
-  Future<int> _compterFichiers() async {
-    int total = 0;
-    for (final List<File> liste in (await _fichiersPresents()).values) {
-      total += liste.length;
-    }
-    return total;
+  /// Taille et empreinte SHA-256 d'un fichier, lues en flux (le fichier n'est jamais entièrement en mémoire).
+  Future<({int octets, String sha256})> _empreinte(File fichier) async {
+    int octets = 0;
+    final Stream<List<int>> flux = fichier.openRead().map((List<int> morceau) {
+      octets += morceau.length;
+      return morceau;
+    });
+    final String empreinte = (await sha256.bind(flux).first).toString();
+    return (octets: octets, sha256: empreinte);
   }
 
-  /// Photos et PDF du téléphone, rangés dans `fichiers/<dossier>/<nom>`.
-  Future<List<ArchiveFile>> _lireFichiers() async {
-    final List<ArchiveFile> fichiers = <ArchiveFile>[];
-    for (final MapEntry<String, List<File>> dossier in (await _fichiersPresents()).entries) {
-      for (final File f in dossier.value) {
-        final String nom = f.uri.pathSegments.last;
-        fichiers.add(
-          ArchiveFile.bytes('${FormatSauvegarde.prefixeFichiers}${dossier.key}/$nom', await f.readAsBytes()),
-        );
+  /// Relit l'archive qu'on vient d'écrire : elle doit s'ouvrir, contenir `donnees.json`, `fichiers.json` et
+  /// exactement les fichiers annoncés, avec les bonnes tailles. (Les empreintes sont contrôlées à la restauration.)
+  Future<void> _verifierArchiveEcrite(File archive, List<EmpreinteFichier> attendus) async {
+    const DonneeInvalide echec = DonneeInvalide(
+      'La sauvegarde écrite n’a pas pu être vérifiée (un fichier a peut-être changé pendant la copie) : '
+      'elle a été abandonnée. Recommencez.',
+    );
+    final InputFileStream flux = InputFileStream(archive.path);
+    try {
+      final Archive contenu = ZipDecoder().decodeStream(flux);
+      final Map<String, int> tailles = <String, int>{
+        for (final ArchiveFile entree in contenu)
+          if (entree.isFile) entree.name: entree.size,
+      };
+      if (!tailles.containsKey(FormatSauvegarde.fichierDonnees) ||
+          !tailles.containsKey(FormatSauvegarde.fichierListe) ||
+          tailles.length != attendus.length + 2) {
+        throw echec;
       }
+      for (final EmpreinteFichier attendu in attendus) {
+        if (tailles['${FormatSauvegarde.prefixeFichiers}${attendu.chemin}'] != attendu.octets) throw echec;
+      }
+    } on ErreurMetier {
+      rethrow;
+    } catch (_) {
+      throw echec;
+    } finally {
+      await flux.close();
     }
-    return fichiers;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Place libre
+  // ---------------------------------------------------------------------------
+
+  /// Vérifie qu'il y a la place d'écrire [necessaire] octets (plus une marge), si on sait la mesurer.
+  Future<void> _verifierPlace(int necessaire, String action) async {
+    final int? libre = await _espaceLibre.octetsLibres(dossierSauvegardes);
+    if (libre == null) return;
+    final int besoin = necessaire + margeEspaceLibre;
+    if (libre >= besoin) return;
+    throw DonneeInvalide(
+      'Il n’y a pas assez de place sur le téléphone pour $action : il faut environ ${_enMegaoctets(besoin)} '
+      'et il en reste ${_enMegaoctets(libre, arrondiSuperieur: false)}. Libérez de la place (supprimez '
+      'd’anciennes sauvegardes de la liste, des photos ou des applications inutiles), puis recommencez.',
+    );
+  }
+
+  String _enMegaoctets(int octets, {bool arrondiSuperieur = true}) {
+    final double mo = octets / (1024 * 1024);
+    return '${(arrondiSuperieur ? mo.ceil() : mo.floor())} Mo';
+  }
+
+  /// Le système a refusé d'écrire parce qu'il n'y a plus de place (ENOSPC).
+  bool _disqueRempli(Object erreur) {
+    if (erreur is! FileSystemException) return false;
+    final OSError? os = erreur.osError;
+    return os != null && (os.errorCode == 28 || os.message.toLowerCase().contains('no space'));
   }
 
   // ---------------------------------------------------------------------------
   // Restauration
   // ---------------------------------------------------------------------------
 
-  /// Vérifie qu'[octets] est bien une sauvegarde de cette application et lit son manifeste, sans rien modifier.
+  /// Vérifie que [archive] est bien une sauvegarde de cette application et lit son manifeste, sans rien modifier.
   /// À appeler avant de demander confirmation : l'erreur (« ce n'est pas une sauvegarde »...) vient tout de suite.
-  ManifesteSauvegarde examiner(Uint8List octets) => _lireArchive(octets).manifeste;
-
-  /// Remplace **toutes** les données (base, photos, PDF) par celles de la sauvegarde [octets].
-  ///
-  /// Dans l'ordre : lecture et vérification de l'archive (rien n'est touché si elle est mauvaise) → copie de
-  /// sécurité des données actuelles → préparation des fichiers dans un dossier provisoire → remplacement de la
-  /// base en une seule transaction (tout ou rien) → mise en place des fichiers.
-  Future<ResultatRestauration> restaurer(Uint8List octets) async {
-    final _Contenu contenu = _lireArchive(octets);
-
-    await creer(TypeSauvegarde.avantRestauration);
-    await _preparerFichiers(contenu);
+  Future<ManifesteSauvegarde> examiner(File archive) async {
+    final _Contenu contenu = await _lireArchive(archive);
     try {
-      await _remplacerDonnees(contenu);
-    } on ErreurMetier {
-      await _abandonnerPreparation();
-      rethrow;
-    } catch (erreur, pile) {
-      debugPrint('Restauration impossible : $erreur\n$pile');
-      await _abandonnerPreparation();
-      throw const DonneeInvalide(_messageIncompatible);
+      return contenu.manifeste;
+    } finally {
+      await contenu.fermer();
     }
-
-    // Les écrans ouverts relisent la base : Drift n'a pas vu passer ces écritures, on le prévient.
-    _base.markTablesUpdated(_base.allTables);
-
-    await _installerFichiers();
-
-    int lignes = 0;
-    for (final List<Map<String, Object?>> t in contenu.tables.values) {
-      lignes += t.length;
-    }
-    return ResultatRestauration(lignes: lignes, fichiers: contenu.fichiers.length);
   }
 
-  /// Ouvre l'archive et vérifie tout ce qu'on peut vérifier sans toucher à la base.
-  _Contenu _lireArchive(Uint8List octets) {
-    final Archive archive = _decoderZip(octets);
+  /// Remplace **toutes** les données (base, photos, PDF) par celles de la sauvegarde [archive].
+  ///
+  /// Dans l'ordre : lecture de l'archive → extraction des fichiers dans un dossier provisoire, en **vérifiant
+  /// la taille et l'empreinte SHA-256 de chacun** (rien n'est touché si l'archive est abîmée) → copie de sécurité
+  /// des données actuelles → remplacement de la base en une seule transaction (tout ou rien) → mise en place
+  /// des fichiers.
+  Future<ResultatRestauration> restaurer(File archive, {SurProgression? surProgression}) {
+    return _enSerie(() => _restaurer(archive, surProgression));
+  }
+
+  Future<ResultatRestauration> _restaurer(File archive, SurProgression? surProgression) async {
+    final _Contenu contenu = await _lireArchive(archive);
+    try {
+      // 1. Les fichiers, écrits à côté et contrôlés un par un.
+      final int octetsFichiers = contenu.fichiers.fold<int>(0, (int somme, _FichierArchive f) => somme + f.octets);
+      await _verifierPlace(octetsFichiers, 'restaurer cette sauvegarde');
+      try {
+        await _extraireFichiers(contenu, surProgression);
+      } on ErreurMetier {
+        await _abandonnerPreparation();
+        rethrow;
+      } catch (erreur, pile) {
+        debugPrint('Extraction impossible : $erreur\n$pile');
+        await _abandonnerPreparation();
+        if (_disqueRempli(erreur)) {
+          throw const DonneeInvalide(
+            'Le téléphone est plein : la restauration a été abandonnée, rien n’a été modifié. '
+            'Libérez de la place, puis recommencez.',
+          );
+        }
+        throw const DonneeInvalide(_messageIncompatible);
+      }
+
+      // 2. La copie de sécurité de ce qui existe (l'archive n'est plus utile : tout est lu, rien n'en dépend).
+      try {
+        await _creer(TypeSauvegarde.avantRestauration, (ProgressionSauvegarde p) {
+          // L'avancement de la copie de sécurité est ramené à une seule étape de la restauration.
+          final double global = ((p.numeroEtape - 1) + (p.fraction ?? 0)) / p.nombreEtapes;
+          surProgression?.call(ProgressionSauvegarde(EtapeSauvegarde.copieDeSecurite, (global * 1000).round(), 1000));
+        });
+      } catch (_) {
+        await _abandonnerPreparation();
+        rethrow;
+      }
+
+      // 3. La base, puis les fichiers.
+      surProgression?.call(const ProgressionSauvegarde(EtapeSauvegarde.remplacement, 0, 1));
+      try {
+        await _remplacerDonnees(contenu);
+      } on ErreurMetier {
+        await _abandonnerPreparation();
+        rethrow;
+      } catch (erreur, pile) {
+        debugPrint('Restauration impossible : $erreur\n$pile');
+        await _abandonnerPreparation();
+        throw const DonneeInvalide(_messageIncompatible);
+      }
+
+      // Les écrans ouverts relisent la base : Drift n'a pas vu passer ces écritures, on le prévient.
+      _base.markTablesUpdated(_base.allTables);
+
+      await _installerFichiers();
+      surProgression?.call(const ProgressionSauvegarde(EtapeSauvegarde.remplacement, 1, 1));
+
+      int lignes = 0;
+      for (final List<Map<String, Object?>> t in contenu.tables.values) {
+        lignes += t.length;
+      }
+      return ResultatRestauration(
+        lignes: lignes,
+        fichiers: contenu.fichiers.length,
+        fichiersAbsents: contenu.manifeste.fichiersAbsents,
+      );
+    } finally {
+      await contenu.fermer();
+    }
+  }
+
+  /// Ouvre l'archive et vérifie tout ce qu'on peut vérifier sans toucher à la base ni extraire un fichier.
+  Future<_Contenu> _lireArchive(File fichier) async {
+    final InputFileStream flux;
+    final Archive archive;
+    if (!await fichier.exists()) throw const DonneeInvalide(_messageIntrouvable);
+    try {
+      flux = InputFileStream(fichier.path);
+    } catch (_) {
+      throw const DonneeInvalide(_messageIntrouvable);
+    }
+    try {
+      archive = ZipDecoder().decodeStream(flux);
+    } catch (_) {
+      await flux.close();
+      throw const DonneeInvalide(_messageNonReconnu);
+    }
+
+    try {
+      return _lireContenu(archive, flux);
+    } catch (_) {
+      await flux.close();
+      rethrow;
+    }
+  }
+
+  _Contenu _lireContenu(Archive archive, InputFileStream flux) {
     final ArchiveFile? entreeDonnees = archive.find(FormatSauvegarde.fichierDonnees);
     if (entreeDonnees == null) throw const DonneeInvalide(_messageNonReconnu);
 
@@ -311,23 +595,34 @@ class ServiceSauvegarde {
       comptes[table] = lignes.length;
     }
 
+    // Format 2 : la liste des fichiers, avec la taille et l'empreinte de chacun.
+    final Map<String, EmpreinteFichier>? annonces = format >= 2 ? _lireListeFichiers(archive) : null;
+
     final List<_FichierArchive> fichiers = <_FichierArchive>[];
+    final Set<String> chemins = <String>{};
     for (final ArchiveFile entree in archive) {
       if (!entree.isFile || entree.name == FormatSauvegarde.fichierDonnees) continue;
       if (!entree.name.startsWith(FormatSauvegarde.prefixeFichiers)) continue;
       // fichiers/<dossier>/<nom> : rien d'autre. Un nom qui remonte dans l'arborescence est refusé.
-      final List<String> morceaux = entree.name.split('/');
-      final bool valide =
-          morceaux.length == 3 &&
-          _dossiers.containsKey(morceaux[1]) &&
-          morceaux[2].isNotEmpty &&
-          morceaux[2] != '.' &&
-          morceaux[2] != '..' &&
-          !morceaux[2].contains('\\') &&
-          !morceaux[2].contains(':');
-      if (!valide) throw const DonneeInvalide(_messageIncompatible);
-      fichiers.add(_FichierArchive(dossier: morceaux[1], nom: morceaux[2], entree: entree));
+      final String chemin = entree.name.substring(FormatSauvegarde.prefixeFichiers.length);
+      final ({String dossier, String nom})? lu = _lireChemin(chemin);
+      if (lu == null || !chemins.add(chemin)) throw const DonneeInvalide(_messageIncompatible);
+      final EmpreinteFichier? annonce = annonces?[chemin];
+      if (annonces != null && (annonce == null || annonce.octets != entree.size)) {
+        throw const DonneeInvalide(_messageIncompatible);
+      }
+      fichiers.add(
+        _FichierArchive(dossier: lu.dossier, nom: lu.nom, entree: entree, octets: entree.size, empreinte: annonce?.sha256),
+      );
     }
+    // Tout ce que la liste annonce doit être dans l'archive.
+    if (annonces != null && annonces.keys.any((String chemin) => !chemins.contains(chemin))) {
+      throw const DonneeInvalide(_messageIncompatible);
+    }
+
+    // Les photos citées par les données mais absentes de l'archive : vrai pour toute archive, même ancienne.
+    final List<String> absents = FormatSauvegarde.fichiersIrremplacablesCites(tables).difference(chemins).toList()
+      ..sort();
 
     final Object? creeLe = manifeste['creeLe'];
     final Object? version = manifeste['versionApplication'];
@@ -337,9 +632,12 @@ class ServiceSauvegarde {
         versionApplication: version is String ? version : '?',
         nombreFichiers: fichiers.length,
         lignes: comptes,
+        format: format,
+        fichiersAbsents: absents,
       ),
       tables: tables,
       fichiers: fichiers,
+      flux: flux,
       // Une sauvegarde du schéma 1 ou 2 n'a pas de catégories : les produits y portent les clés des cinq de départ.
       sansCategories: tablesBrutes['categories_produit'] == null,
       // Une sauvegarde d'avant le schéma 4 n'a pas de lieux de vente : ses ventes sont « Non renseigné ».
@@ -349,12 +647,48 @@ class ServiceSauvegarde {
     );
   }
 
-  Archive _decoderZip(Uint8List octets) {
-    try {
-      return ZipDecoder().decodeBytes(octets);
-    } catch (_) {
-      throw const DonneeInvalide(_messageNonReconnu);
+  /// `fichiers.json` : « dossier/nom » → taille et empreinte annoncées.
+  Map<String, EmpreinteFichier> _lireListeFichiers(Archive archive) {
+    final ArchiveFile? entree = archive.find(FormatSauvegarde.fichierListe);
+    if (entree == null) throw const DonneeInvalide(_messageIncompatible);
+    final Object? document = _decoderJson(entree);
+    final Object? liste = document is Map ? document['fichiers'] : null;
+    if (liste is! List) throw const DonneeInvalide(_messageIncompatible);
+
+    final RegExp modeleEmpreinte = RegExp(r'^[0-9a-f]{64}$');
+    final Map<String, EmpreinteFichier> annonces = <String, EmpreinteFichier>{};
+    for (final Object? brut in liste) {
+      if (brut is! Map) throw const DonneeInvalide(_messageIncompatible);
+      final Object? chemin = brut['chemin'];
+      final Object? octets = brut['octets'];
+      final Object? empreinte = brut['sha256'];
+      if (chemin is! String ||
+          octets is! int ||
+          octets < 0 ||
+          empreinte is! String ||
+          !modeleEmpreinte.hasMatch(empreinte) ||
+          _lireChemin(chemin) == null ||
+          annonces.containsKey(chemin)) {
+        throw const DonneeInvalide(_messageIncompatible);
+      }
+      annonces[chemin] = EmpreinteFichier(chemin: chemin, octets: octets, sha256: empreinte);
     }
+    return annonces;
+  }
+
+  /// `photos_produits/photo_1.jpg` → dossier et nom ; `null` si ce n'est pas un chemin que l'application range
+  /// (dossier inconnu, chemin qui remonte, séparateur étranger...).
+  ({String dossier, String nom})? _lireChemin(String chemin) {
+    final List<String> morceaux = chemin.split('/');
+    final bool valide =
+        morceaux.length == 2 &&
+        _dossiers.containsKey(morceaux[0]) &&
+        morceaux[1].isNotEmpty &&
+        morceaux[1] != '.' &&
+        morceaux[1] != '..' &&
+        !morceaux[1].contains('\\') &&
+        !morceaux[1].contains(':');
+    return valide ? (dossier: morceaux[0], nom: morceaux[1]) : null;
   }
 
   Object? _decoderJson(ArchiveFile entree) {
@@ -431,15 +765,33 @@ class ServiceSauvegarde {
   Directory _provisoire(Directory cible) => Directory('${cible.path}.restauration');
   Directory _ancien(Directory cible) => Directory('${cible.path}.ancien');
 
-  Future<void> _preparerFichiers(_Contenu contenu) async {
+  /// Écrit chaque fichier de l'archive dans le dossier provisoire, puis relit ce qui a été écrit : la taille
+  /// (et, pour une archive du format 2, l'empreinte SHA-256) doit être celle annoncée, sinon l'archive est abîmée.
+  Future<void> _extraireFichiers(_Contenu contenu, SurProgression? surProgression) async {
     for (final MapEntry<String, Directory> dossier in _dossiers.entries) {
       final Directory provisoire = _provisoire(dossier.value);
       if (await provisoire.exists()) await provisoire.delete(recursive: true);
       await provisoire.create(recursive: true);
     }
-    for (final _FichierArchive f in contenu.fichiers) {
-      final Directory provisoire = _provisoire(_dossiers[f.dossier]!);
-      await File('${provisoire.path}${Platform.pathSeparator}${f.nom}').writeAsBytes(f.entree.content);
+    final int total = contenu.fichiers.length;
+    surProgression?.call(ProgressionSauvegarde(EtapeSauvegarde.controleFichiers, 0, total));
+    for (int i = 0; i < total; i++) {
+      final _FichierArchive f = contenu.fichiers[i];
+      final File cible = File('${_provisoire(_dossiers[f.dossier]!).path}${Platform.pathSeparator}${f.nom}');
+      final OutputFileStream sortie = OutputFileStream(cible.path);
+      try {
+        f.entree.writeContent(sortie);
+      } finally {
+        await sortie.close();
+      }
+      final ({int octets, String sha256}) lu = await _empreinte(cible);
+      if (lu.octets != f.octets || (f.empreinte != null && lu.sha256 != f.empreinte)) {
+        throw DonneeInvalide(
+          'Cette sauvegarde est abîmée : le fichier « ${f.nom} » ne correspond pas à son empreinte. '
+          'Rien n’a été modifié.',
+        );
+      }
+      surProgression?.call(ProgressionSauvegarde(EtapeSauvegarde.controleFichiers, i + 1, total));
     }
   }
 
@@ -481,11 +833,12 @@ class ServiceSauvegarde {
   // ---------------------------------------------------------------------------
 
   static final RegExp _modeleNom = RegExp(
-    r'^crochet-creations-(auto|manuelle|avant-restauration)-(\d{4})-(\d{2})-(\d{2})-(\d{2})(\d{2})(\d{2})(?:-\d+)?\.zip$',
+    r'^crochet-creations-(auto|manuelle|avant-restauration)-(\d{4})-(\d{2})-(\d{2})-(\d{2})(\d{2})(\d{2})(?:-\d+)?(-incomplete)?\.zip$',
   );
 
   /// `crochet-creations-manuelle-2026-10-31-134912.zip` → type et date ; `null` si ce n'est pas une sauvegarde.
-  ({TypeSauvegarde type, DateTime date})? _lireNom(String nom) {
+  /// Un nom qui finit par `-incomplete` est une sauvegarde incomplète.
+  ({TypeSauvegarde type, DateTime date, bool complete})? _lireNom(String nom) {
     final RegExpMatch? m = _modeleNom.firstMatch(nom);
     if (m == null) return null;
     final TypeSauvegarde type = TypeSauvegarde.values.firstWhere((TypeSauvegarde t) => t.code == m.group(1));
@@ -497,22 +850,42 @@ class ServiceSauvegarde {
       int.parse(m.group(6)!),
       int.parse(m.group(7)!),
     );
-    return (type: type, date: date);
+    return (type: type, date: date, complete: m.group(8) == null);
   }
 
-  String _nomFichier(TypeSauvegarde type, DateTime date, int numero) {
+  /// `crochet-creations-manuelle-2026-10-31-134912.zip` ; `-2` si deux sauvegardes tombent dans la même seconde ;
+  /// `-incomplete` avant `.zip` quand des photos manquaient.
+  String _nomFichier(TypeSauvegarde type, DateTime date, int numero, bool complete) {
     String deux(int n) => n.toString().padLeft(2, '0');
     final String horodatage =
         '${date.year.toString().padLeft(4, '0')}-${deux(date.month)}-${deux(date.day)}-'
         '${deux(date.hour)}${deux(date.minute)}${deux(date.second)}';
-    return 'crochet-creations-${type.code}-$horodatage${numero > 1 ? '-$numero' : ''}.zip';
+    return 'crochet-creations-${type.code}-$horodatage${numero > 1 ? '-$numero' : ''}${complete ? '' : '-incomplete'}.zip';
   }
 
   /// Un nom qui n'existe pas encore (deux sauvegardes dans la même seconde reçoivent « -2 », « -3 »...).
-  Future<File> _fichierLibre(TypeSauvegarde type, DateTime date) async {
+  Future<File> _fichierLibre(TypeSauvegarde type, DateTime date, {required bool complete}) async {
+    File fichier(int numero, bool entiere) =>
+        File('${dossierSauvegardes.path}${Platform.pathSeparator}${_nomFichier(type, date, numero, entiere)}');
     for (int numero = 1; ; numero++) {
-      final File f = File('${dossierSauvegardes.path}${Platform.pathSeparator}${_nomFichier(type, date, numero)}');
-      if (!await f.exists()) return f;
+      if (!await fichier(numero, true).exists() && !await fichier(numero, false).exists()) {
+        return fichier(numero, complete);
+      }
+    }
+  }
+
+  /// Efface les fichiers provisoires laissés par une sauvegarde interrompue (application fermée en route).
+  Future<void> _effacerProvisoires() async {
+    await for (final FileSystemEntity entite in dossierSauvegardes.list()) {
+      if (entite is File && entite.path.endsWith('.zip.tmp')) await _effacer(entite);
+    }
+  }
+
+  Future<void> _effacer(File fichier) async {
+    try {
+      if (await fichier.exists()) await fichier.delete();
+    } on FileSystemException {
+      // Un fichier provisoire impossible à effacer sera retenté à la prochaine sauvegarde.
     }
   }
 
@@ -533,12 +906,32 @@ class ServiceSauvegarde {
   }
 }
 
-/// Une archive lue et vérifiée, prête à être restaurée.
+/// Toutes les lignes de toutes les tables, lues d'un seul tenant.
+class _InstantaneBase {
+  const _InstantaneBase(this.tables);
+
+  final Map<String, List<Map<String, Object?>>> tables;
+}
+
+/// Une photo ou un PDF du téléphone.
+class _FichierLocal {
+  const _FichierLocal({required this.dossier, required this.nom, required this.fichier});
+
+  final String dossier;
+  final String nom;
+  final File fichier;
+
+  /// `dossier/nom`, comme dans `fichiers.json`.
+  String get chemin => '$dossier/$nom';
+}
+
+/// Une archive lue et vérifiée, prête à être restaurée. Le fichier reste ouvert jusqu'à [fermer].
 class _Contenu {
   const _Contenu({
     required this.manifeste,
     required this.tables,
     required this.fichiers,
+    required this.flux,
     required this.sansCategories,
     required this.sansLieux,
     required this.sansCategoriesNote,
@@ -547,6 +940,7 @@ class _Contenu {
   final ManifesteSauvegarde manifeste;
   final Map<String, List<Map<String, Object?>>> tables;
   final List<_FichierArchive> fichiers;
+  final InputFileStream flux;
 
   /// L'archive ne contient pas la table des catégories (sauvegarde d'un schéma antérieur au 3).
   final bool sansCategories;
@@ -556,12 +950,26 @@ class _Contenu {
 
   /// L'archive ne contient pas la table des catégories de notes (sauvegarde d'un schéma antérieur au 5).
   final bool sansCategoriesNote;
+
+  Future<void> fermer() => flux.close();
 }
 
 class _FichierArchive {
-  const _FichierArchive({required this.dossier, required this.nom, required this.entree});
+  const _FichierArchive({
+    required this.dossier,
+    required this.nom,
+    required this.entree,
+    required this.octets,
+    required this.empreinte,
+  });
 
   final String dossier;
   final String nom;
   final ArchiveFile entree;
+
+  /// Taille annoncée (celle de l'entrée de l'archive).
+  final int octets;
+
+  /// SHA-256 annoncé dans `fichiers.json` ; `null` pour une archive du format 1.
+  final String? empreinte;
 }

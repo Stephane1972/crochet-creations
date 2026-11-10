@@ -1,5 +1,5 @@
+import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -20,8 +20,9 @@ import 'sauvegarde_providers.dart';
 
 /// Écran 23 : sauvegarde, export et restauration (étape 11).
 ///
-/// - **Sauvegarder maintenant** : une archive .zip (données, photos, PDF) rangée sur le téléphone ; une copie
-///   automatique est aussi faite à l'ouverture de l'application si la dernière date d'un jour ou plus.
+/// - **Sauvegarder maintenant** : une archive .zip (données, photos, PDF) rangée sur le téléphone, avec une barre
+///   de progression ; une copie automatique est aussi faite à l'ouverture de l'application si la dernière date
+///   d'un jour ou plus. Une sauvegarde est dite « incomplète » si des photos manquaient sur le téléphone.
 /// - **Partager** une sauvegarde : pour en garder une copie ailleurs que sur le téléphone.
 /// - **Restaurer** (depuis la liste ou depuis un fichier) : remplace toutes les données, après confirmation
 ///   et copie de sécurité.
@@ -39,28 +40,58 @@ class _SauvegardeScreenState extends ConsumerState<SauvegardeScreen> {
   /// Une opération est en cours : les boutons sont désactivés (on ne lance pas deux sauvegardes à la fois).
   bool _occupe = false;
 
+  /// Où en est la sauvegarde ou la restauration en cours (`null` : pas de progression à montrer).
+  ProgressionSauvegarde? _progression;
+
+  /// Pour ne pas redessiner l'écran à chaque photo : au plus un changement tous les 100 ms (sauf changement d'étape).
+  final Stopwatch _chrono = Stopwatch();
+
+  void _surProgression(ProgressionSauvegarde progression) {
+    if (!mounted) return;
+    final bool autreEtape = _progression?.etape != progression.etape;
+    final bool terminee = progression.total > 0 && progression.fait >= progression.total;
+    if (!autreEtape && !terminee && _chrono.isRunning && _chrono.elapsedMilliseconds < 100) return;
+    _chrono
+      ..reset()
+      ..start();
+    setState(() => _progression = progression);
+  }
+
   /// Exécute une opération longue en désactivant les boutons ; une erreur est expliquée en bas de l'écran.
   Future<void> _executer(Future<void> Function() action) async {
     if (_occupe) return;
-    setState(() => _occupe = true);
+    setState(() {
+      _occupe = true;
+      _progression = null;
+    });
     try {
       await action();
     } catch (erreur, pile) {
       debugPrint('Sauvegarde : $erreur\n$pile');
       if (mounted) afficherMessage(context, messageErreur(erreur));
     } finally {
-      if (mounted) setState(() => _occupe = false);
+      _chrono.stop();
+      if (mounted) {
+        setState(() {
+          _occupe = false;
+          _progression = null;
+        });
+      }
     }
   }
 
   Future<void> _sauvegarder() {
     return _executer(() async {
-      await ref.read(serviceSauvegardeProvider).creer(TypeSauvegarde.manuelle);
+      final SauvegardeLocale sauvegarde = await ref
+          .read(serviceSauvegardeProvider)
+          .creer(TypeSauvegarde.manuelle, surProgression: _surProgression);
       ref.invalidate(sauvegardesLocalesProvider);
       if (!mounted) return;
       afficherMessage(
         context,
-        'Sauvegarde créée. Partagez-la pour en garder une copie hors du téléphone.',
+        sauvegarde.complete
+            ? 'Sauvegarde créée. Partagez-la pour en garder une copie hors du téléphone.'
+            : _phraseSauvegardeIncomplete(sauvegarde.fichiersAbsents.length),
       );
     });
   }
@@ -93,41 +124,48 @@ class _SauvegardeScreenState extends ConsumerState<SauvegardeScreen> {
   }
 
   Future<void> _restaurerDepuisListe(SauvegardeLocale sauvegarde) async {
-    final Uint8List octets;
-    try {
-      octets = await sauvegarde.fichier.readAsBytes();
-    } on FileSystemException {
+    if (!await sauvegarde.fichier.exists()) {
       if (mounted) afficherMessage(context, 'Cette sauvegarde est introuvable sur le téléphone.');
       ref.invalidate(sauvegardesLocalesProvider);
       return;
     }
     if (!mounted) return;
-    await _confirmerEtRestaurer(octets);
+    await _confirmerEtRestaurer(sauvegarde.fichier);
   }
 
   Future<void> _restaurerDepuisFichier() async {
-    final Uint8List? octets;
+    final File? copie;
     try {
-      octets = await ref.read(selecteurFichierSauvegardeProvider).choisir();
+      copie = await ref.read(selecteurFichierSauvegardeProvider).choisir();
     } catch (erreur, pile) {
       debugPrint('Choix du fichier : $erreur\n$pile');
       if (mounted) afficherMessage(context, 'Impossible d’ouvrir ce fichier.');
       return;
     }
-    if (octets == null || !mounted) return;
-    await _confirmerEtRestaurer(octets);
+    if (copie == null) return;
+    try {
+      if (mounted) await _confirmerEtRestaurer(copie);
+    } finally {
+      // Le sélecteur a donné une copie de travail : elle n'est plus utile.
+      try {
+        if (await copie.exists()) await copie.delete();
+      } on FileSystemException {
+        // Elle disparaîtra avec le dossier temporaire.
+      }
+    }
   }
 
   /// Vérifie l'archive (message clair si ce n'est pas une sauvegarde), demande confirmation en disant ce
   /// qu'elle contient, puis restaure.
-  Future<void> _confirmerEtRestaurer(Uint8List octets) async {
+  Future<void> _confirmerEtRestaurer(File archive) async {
     final ManifesteSauvegarde manifeste;
     try {
-      manifeste = ref.read(serviceSauvegardeProvider).examiner(octets);
+      manifeste = await ref.read(serviceSauvegardeProvider).examiner(archive);
     } on ErreurMetier catch (erreur) {
-      afficherMessage(context, erreur.message);
+      if (mounted) afficherMessage(context, erreur.message);
       return;
     }
+    if (!mounted) return;
 
     final String quand = manifeste.creeLe == null ? 'date inconnue' : _dateHeure(manifeste.creeLe!);
     final bool ok = await confirmer(
@@ -135,6 +173,7 @@ class _SauvegardeScreenState extends ConsumerState<SauvegardeScreen> {
       titre: 'Restaurer cette sauvegarde ?',
       message:
           'Sauvegarde du $quand : ${_resume(manifeste)}.\n\n'
+          '${manifeste.complete ? '' : '${_phraseArchiveIncomplete(manifeste.fichiersAbsents.length)}\n\n'}'
           'TOUTES vos données actuelles (produits, clients, ventes, factures, photos...) seront remplacées par '
           'celles de cette sauvegarde.\n\n'
           'Une copie de sécurité de vos données actuelles est faite juste avant : vous la retrouverez dans la liste.',
@@ -144,7 +183,9 @@ class _SauvegardeScreenState extends ConsumerState<SauvegardeScreen> {
 
     ResultatRestauration? restauration;
     await _executer(() async {
-      restauration = await ref.read(serviceSauvegardeProvider).restaurer(octets);
+      restauration = await ref
+          .read(serviceSauvegardeProvider)
+          .restaurer(archive, surProgression: _surProgression);
 
       // Ce que l'application garde en mémoire doit refléter les données restaurées : le mode jour / nuit
       // (enregistré dans les réglages) et la vente en cours (ses produits n'existent peut-être plus).
@@ -165,7 +206,8 @@ class _SauvegardeScreenState extends ConsumerState<SauvegardeScreen> {
         title: const Text('Restauration terminée'),
         content: Text(
           '${_nombre(resultat.lignes, 'enregistrement', 'enregistrements')} et '
-          '${_nombre(resultat.fichiers, 'fichier', 'fichiers')} (photos, PDF) remis en place.',
+          '${_nombre(resultat.fichiers, 'fichier', 'fichiers')} (photos, PDF) remis en place.'
+          '${resultat.fichiersAbsents.isEmpty ? '' : '\n\n${_phraseRestaurationIncomplete(resultat.fichiersAbsents.length)}'}',
         ),
         actions: <Widget>[
           FilledButton(
@@ -176,7 +218,9 @@ class _SauvegardeScreenState extends ConsumerState<SauvegardeScreen> {
       ),
     );
     if (!mounted) return;
-    await Navigator.of(context).pushNamedAndRemoveUntil(AppRoutes.accueil, (Route<dynamic> route) => false);
+    // Pas de « await » : ce futur ne se termine que lorsque la page d'accueil est quittée, et rien ne doit rester
+    // en attente derrière (la copie de travail du sélecteur est supprimée dès que cette fonction se termine).
+    unawaited(Navigator.of(context).pushNamedAndRemoveUntil(AppRoutes.accueil, (Route<dynamic> route) => false));
   }
 
   Future<void> _exporterCsv() {
@@ -215,15 +259,20 @@ class _SauvegardeScreenState extends ConsumerState<SauvegardeScreen> {
       appBar: AppBar(
         title: const Text('Sauvegarde et export'),
         bottom: _occupe
-            ? const PreferredSize(
-                preferredSize: Size.fromHeight(4),
-                child: LinearProgressIndicator(),
+            ? PreferredSize(
+                preferredSize: const Size.fromHeight(4),
+                child: LinearProgressIndicator(value: _progression?.fraction),
               )
             : null,
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
         children: <Widget>[
+          if (_occupe && _progression != null) ...<Widget>[
+            CarteProgressionSauvegarde(progression: _progression!),
+            const SizedBox(height: 16),
+          ],
+
           // --- Sauvegarder -------------------------------------------------------------------------------
           const _TitreSection('Sauvegarder'),
           Card(
@@ -238,8 +287,9 @@ class _SauvegardeScreenState extends ConsumerState<SauvegardeScreen> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Une sauvegarde contient toutes vos données, vos photos et vos PDF. L’application en fait une '
-                    'toute seule à l’ouverture, si la dernière date de plus d’un jour (les 7 dernières sont gardées).',
+                    'Une sauvegarde contient toutes vos données, vos photos et vos PDF ; elle est vérifiée avant d’être '
+                    'rangée. L’application en fait une toute seule à l’ouverture, si la dernière date de plus d’un '
+                    'jour (les 7 dernières sont gardées).',
                     style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
                   ),
                   const SizedBox(height: 14),
@@ -412,6 +462,25 @@ class _SauvegardeScreenState extends ConsumerState<SauvegardeScreen> {
   }
 
   String _nombre(int n, String singulier, String pluriel) => '$n ${n > 1 ? pluriel : singulier}';
+
+  /// Annoncé juste après « Sauvegarder maintenant » quand des photos manquaient.
+  String _phraseSauvegardeIncomplete(int n) => n > 1
+      ? 'Sauvegarde créée, mais incomplète : $n photos citées par vos données sont introuvables sur le téléphone, '
+            'elles ne sont donc pas dans la sauvegarde.'
+      : 'Sauvegarde créée, mais incomplète : 1 photo citée par vos données est introuvable sur le téléphone, '
+            'elle n’est donc pas dans la sauvegarde.';
+
+  /// Dans la demande de confirmation d'une restauration.
+  String _phraseArchiveIncomplete(int n) => n > 1
+      ? 'ATTENTION, cette sauvegarde est incomplète : $n photos manquaient déjà quand elle a été faite, '
+            'elles ne pourront pas être remises.'
+      : 'ATTENTION, cette sauvegarde est incomplète : 1 photo manquait déjà quand elle a été faite, '
+            'elle ne pourra pas être remise.';
+
+  /// Dans le compte rendu d'une restauration.
+  String _phraseRestaurationIncomplete(int n) => n > 1
+      ? '$n photos manquaient dans la sauvegarde : elles n’ont pas pu être remises.'
+      : '1 photo manquait dans la sauvegarde : elle n’a pas pu être remise.';
 }
 
 class _TitreSection extends StatelessWidget {
@@ -424,6 +493,61 @@ class _TitreSection extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10, left: 4),
       child: Text(texte, style: Theme.of(context).textTheme.titleMedium),
+    );
+  }
+}
+
+/// Où en est la sauvegarde ou la restauration : l'étape, et « n sur N » quand on compte des fichiers.
+class CarteProgressionSauvegarde extends StatelessWidget {
+  const CarteProgressionSauvegarde({super.key, required this.progression});
+
+  final ProgressionSauvegarde progression;
+
+  String get _libelle => switch (progression.etape) {
+    EtapeSauvegarde.lectureDonnees => 'Lecture de vos données',
+    EtapeSauvegarde.empreintes => 'Contrôle de vos photos et PDF',
+    EtapeSauvegarde.ecritureFichiers => 'Copie des photos et PDF dans la sauvegarde',
+    EtapeSauvegarde.verification => 'Vérification de la sauvegarde',
+    EtapeSauvegarde.controleFichiers => 'Contrôle des fichiers de la sauvegarde',
+    EtapeSauvegarde.copieDeSecurite => 'Copie de sécurité de vos données actuelles',
+    EtapeSauvegarde.remplacement => 'Remplacement de vos données',
+  };
+
+  /// On compte des fichiers à ces étapes seulement.
+  bool get _compteDesFichiers =>
+      progression.total > 1 &&
+      (progression.etape == EtapeSauvegarde.empreintes ||
+          progression.etape == EtapeSauvegarde.ecritureFichiers ||
+          progression.etape == EtapeSauvegarde.controleFichiers);
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              'Étape ${progression.numeroEtape} sur ${progression.nombreEtapes} : $_libelle',
+              style: theme.textTheme.titleSmall,
+            ),
+            if (_compteDesFichiers) ...<Widget>[
+              const SizedBox(height: 4),
+              Text(
+                '${progression.fait} sur ${progression.total} fichiers',
+                style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              ),
+            ],
+            const SizedBox(height: 4),
+            Text(
+              'Ne fermez pas l’application avant la fin.',
+              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -441,14 +565,27 @@ class _LigneSauvegarde extends StatelessWidget {
     final ColorScheme scheme = theme.colorScheme;
     return ListTile(
       contentPadding: const EdgeInsets.only(left: 16, right: 4),
-      leading: Icon(Icons.folder_zip_outlined, color: scheme.primary),
+      leading: Icon(
+        sauvegarde.complete ? Icons.folder_zip_outlined : Icons.warning_amber_outlined,
+        color: sauvegarde.complete ? scheme.primary : scheme.error,
+      ),
       title: Text(
         '${formatDateCourte(sauvegarde.date)} à ${formatHeure(sauvegarde.date)}',
         style: theme.textTheme.titleSmall,
       ),
-      subtitle: Text(
-        '${sauvegarde.type.libelle} · ${_taille(sauvegarde.octets)}',
-        style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            '${sauvegarde.type.libelle} · ${_taille(sauvegarde.octets)}',
+            style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+          ),
+          if (!sauvegarde.complete)
+            Text(
+              'Incomplète : des photos manquaient',
+              style: theme.textTheme.bodyMedium?.copyWith(color: scheme.error),
+            ),
+        ],
       ),
       trailing: PopupMenuButton<_Action>(
         key: ValueKey<String>('menu-${sauvegarde.nom}'),

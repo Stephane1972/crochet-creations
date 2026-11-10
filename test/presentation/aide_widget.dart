@@ -129,15 +129,26 @@ class FauxServicePartageFichiers implements ServicePartageFichiers {
   }
 }
 
-/// Faux sélecteur de fichier : « choisit » toujours [contenu] (ou annule si `null`).
+/// Faux sélecteur de fichier : « choisit » toujours [contenu] (ou annule si `null`). Comme le vrai, il donne une
+/// **copie de travail**, que l'écran supprime ensuite.
 class FauxSelecteurFichier implements SelecteurFichierSauvegarde {
   Uint8List? contenu;
   int appels = 0;
 
+  /// La dernière copie de travail donnée (pour vérifier qu'elle a été supprimée).
+  File? derniereCopie;
+
   @override
-  Future<Uint8List?> choisir() async {
+  Future<File?> choisir() async {
     appels++;
-    return contenu;
+    final Uint8List? octets = contenu;
+    if (octets == null) return null;
+    final File copie = File(
+      '${Directory.systemTemp.path}/choisi_${DateTime.now().microsecondsSinceEpoch}_$appels.zip',
+    );
+    await copie.writeAsBytes(octets);
+    derniereCopie = copie;
+    return copie;
   }
 }
 

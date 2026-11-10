@@ -194,7 +194,10 @@ Finder boutonAjouterPiece() => find.byKey(const Key('ajouter-piece-jointe'));
 Future<void> ajouterPiece(WidgetTester tester, String choix) async {
   await toucher(tester, boutonAjouterPiece());
   expect(find.byType(BottomSheet), findsOneWidget);
-  await toucher(tester, dansFeuille(find.text(choix)));
+  // Pas de pumpAndSettle ici : pendant la copie du fichier, la roue de « Ajout en cours… » tourne sans fin.
+  await tester.tap(dansFeuille(find.text(choix)));
+  await tester.pump();
+  await laisserFinir(tester);
 }
 
 void main() {

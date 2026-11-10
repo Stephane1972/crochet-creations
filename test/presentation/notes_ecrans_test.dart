@@ -1,11 +1,17 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:crochet_creations/core/router/app_routes.dart';
 import 'package:crochet_creations/data/database/app_database.dart';
+import 'package:crochet_creations/data/stockage/ouvreur_piece_jointe.dart';
+import 'package:crochet_creations/data/stockage/stockage_pieces_jointes.dart';
+import 'package:crochet_creations/domain/enums.dart';
+import 'package:crochet_creations/domain/pieces_jointes.dart';
 import 'package:crochet_creations/presentation/more/more_screen.dart';
 import 'package:crochet_creations/presentation/notes/categories_note_screen.dart';
 import 'package:crochet_creations/presentation/notes/note_form_screen.dart';
 import 'package:crochet_creations/presentation/notes/notes_screen.dart';
+import 'package:crochet_creations/presentation/notes/pieces_jointes_section.dart';
 import 'package:crochet_creations/presentation/settings/settings_screen.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
@@ -147,6 +153,48 @@ Future<void> ouvrirFeuilleCategorie(WidgetTester tester) async {
 /// La coche de la feuille : le nom de la catégorie actuellement choisie.
 Finder cocheSur(String nom) =>
     find.descendant(of: dansFeuille(find.widgetWithText(ListTile, nom)), matching: find.byIcon(Icons.check));
+
+/// Une pièce jointe déjà rangée dans le téléphone (comme après un ajout enregistré).
+Future<PieceRangee> rangerPiece(WidgetTester tester, EnvironnementTest env, String nom, {int octets = 2048}) {
+  return env.travailler(
+    tester,
+    () => env.stockagePiecesJointes.enregistrer(
+      FichierChoisi(
+        nom: nom,
+        type: typePieceJointeDepuisNom(nom),
+        octets: octets,
+        lire: () => Stream<List<int>>.value(List<int>.filled(octets, 1)),
+      ),
+    ),
+  );
+}
+
+Future<Note> creerNoteAvecPieces(
+  WidgetTester tester,
+  EnvironnementTest env,
+  String titre,
+  List<PieceRangee> pieces,
+) => env.travailler(tester, () => env.notes.creer(titre: titre, piecesJointes: pieces));
+
+/// Les noms des fichiers rangés dans le dossier des pièces jointes (lecture directe, sans attendre).
+List<String> fichiersRanges(EnvironnementTest env) {
+  final Directory dossier = env.dossierPiecesJointes;
+  if (!dossier.existsSync()) return <String>[];
+  return dossier
+      .listSync()
+      .map((FileSystemEntity e) => e.uri.pathSegments.where((String s) => s.isNotEmpty).last)
+      .toList()
+    ..sort();
+}
+
+Finder boutonAjouterPiece() => find.byKey(const Key('ajouter-piece-jointe'));
+
+/// Appuie sur « Ajouter une pièce jointe », puis sur [choix] dans la feuille.
+Future<void> ajouterPiece(WidgetTester tester, String choix) async {
+  await toucher(tester, boutonAjouterPiece());
+  expect(find.byType(BottomSheet), findsOneWidget);
+  await toucher(tester, dansFeuille(find.text(choix)));
+}
 
 void main() {
   // ---------------------------------------------------------------------------
@@ -875,6 +923,303 @@ void main() {
       expect(puce('Documents entreprise'), findsNothing);
       expect(dansNotes(find.text('Doudou pour Léa')), findsOneWidget);
       expect(dansNotes(find.text('Idée de bonnet')), findsOneWidget);
+
+      await env.fermer(tester);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Les pièces jointes
+  // ---------------------------------------------------------------------------
+
+  group('pièces jointes', () {
+    testWidgets('le formulaire annonce les limites avant tout ajout', (WidgetTester tester) async {
+      final EnvironnementTest env = await EnvironnementTest.creer(tester);
+      await ouvrirNouvelleNote(tester, env);
+
+      expect(dansFormulaire(find.text('Pièces jointes')), findsOneWidget);
+      expect(dansFormulaire(find.text('Ajouter une pièce jointe')), findsOneWidget);
+      expect(
+        tester.widget<Text>(find.byKey(const Key('limites-pieces-jointes'))).data,
+        'Photos et documents : 25 Mo au plus chacun. Vidéos : 150 Mo au plus. 20 pièces jointes au plus par note.',
+      );
+
+      // La feuille de choix rappelle les limites aussi.
+      await toucher(tester, boutonAjouterPiece());
+      expect(dansFeuille(find.text('Prendre une photo')), findsOneWidget);
+      expect(dansFeuille(find.text('Choisir une photo dans la galerie')), findsOneWidget);
+      expect(dansFeuille(find.text('Filmer une vidéo')), findsOneWidget);
+      expect(dansFeuille(find.text('Choisir une vidéo dans la galerie')), findsOneWidget);
+      expect(dansFeuille(find.text('Choisir un document (PDF, Word, tableur…)')), findsOneWidget);
+      expect(dansFeuille(find.textContaining('150 Mo au plus')), findsOneWidget);
+
+      await env.fermer(tester);
+    });
+
+    testWidgets('joindre un document : il est copié dans le téléphone, et enregistré avec la note', (
+      WidgetTester tester,
+    ) async {
+      final EnvironnementTest env = await EnvironnementTest.creer(tester);
+      await ouvrirNouvelleNote(tester, env);
+      env.selecteurPieceJointe.preparer('Patron poncho.pdf', TypePieceJointe.document, octets: 2048);
+
+      await ajouterPiece(tester, 'Choisir un document (PDF, Word, tableur…)');
+      await attendreAffichage(tester, dansFormulaire(find.text('Patron poncho.pdf')));
+
+      expect(env.selecteurPieceJointe.sources, <SourcePieceJointe>[SourcePieceJointe.document]);
+      expect(dansFormulaire(find.text('Document · 2 Ko')), findsOneWidget);
+      expect(dansFormulaire(find.text('Pièces jointes (1 sur 20)')), findsOneWidget);
+      expect(fichiersRanges(env), hasLength(1)); // déjà copié, pas encore dans la note
+
+      await saisir(tester, 'Titre *', 'Poncho');
+      await toucher(tester, boutonEnregistrer());
+      await attendreAffichage(tester, find.text('Note enregistrée.'));
+
+      final Note note = (await notesEnBase(tester, env)).single;
+      final List<PieceJointeNote> pieces = await env.travailler(tester, () => env.notes.listerPiecesJointes(note.id));
+      expect(pieces, hasLength(1));
+      expect(pieces.single.nomAffiche, 'Patron poncho.pdf');
+      expect(pieces.single.typeFichier, TypePieceJointe.document);
+      expect(pieces.single.octets, 2048);
+      expect(fichiersRanges(env), <String>[pieces.single.nomFichier]);
+      expect(env.dossierPiecesJointes.uri.pathSegments, contains('notes_pieces_jointes'));
+      await attendreAffichage(tester, dansNotes(find.text('1 pièce jointe')));
+
+      await env.fermer(tester);
+    });
+
+    testWidgets('photo de la galerie, vidéo de la galerie : le bon type est retenu', (WidgetTester tester) async {
+      final EnvironnementTest env = await EnvironnementTest.creer(tester);
+      await ouvrirNouvelleNote(tester, env);
+
+      env.selecteurPieceJointe.preparer('Modèle.jpg', TypePieceJointe.photo);
+      await ajouterPiece(tester, 'Choisir une photo dans la galerie');
+      await attendreAffichage(tester, dansFormulaire(find.text('Modèle.jpg')));
+      env.selecteurPieceJointe.preparer('Tuto.mp4', TypePieceJointe.video);
+      await ajouterPiece(tester, 'Choisir une vidéo dans la galerie');
+      await attendreAffichage(tester, dansFormulaire(find.text('Tuto.mp4')));
+
+      expect(env.selecteurPieceJointe.sources, <SourcePieceJointe>[
+        SourcePieceJointe.photoGalerie,
+        SourcePieceJointe.videoGalerie,
+      ]);
+      expect(dansFormulaire(find.text('Photo · 100 o')), findsOneWidget);
+      expect(dansFormulaire(find.text('Vidéo · 100 o')), findsOneWidget);
+      expect(dansFormulaire(find.text('Pièces jointes (2 sur 20)')), findsOneWidget);
+
+      await env.fermer(tester);
+    });
+
+    testWidgets('un fichier trop gros est refusé avec la limite, et rien n’est copié', (WidgetTester tester) async {
+      final EnvironnementTest env = await EnvironnementTest.creer(tester);
+      await ouvrirNouvelleNote(tester, env);
+
+      env.selecteurPieceJointe.preparer('Gros.jpg', TypePieceJointe.photo, octets: 26 * 1024 * 1024);
+      await ajouterPiece(tester, 'Choisir une photo dans la galerie');
+      await attendreAffichage(tester, find.textContaining('la limite est de 25 Mo pour les photos'));
+      expect(dansFormulaire(find.text('Gros.jpg')), findsNothing);
+
+      env.selecteurPieceJointe.preparer('Film.mp4', TypePieceJointe.video, octets: 151 * 1024 * 1024);
+      await ajouterPiece(tester, 'Choisir une vidéo dans la galerie');
+      await attendreAffichage(tester, find.textContaining('la limite est de 150 Mo pour les vidéos'));
+      expect(dansFormulaire(find.text('Film.mp4')), findsNothing);
+
+      env.selecteurPieceJointe.preparer('Gros.pdf', TypePieceJointe.document, octets: 26 * 1024 * 1024);
+      await ajouterPiece(tester, 'Choisir un document (PDF, Word, tableur…)');
+      await attendreAffichage(tester, find.textContaining('la limite est de 25 Mo pour les documents'));
+
+      expect(dansFormulaire(find.text('Pièces jointes')), findsOneWidget); // toujours aucune
+      expect(fichiersRanges(env), isEmpty);
+
+      await env.fermer(tester);
+    });
+
+    testWidgets('annuler le choix du fichier n’ajoute rien et ne dit rien', (WidgetTester tester) async {
+      final EnvironnementTest env = await EnvironnementTest.creer(tester);
+      await ouvrirNouvelleNote(tester, env);
+
+      await ajouterPiece(tester, 'Prendre une photo'); // le faux sélecteur annule (aucun fichier préparé)
+
+      expect(env.selecteurPieceJointe.sources, <SourcePieceJointe>[SourcePieceJointe.photoAppareil]);
+      expect(find.byType(SnackBar), findsNothing);
+      expect(dansFormulaire(find.text('Pièces jointes')), findsOneWidget);
+      expect(fichiersRanges(env), isEmpty);
+
+      await env.fermer(tester);
+    });
+
+    testWidgets('20 pièces jointes au plus : un 21e ajout est refusé avant même de choisir un fichier', (
+      WidgetTester tester,
+    ) async {
+      final EnvironnementTest env = await EnvironnementTest.creer(tester);
+      final List<PieceRangee> vingt = <PieceRangee>[
+        for (int i = 0; i < 20; i++) await rangerPiece(tester, env, 'f$i.pdf', octets: 10),
+      ];
+      await creerNoteAvecPieces(tester, env, 'Pleine', vingt);
+      await ouvrirLaNote(tester, env, 'Pleine');
+
+      expect(dansFormulaire(find.text('Pièces jointes (20 sur 20)')), findsOneWidget);
+      await toucher(tester, boutonAjouterPiece());
+
+      expect(find.byType(BottomSheet), findsNothing);
+      await attendreAffichage(tester, find.text('Une note peut avoir 20 pièces jointes au plus.'));
+      expect(env.selecteurPieceJointe.sources, isEmpty);
+
+      await env.fermer(tester);
+    });
+
+    testWidgets('retirer une pièce jointe enregistrée : elle n’est effacée du téléphone qu’à « Enregistrer »', (
+      WidgetTester tester,
+    ) async {
+      final EnvironnementTest env = await EnvironnementTest.creer(tester);
+      final PieceRangee patron = await rangerPiece(tester, env, 'Patron.pdf');
+      final PieceRangee photo = await rangerPiece(tester, env, 'Modèle.jpg');
+      await creerNoteAvecPieces(tester, env, 'Poncho', <PieceRangee>[patron, photo]);
+      await ouvrirLaNote(tester, env, 'Poncho');
+
+      expect(dansFormulaire(find.text('Patron.pdf')), findsOneWidget);
+      expect(dansFormulaire(find.text('Modèle.jpg')), findsOneWidget);
+      await toucher(tester, find.byTooltip('Retirer cette pièce jointe').first);
+
+      expect(dansFormulaire(find.text('Patron.pdf')), findsNothing);
+      expect(dansFormulaire(find.text('Modèle.jpg')), findsOneWidget);
+      expect(dansFormulaire(find.text('Pièces jointes (1 sur 20)')), findsOneWidget);
+      expect(fichiersRanges(env), hasLength(2)); // rien n'est encore effacé
+
+      await toucher(tester, boutonEnregistrer());
+      await attendreAffichage(tester, find.text('Modifications enregistrées.'));
+      await attendreJusqua(tester, () => fichiersRanges(env).length == 1);
+
+      final Note note = (await notesEnBase(tester, env)).single;
+      final List<PieceJointeNote> pieces = await env.travailler(tester, () => env.notes.listerPiecesJointes(note.id));
+      expect(pieces.map((PieceJointeNote p) => p.nomAffiche), <String>['Modèle.jpg']);
+      expect(fichiersRanges(env), <String>[photo.nomFichier]);
+
+      await env.fermer(tester);
+    });
+
+    testWidgets('retirer une pièce jointe qu’on vient d’ajouter efface aussitôt sa copie', (WidgetTester tester) async {
+      final EnvironnementTest env = await EnvironnementTest.creer(tester);
+      await ouvrirNouvelleNote(tester, env);
+      env.selecteurPieceJointe.preparer('Modèle.jpg', TypePieceJointe.photo);
+      await ajouterPiece(tester, 'Choisir une photo dans la galerie');
+      await attendreAffichage(tester, dansFormulaire(find.text('Modèle.jpg')));
+      expect(fichiersRanges(env), hasLength(1));
+
+      await toucher(tester, find.byTooltip('Retirer cette pièce jointe'));
+      await attendreJusqua(tester, () => fichiersRanges(env).isEmpty);
+
+      expect(dansFormulaire(find.text('Modèle.jpg')), findsNothing);
+      expect(fichiersRanges(env), isEmpty);
+
+      await env.fermer(tester);
+    });
+
+    testWidgets('abandonner la note efface les copies des pièces ajoutées, et seulement elles', (
+      WidgetTester tester,
+    ) async {
+      final EnvironnementTest env = await EnvironnementTest.creer(tester);
+      final PieceRangee existante = await rangerPiece(tester, env, 'Patron.pdf');
+      await creerNoteAvecPieces(tester, env, 'Poncho', <PieceRangee>[existante]);
+      await ouvrirLaNote(tester, env, 'Poncho');
+      env.selecteurPieceJointe.preparer('Nouvelle.jpg', TypePieceJointe.photo);
+      await ajouterPiece(tester, 'Choisir une photo dans la galerie');
+      await attendreAffichage(tester, dansFormulaire(find.text('Nouvelle.jpg')));
+      expect(fichiersRanges(env), hasLength(2));
+
+      await retourArriere(tester);
+      expect(find.text('Abandonner les modifications ?'), findsOneWidget);
+      await tester.tap(find.widgetWithText(FilledButton, 'Abandonner'));
+      await tester.pumpAndSettle();
+      await attendreJusqua(tester, () => fichiersRanges(env).length == 1);
+
+      expect(find.byType(NoteFormScreen), findsNothing);
+      expect(fichiersRanges(env), <String>[existante.nomFichier]);
+      final Note note = (await notesEnBase(tester, env)).single;
+      expect(await env.travailler(tester, () => env.notes.listerPiecesJointes(note.id)), hasLength(1));
+
+      await env.fermer(tester);
+    });
+
+    testWidgets('un document ou une vidéo s’ouvre dans l’application du téléphone ; sans application, on le dit', (
+      WidgetTester tester,
+    ) async {
+      final EnvironnementTest env = await EnvironnementTest.creer(tester);
+      final PieceRangee patron = await rangerPiece(tester, env, 'Patron.pdf');
+      final PieceRangee tuto = await rangerPiece(tester, env, 'Tuto.mp4');
+      await creerNoteAvecPieces(tester, env, 'Poncho', <PieceRangee>[patron, tuto]);
+      await ouvrirLaNote(tester, env, 'Poncho');
+
+      await toucher(tester, dansFormulaire(find.text('Patron.pdf')));
+      expect(env.ouvreurPieceJointe.ouverts, <String>[patron.nomFichier]);
+      expect(find.byType(SnackBar), findsNothing);
+
+      env.ouvreurPieceJointe.resultat = ResultatOuverture.aucuneApplication;
+      await toucher(tester, dansFormulaire(find.text('Tuto.mp4')));
+      await attendreAffichage(tester, find.text('Aucune application du téléphone ne sait ouvrir ce fichier.'));
+      expect(env.ouvreurPieceJointe.ouverts, <String>[patron.nomFichier, tuto.nomFichier]);
+
+      env.ouvreurPieceJointe.resultat = ResultatOuverture.introuvable;
+      await toucher(tester, dansFormulaire(find.text('Patron.pdf')));
+      await attendreAffichage(tester, find.text('Ce fichier est introuvable sur le téléphone.'));
+
+      env.ouvreurPieceJointe.resultat = ResultatOuverture.echec;
+      await toucher(tester, dansFormulaire(find.text('Patron.pdf')));
+      await attendreAffichage(tester, find.text('Impossible d’ouvrir ce fichier.'));
+
+      await env.fermer(tester);
+    });
+
+    testWidgets('une photo s’affiche en plein écran dans l’application, sans autre application', (
+      WidgetTester tester,
+    ) async {
+      final EnvironnementTest env = await EnvironnementTest.creer(tester);
+      final PieceRangee photo = await rangerPiece(tester, env, 'Modèle.jpg');
+      await creerNoteAvecPieces(tester, env, 'Poncho', <PieceRangee>[photo]);
+      await ouvrirLaNote(tester, env, 'Poncho');
+
+      await toucher(tester, dansFormulaire(find.text('Modèle.jpg')));
+
+      expect(find.byType(PhotoJointeScreen), findsOneWidget);
+      expect(find.descendant(of: find.byType(PhotoJointeScreen), matching: find.text('Modèle.jpg')), findsOneWidget);
+      expect(env.ouvreurPieceJointe.ouverts, isEmpty);
+
+      await env.fermer(tester);
+    });
+
+    testWidgets('la liste des notes montre le nombre de pièces jointes de chacune', (WidgetTester tester) async {
+      final EnvironnementTest env = await EnvironnementTest.creer(tester);
+      await creerNoteAvecPieces(tester, env, 'Poncho', <PieceRangee>[
+        await rangerPiece(tester, env, 'a.pdf'),
+        await rangerPiece(tester, env, 'b.jpg'),
+      ]);
+      await creerNoteAvecPieces(tester, env, 'Bonnet', <PieceRangee>[await rangerPiece(tester, env, 'c.mp4')]);
+      await creerNote(tester, env, titre: 'Idée seule');
+      await ouvrirBlocNotes(tester, env);
+
+      await attendreAffichage(tester, dansNotes(find.text('2 pièces jointes')));
+      expect(dansNotes(find.text('1 pièce jointe')), findsOneWidget);
+      expect(dansNotes(find.textContaining('pièce')), findsNWidgets(2)); // la note sans pièce jointe n'en parle pas
+
+      await env.fermer(tester);
+    });
+
+    testWidgets('supprimer la note supprime aussi ses pièces jointes, dans le téléphone', (WidgetTester tester) async {
+      final EnvironnementTest env = await EnvironnementTest.creer(tester);
+      final PieceRangee piece = await rangerPiece(tester, env, 'Patron.pdf');
+      final PieceRangee autre = await rangerPiece(tester, env, 'Autre.pdf');
+      await creerNoteAvecPieces(tester, env, 'À supprimer', <PieceRangee>[piece]);
+      await creerNoteAvecPieces(tester, env, 'À garder', <PieceRangee>[autre]);
+      await ouvrirLaNote(tester, env, 'À supprimer');
+
+      await toucher(tester, find.byTooltip('Plus d’actions'));
+      await toucher(tester, find.text('Supprimer la note'));
+      await toucher(tester, dansDialogue(find.text('Supprimer')));
+      await attendreAffichage(tester, find.text('Note supprimée.'));
+      await attendreJusqua(tester, () => fichiersRanges(env).length == 1);
+
+      expect(fichiersRanges(env), <String>[autre.nomFichier]);
+      expect((await notesEnBase(tester, env)).map((Note n) => n.titre), <String>['À garder']);
 
       await env.fermer(tester);
     });

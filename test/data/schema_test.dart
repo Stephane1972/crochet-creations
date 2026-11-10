@@ -34,7 +34,7 @@ void main() {
   );
 
   group('structure', () {
-    test('les 19 tables du schéma existent', () async {
+    test('les 20 tables du schéma existent', () async {
       final List<String> tables = (await noms(
         'table',
       )).where((n) => !n.startsWith('sqlite_')).toList();
@@ -55,6 +55,7 @@ void main() {
         'paiements',
         'parametres_entreprise',
         'photos_produit',
+        'pieces_jointes_note',
         'produits',
         'variantes_produit',
         'ventes',
@@ -83,6 +84,7 @@ void main() {
           'idx_depenses_date_depense',
           'idx_notes_categorie_id',
           'idx_notes_modifie_le',
+          'idx_pieces_jointes_note_note_id',
         ]),
       );
     });
@@ -90,7 +92,7 @@ void main() {
     test('la version du schéma est enregistrée dans le fichier', () async {
       final row = await db.customSelect('PRAGMA user_version').getSingle();
       expect(row.read<int>('user_version'), AppDatabase.versionSchema);
-      expect(AppDatabase.versionSchema, 5);
+      expect(AppDatabase.versionSchema, 6);
     });
 
     test('les quatre lieux de vente de départ existent dès la création, dans l’ordre', () async {
@@ -141,6 +143,42 @@ void main() {
       await expectLater(sql('DELETE FROM categories_note WHERE id = ?', <Object?>[categorie]), throwsA(anything));
       await expectLater(sql("INSERT INTO notes (titre, categorie_id) VALUES ('Orpheline', 9999)"), throwsA(anything));
       expect(await db.select(db.notes).get(), hasLength(1));
+    });
+
+    test('une pièce jointe est rattachée à une note, de type connu, avec un nom de fichier unique', () async {
+      await sql("INSERT INTO notes (titre) VALUES ('Poncho')");
+      final int note = (await db.select(db.notes).get()).single.id;
+      Future<void> piece(String fichier, {String type = 'document', int octets = 100, int noteId = -1}) => sql(
+        'INSERT INTO pieces_jointes_note (note_id, nom_fichier, nom_affiche, type_fichier, octets) VALUES (?, ?, ?, ?, ?)',
+        <Object?>[noteId == -1 ? note : noteId, fichier, 'Patron.pdf', type, octets],
+      );
+
+      await piece('piece_1.pdf');
+      final PieceJointeNote ajoutee = (await db.select(db.piecesJointesNote).get()).single;
+      expect(ajoutee.typeFichier, TypePieceJointe.document);
+      expect(ajoutee.octets, 100);
+
+      await expectLater(piece('piece_1.pdf'), throwsA(anything)); // un fichier n'appartient qu'à une pièce jointe
+      await expectLater(piece('piece_2.xyz', type: 'musique'), throwsA(anything)); // type inconnu
+      await expectLater(piece('piece_3.pdf', octets: -1), throwsA(anything)); // taille négative
+      await expectLater(piece('   '), throwsA(anything)); // nom de fichier vide
+      await expectLater(piece('piece_4.pdf', noteId: 9999), throwsA(anything)); // note inconnue
+      expect(await db.select(db.piecesJointesNote).get(), hasLength(1));
+    });
+
+    test('supprimer une note supprime ses pièces jointes (en cascade)', () async {
+      await sql("INSERT INTO notes (titre) VALUES ('Poncho')");
+      await sql("INSERT INTO notes (titre) VALUES ('Bonnet')");
+      final List<Note> notes = await db.select(db.notes).get();
+      for (final Note n in notes) {
+        await sql(
+          "INSERT INTO pieces_jointes_note (note_id, nom_fichier, nom_affiche, type_fichier, octets) VALUES (?, ?, 'a.jpg', 'photo', 10)",
+          <Object?>[n.id, 'piece_${n.id}.jpg'],
+        );
+      }
+      await sql('DELETE FROM notes WHERE id = ?', <Object?>[notes.first.id]);
+      final List<PieceJointeNote> restantes = await db.select(db.piecesJointesNote).get();
+      expect(restantes.map((PieceJointeNote p) => p.noteId), <int>[notes.last.id]);
     });
 
     test('ventes et devis ont une colonne pour le nom d’un client supprimé', () async {

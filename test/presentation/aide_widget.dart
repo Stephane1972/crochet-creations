@@ -24,9 +24,12 @@ import 'package:crochet_creations/data/partage/service_documents.dart';
 import 'package:crochet_creations/data/partage/service_partage_fichiers.dart';
 import 'package:crochet_creations/data/sauvegarde/selecteur_fichier.dart';
 import 'package:crochet_creations/data/sauvegarde/service_sauvegarde.dart';
+import 'package:crochet_creations/data/stockage/ouvreur_piece_jointe.dart';
 import 'package:crochet_creations/data/stockage/selecteur_photo.dart';
+import 'package:crochet_creations/data/stockage/selecteur_piece_jointe.dart';
 import 'package:crochet_creations/data/stockage/stockage_pdf.dart';
 import 'package:crochet_creations/data/stockage/stockage_photos.dart';
+import 'package:crochet_creations/data/stockage/stockage_pieces_jointes.dart';
 import 'package:crochet_creations/domain/calculs/panier.dart';
 import 'package:crochet_creations/domain/categories_produit.dart';
 import 'package:crochet_creations/domain/document_devis.dart';
@@ -54,6 +57,42 @@ class FauxSelecteurPhoto implements SelecteurPhoto {
 
   @override
   Future<String?> retrouverPhotoPerdue() async => null;
+}
+
+/// Faux sélecteur de pièce jointe : renvoie [prochain] au prochain choix (puis `null` = la personne annule).
+class FauxSelecteurPieceJointe implements SelecteurPieceJointe {
+  FichierChoisi? prochain;
+  final List<SourcePieceJointe> sources = <SourcePieceJointe>[];
+
+  /// Prépare un fichier de [octets] octets (rempli de zéros), lu en flux comme le ferait le téléphone.
+  void preparer(String nom, TypePieceJointe type, {int octets = 100, bool annoncerLaTaille = true}) {
+    prochain = FichierChoisi(
+      nom: nom,
+      type: type,
+      octets: annoncerLaTaille ? octets : null,
+      lire: () => Stream<List<int>>.value(List<int>.filled(octets, 0)),
+    );
+  }
+
+  @override
+  Future<FichierChoisi?> choisir(SourcePieceJointe source) async {
+    sources.add(source);
+    final FichierChoisi? choisi = prochain;
+    prochain = null;
+    return choisi;
+  }
+}
+
+/// Faux ouvreur : note les fichiers qu'on a demandé d'ouvrir, et répond [resultat].
+class FauxOuvreurPieceJointe implements OuvreurPieceJointe {
+  ResultatOuverture resultat = ResultatOuverture.ouvert;
+  final List<String> ouverts = <String>[];
+
+  @override
+  Future<ResultatOuverture> ouvrir(File fichier) async {
+    ouverts.add(fichier.uri.pathSegments.last);
+    return resultat;
+  }
 }
 
 /// Faux fabricant de PDF : rapide, sans polices ni logo. Garde les documents reçus pour que les tests
@@ -166,7 +205,7 @@ class EnvironnementTest {
   late final CategorieRepository categories = CategorieRepository(db);
   late final LieuVenteRepository lieux = LieuVenteRepository(db);
   late final CategorieNoteRepository categoriesNote = CategorieNoteRepository(db);
-  late final NoteRepository notes = NoteRepository(db);
+  late final NoteRepository notes = NoteRepository(db, stockagePiecesJointes: stockagePiecesJointes);
   late final VenteRepository ventes = VenteRepository(db, produits);
   late final CoursRepository cours = CoursRepository(db, ventes);
   late final DepenseRepository depenses = DepenseRepository(db);
@@ -185,6 +224,8 @@ class EnvironnementTest {
   final FauxGenerateurDevisPdf generateurDevisPdf = FauxGenerateurDevisPdf();
   final FauxServicePartageFichiers partageFichiers = FauxServicePartageFichiers();
   final FauxSelecteurFichier selecteurFichier = FauxSelecteurFichier();
+  final FauxSelecteurPieceJointe selecteurPieceJointe = FauxSelecteurPieceJointe();
+  final FauxOuvreurPieceJointe ouvreurPieceJointe = FauxOuvreurPieceJointe();
   late final ServiceSauvegarde sauvegarde = ServiceSauvegarde(
     base: db,
     dossierSauvegardes: Directory('${dossier.path}/sauvegardes'),
@@ -192,8 +233,10 @@ class EnvironnementTest {
     dossierPhotos: dossierPhotos,
     dossierFactures: dossierFactures,
     dossierDevis: dossierDevis,
+    dossierPiecesJointes: dossierPiecesJointes,
     horloge: () => maintenant ?? DateTime.now(),
   );
+  late final StockagePiecesJointes stockagePiecesJointes = StockagePiecesJointes(dossierPiecesJointes);
   late final StockagePdf stockageFactures = StockagePdf(dossierFactures);
   late final StockagePdf stockageDevis = StockagePdf(dossierDevis);
   late final FactureRepository factures = FactureRepository(
@@ -226,6 +269,7 @@ class EnvironnementTest {
   Directory get dossierPhotos => Directory('${dossier.path}/photos_produits');
   Directory get dossierFactures => Directory('${dossier.path}/factures');
   Directory get dossierDevis => Directory('${dossier.path}/devis');
+  Directory get dossierPiecesJointes => Directory('${dossier.path}/notes_pieces_jointes');
 
   List<Override> get overrides => <Override>[
     appDatabaseProvider.overrideWithValue(db),
@@ -234,6 +278,9 @@ class EnvironnementTest {
     photoRetrouveeInitialeProvider.overrideWithValue(photoRetrouvee),
     stockageFacturesProvider.overrideWithValue(stockageFactures),
     stockageDevisProvider.overrideWithValue(stockageDevis),
+    stockagePiecesJointesProvider.overrideWithValue(stockagePiecesJointes),
+    selecteurPieceJointeProvider.overrideWithValue(selecteurPieceJointe),
+    ouvreurPieceJointeProvider.overrideWithValue(ouvreurPieceJointe),
     generateurFacturePdfProvider.overrideWithValue(generateurPdf.call),
     generateurDevisPdfProvider.overrideWithValue(generateurDevisPdf.call),
     serviceDocumentsProvider.overrideWithValue(documents),

@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:crochet_creations/core/router/app_routes.dart';
 import 'package:crochet_creations/data/database/app_database.dart';
 import 'package:crochet_creations/data/stockage/ouvreur_piece_jointe.dart';
+import 'package:crochet_creations/data/stockage/selecteur_piece_jointe.dart';
 import 'package:crochet_creations/data/stockage/stockage_pieces_jointes.dart';
 import 'package:crochet_creations/domain/enums.dart';
 import 'package:crochet_creations/domain/pieces_jointes.dart';

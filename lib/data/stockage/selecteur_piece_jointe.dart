@@ -41,7 +41,8 @@ class SelecteurPieceJointeSysteme implements SelecteurPieceJointe {
         return FichierChoisi(
           nom: choisi.name,
           type: typePieceJointeDepuisNom(choisi.name),
-          octets: choisi.size,
+          // file_picker 13 : la taille annoncée peut manquer (null) ; elle est alors constatée pendant la copie.
+          octets: choisi.lengthSync() ?? await choisi.length(),
           lire: () => choisi.readAsByteStream(),
         );
     }

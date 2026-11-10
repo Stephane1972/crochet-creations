@@ -51,6 +51,7 @@ class ServiceSauvegarde {
     required Directory dossierPhotos,
     required Directory dossierFactures,
     required Directory dossierDevis,
+    required Directory dossierPiecesJointes,
     DateTime Function()? horloge,
     ControleEspaceLibre? espaceLibre,
   }) : _base = base,
@@ -58,6 +59,7 @@ class ServiceSauvegarde {
          FormatSauvegarde.dossierPhotos: dossierPhotos,
          FormatSauvegarde.dossierFactures: dossierFactures,
          FormatSauvegarde.dossierDevis: dossierDevis,
+         FormatSauvegarde.dossierPiecesJointes: dossierPiecesJointes,
        },
        _horloge = horloge ?? DateTime.now,
        _espaceLibre = espaceLibre ?? const ControleEspaceLibreInconnu();

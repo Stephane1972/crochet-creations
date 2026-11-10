@@ -1,4 +1,4 @@
-/// Schéma de la base de données (SQLite, via Drift) : 19 tables.
+/// Schéma de la base de données (SQLite, via Drift) : 20 tables.
 ///
 /// Conventions (détail dans ARCHITECTURE.md) :
 /// - **Montants** : nombres entiers de centimes (`1250` = 12,50 €). Jamais de décimaux.
@@ -664,4 +664,39 @@ class Notes extends Table with Tracabilite {
 
   @override
   List<String> get customConstraints => ['CHECK (length(trim(titre)) > 0)'];
+}
+
+/// Une pièce jointe d'une note : une photo, une vidéo ou un document rangé dans le téléphone.
+///
+/// La base ne garde que des **noms** : `nom_fichier` est le nom du fichier rangé dans le dossier des pièces jointes
+/// (jamais un chemin : le dossier peut changer de place, voir `StockagePiecesJointes`), `nom_affiche` est le nom que
+/// la personne reconnaît (celui du fichier d'origine). Supprimer une note supprime ses lignes ici (`CASCADE`) ;
+/// `NoteRepository` efface ensuite les fichiers.
+@DataClassName('PieceJointeNote')
+@TableIndex(name: 'idx_pieces_jointes_note_note_id', columns: {#noteId})
+class PiecesJointesNote extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  IntColumn get noteId => integer().references(Notes, #id, onDelete: KeyAction.cascade)();
+
+  /// Nom du fichier rangé (unique : un fichier n'appartient qu'à une pièce jointe).
+  TextColumn get nomFichier => text().withLength(min: 1, max: 255).unique()();
+
+  /// Nom affiché, celui du fichier d'origine.
+  TextColumn get nomAffiche => text().withLength(min: 1, max: 120)();
+
+  TextColumn get typeFichier => textEnum<TypePieceJointe>()();
+
+  /// Taille du fichier au moment de l'ajout.
+  IntColumn get octets => integer()();
+
+  DateTimeColumn get creeLe => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  List<String> get customConstraints => [
+    'CHECK (length(trim(nom_fichier)) > 0)',
+    'CHECK (length(trim(nom_affiche)) > 0)',
+    "CHECK (type_fichier IN ('photo', 'video', 'document'))",
+    'CHECK (octets >= 0)',
+  ];
 }

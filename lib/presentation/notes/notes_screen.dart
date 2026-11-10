@@ -54,6 +54,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
     final AsyncValue<List<Note>> notes = ref.watch(notesProvider);
     final AsyncValue<List<CategorieNote>> categories = ref.watch(categoriesNoteProvider);
     final List<CategorieNote> listeCategories = categories.valueOrNull ?? const <CategorieNote>[];
+    final Map<int, int> piecesJointes = ref.watch(nombrePiecesJointesParNoteProvider).valueOrNull ?? const <int, int>{};
 
     // Une catégorie supprimée pendant qu'elle était choisie : on revient à « Toutes ».
     final _Filtre filtre =
@@ -153,6 +154,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                     return _LigneNote(
                       note: note,
                       categorie: categorieNoteParId(listeCategories, note.categorieId),
+                      piecesJointes: piecesJointes[note.id] ?? 0,
                     );
                   },
                 );
@@ -179,10 +181,13 @@ class _PuceFiltre extends StatelessWidget {
 }
 
 class _LigneNote extends StatelessWidget {
-  const _LigneNote({required this.note, required this.categorie});
+  const _LigneNote({required this.note, required this.categorie, required this.piecesJointes});
 
   final Note note;
   final CategorieNote? categorie;
+
+  /// Nombre de pièces jointes de la note (0 : rien à signaler).
+  final int piecesJointes;
 
   @override
   Widget build(BuildContext context) {
@@ -208,9 +213,20 @@ class _LigneNote extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: discret,
           ),
+          if (piecesJointes > 0)
+            Row(
+              children: <Widget>[
+                Icon(Icons.attach_file, size: 14, color: scheme.onSurfaceVariant),
+                const SizedBox(width: 2),
+                Text(
+                  piecesJointes > 1 ? '$piecesJointes pièces jointes' : '1 pièce jointe',
+                  style: discret,
+                ),
+              ],
+            ),
         ],
       ),
-      isThreeLine: note.contenu.isNotEmpty,
+      isThreeLine: note.contenu.isNotEmpty || piecesJointes > 0,
       onTap: () => Navigator.of(context).pushNamed(AppRoutes.noteModifier, arguments: note.id),
     );
   }

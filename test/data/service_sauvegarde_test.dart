@@ -13,7 +13,9 @@ import 'package:crochet_creations/data/repositories/note_repository.dart';
 import 'package:crochet_creations/data/sauvegarde/espace_libre.dart';
 import 'package:crochet_creations/data/sauvegarde/format_sauvegarde.dart';
 import 'package:crochet_creations/data/sauvegarde/service_sauvegarde.dart';
+import 'package:crochet_creations/data/stockage/stockage_pieces_jointes.dart';
 import 'package:crochet_creations/domain/categories_produit.dart';
+import 'package:crochet_creations/domain/enums.dart';
 import 'package:crochet_creations/domain/erreurs.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter_test/flutter_test.dart';
@@ -44,6 +46,7 @@ class _Banc {
   Directory get photos => Directory('${racine.path}/photos_produits');
   Directory get factures => Directory('${racine.path}/factures');
   Directory get devis => Directory('${racine.path}/devis');
+  Directory get piecesJointes => Directory('${racine.path}/notes_pieces_jointes');
 
   late final ServiceSauvegarde service = ServiceSauvegarde(
     base: db,
@@ -52,6 +55,7 @@ class _Banc {
     dossierPhotos: photos,
     dossierFactures: factures,
     dossierDevis: devis,
+    dossierPiecesJointes: piecesJointes,
     horloge: () => maintenant,
     espaceLibre: espace,
   );
@@ -1193,6 +1197,100 @@ void main() {
       await echouer((Map<String, dynamic> tables) {
         tables['produits'] = 'oups';
       });
+    });
+  });
+
+  group('pièces jointes des notes', () {
+    const String contenuPiece = '%PDF patron du poncho';
+
+    /// Une note avec une pièce jointe (le fichier est rangé dans le dossier des pièces jointes de [b]).
+    Future<void> noteAvecPiece(_Banc b, {String nomFichier = 'piece_1.pdf'}) async {
+      await b.ajouterFichier(b.piecesJointes, nomFichier, contenuPiece);
+      await NoteRepository(b.db).creer(
+        titre: 'Patron du poncho',
+        piecesJointes: <PieceRangee>[
+          PieceRangee(
+            nomFichier: nomFichier,
+            nomAffiche: 'Patron poncho.pdf',
+            type: TypePieceJointe.document,
+            octets: utf8.encode(contenuPiece).length,
+          ),
+        ],
+      );
+    }
+
+    test('sont citées par les données : leur fichier est irremplaçable, comme une photo', () async {
+      await noteAvecPiece(banc);
+      final Set<String> citees = FormatSauvegarde.fichiersIrremplacablesCites(await instantane(banc.db));
+      expect(citees, <String>{'notes_pieces_jointes/piece_1.pdf'});
+    });
+
+    test('l’archive les contient avec leur empreinte, et une restauration sur un autre téléphone les remet à l’identique', () async {
+      await remplirBase(banc.db);
+      await banc.ecrireFichiers();
+      await noteAvecPiece(banc);
+
+      final SauvegardeLocale s = await banc.service.creer(TypeSauvegarde.manuelle);
+      expect(s.complete, isTrue);
+      final Archive archive = ZipDecoder().decodeBytes(await s.fichier.readAsBytes());
+      expect(utf8.decode(archive.find('fichiers/notes_pieces_jointes/piece_1.pdf')!.content), contenuPiece);
+      final Map<String, dynamic> liste =
+          jsonDecode(utf8.decode(archive.find('fichiers.json')!.content)) as Map<String, dynamic>;
+      final Map<String, dynamic> entree = (liste['fichiers'] as List<dynamic>)
+          .cast<Map<String, dynamic>>()
+          .firstWhere((Map<String, dynamic> f) => f['chemin'] == 'notes_pieces_jointes/piece_1.pdf');
+      expect(entree['sha256'], _empreinteDe(contenuPiece));
+      expect(entree['octets'], utf8.encode(contenuPiece).length);
+
+      final Map<String, List<Map<String, Object?>>> avant = await instantane(banc.db);
+      final _Banc autre = await _Banc.creer();
+      addTearDown(autre.fermer);
+      final ResultatRestauration resultat = await autre.restaurer(await s.fichier.readAsBytes());
+
+      expect(resultat.fichiersAbsents, isEmpty);
+      expect(await instantane(autre.db), avant);
+      expect(await autre.contenuDe(autre.piecesJointes), <String, String>{'piece_1.pdf': contenuPiece});
+      final List<PieceJointeNote> pieces = await autre.db.select(autre.db.piecesJointesNote).get();
+      expect(pieces.single.nomAffiche, 'Patron poncho.pdf');
+      expect(pieces.single.typeFichier, TypePieceJointe.document);
+    });
+
+    test('une pièce jointe dont le fichier manque : la sauvegarde est incomplète, et le dit', () async {
+      await noteAvecPiece(banc);
+      await File('${banc.piecesJointes.path}/piece_1.pdf').delete();
+
+      final SauvegardeLocale s = await banc.service.creer(TypeSauvegarde.manuelle);
+      expect(s.complete, isFalse);
+      expect(s.fichiersAbsents, <String>['notes_pieces_jointes/piece_1.pdf']);
+      expect(s.nom, endsWith('-incomplete.zip'));
+    });
+
+    test('un fichier provisoire (.tmp) du dossier des pièces jointes ne part pas dans l’archive', () async {
+      await noteAvecPiece(banc);
+      await banc.ajouterFichier(banc.piecesJointes, 'piece_2.mp4.tmp', 'copie interrompue');
+
+      final Archive archive = ZipDecoder().decodeBytes(await banc.octetsArchive());
+      expect(archive.files.map((ArchiveFile f) => f.name), contains('fichiers/notes_pieces_jointes/piece_1.pdf'));
+      expect(archive.files.map((ArchiveFile f) => f.name), isNot(contains('fichiers/notes_pieces_jointes/piece_2.mp4.tmp')));
+    });
+
+    test('une sauvegarde faite avant les pièces jointes (schéma 5) est restaurée : aucune pièce jointe', () async {
+      await remplirBase(banc.db);
+      await banc.ecrireFichiers();
+      final Uint8List actuelle = await banc.octetsArchive();
+      final Map<String, List<Map<String, Object?>>> avant = await instantane(banc.db);
+
+      final Uint8List ancienne = _modifierDonnees(actuelle, (Map<String, dynamic> d) {
+        (d['manifeste'] as Map<String, dynamic>)['versionSchema'] = 5;
+        (d['tables'] as Map<String, dynamic>).remove('pieces_jointes_note');
+      });
+      await noteAvecPiece(banc);
+      await banc.restaurer(ancienne);
+
+      final Map<String, List<Map<String, Object?>>> apres = await instantane(banc.db);
+      expect(apres.remove('pieces_jointes_note'), isEmpty);
+      avant.remove('pieces_jointes_note');
+      expect(apres, avant);
     });
   });
 

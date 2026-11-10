@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:crochet_creations/data/database/app_database.dart';
 import 'package:crochet_creations/domain/categories_produit.dart';
+import 'package:crochet_creations/domain/enums.dart';
 import 'package:drift/drift.dart' show OrderingTerm, Value, driftRuntimeOptions;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -98,15 +99,22 @@ void main() {
     expect(categories.map((CategorieNote c) => c.nom), <String>['Futures commandes', 'Documents entreprise']);
   }
 
-  /// Ramène une base du schéma actuel à l'état d'une base du schéma 4 : sans le bloc-notes.
+  /// Ramène une base du schéma actuel à l'état d'une base du schéma 5 : sans les pièces jointes des notes.
+  void retirerLesPiecesJointes(dynamic raw) {
+    raw.execute('DROP INDEX idx_pieces_jointes_note_note_id');
+    raw.execute('DROP TABLE pieces_jointes_note');
+  }
+
+  /// Ramène une base du schéma actuel à l'état d'une base du schéma 4 : sans le bloc-notes (ni ses pièces jointes).
   void retirerLeBlocNotes(dynamic raw) {
+    retirerLesPiecesJointes(raw);
     raw.execute('DROP INDEX idx_notes_categorie_id');
     raw.execute('DROP INDEX idx_notes_modifie_le');
     raw.execute('DROP TABLE notes');
     raw.execute('DROP TABLE categories_note');
   }
 
-  /// Ramène une base du schéma actuel à l'état d'une base du schéma 3 : sans les lieux de vente (ni le bloc-notes).
+  /// Ramène une base du schéma actuel à l'état d'une base du schéma 3 : sans les lieux de vente (ni le bloc-notes ni ses pièces jointes).
   void retirerLesLieux(dynamic raw) {
     retirerLeBlocNotes(raw);
     raw.execute('DROP INDEX idx_ventes_lieu_id');
@@ -114,7 +122,7 @@ void main() {
     raw.execute('DROP TABLE lieux_vente');
   }
 
-  test('du schéma 1 au schéma 5 : les données restent, « client_nom », les catégories, les lieux et le bloc-notes apparaissent', () async {
+  test('du schéma 1 au schéma 6 : les données restent, « client_nom », les catégories, les lieux et le bloc-notes apparaissent', () async {
     // 1. Une base créée avec le schéma actuel, remplie de quelques lignes.
     final int clientId = await remplirBase();
 
@@ -133,7 +141,7 @@ void main() {
     );
     // La première requête déclenche la mise à jour, puis le test relit le résultat.
     final int version = (await rouverte.customSelect('PRAGMA user_version').getSingle()).read<int>('user_version');
-    expect(version, 5);
+    expect(version, 6);
     for (final String table in <String>['ventes', 'devis']) {
       expect(await colonnes(rouverte, table), contains('client_nom'), reason: table);
     }
@@ -162,7 +170,7 @@ void main() {
     await rouverte.close();
   });
 
-  test('du schéma 2 au schéma 5 : catégories, lieux et bloc-notes apparaissent avec ceux de départ, rien d’autre ne bouge', () async {
+  test('du schéma 2 au schéma 6 : catégories, lieux et bloc-notes apparaissent avec ceux de départ, rien d’autre ne bouge', () async {
     await remplirBase();
 
     final AppDatabase rouverte = AppDatabase(
@@ -176,7 +184,7 @@ void main() {
       ),
     );
     final int version = (await rouverte.customSelect('PRAGMA user_version').getSingle()).read<int>('user_version');
-    expect(version, 5);
+    expect(version, 6);
     await verifierLieuxDeDepart(rouverte);
     await verifierCategoriesNoteDeDepart(rouverte);
 
@@ -189,7 +197,7 @@ void main() {
     await rouverte.close();
   });
 
-  test('du schéma 3 au schéma 5 : les lieux de vente apparaissent, toutes les ventes restent « Non renseigné »', () async {
+  test('du schéma 3 au schéma 6 : les lieux de vente apparaissent, toutes les ventes restent « Non renseigné »', () async {
     final int clientId = await remplirBase();
     // Une deuxième vente, pour vérifier qu'aucune n'est touchée.
     final AppDatabase preparee = AppDatabase(NativeDatabase(fichier));
@@ -208,7 +216,7 @@ void main() {
       ),
     );
     final int version = (await rouverte.customSelect('PRAGMA user_version').getSingle()).read<int>('user_version');
-    expect(version, 5);
+    expect(version, 6);
     await verifierCategoriesNoteDeDepart(rouverte);
 
     // Les quatre lieux de départ sont là, la colonne et son index aussi.
@@ -236,7 +244,7 @@ void main() {
     await rouverte.close();
   });
 
-  test('rouvrir une base déjà au schéma 5 ne recrée pas les lieux supprimés ou renommés', () async {
+  test('rouvrir une base déjà au schéma 6 ne recrée pas les lieux supprimés ou renommés', () async {
     final AppDatabase premiere = AppDatabase(NativeDatabase(fichier));
     await (premiere.update(premiere.lieuxVente)..where((t) => t.nom.equals('Marché'))).write(
       const LieuxVenteCompanion(nom: Value('Marché de Noël')),
@@ -250,7 +258,7 @@ void main() {
     await deuxieme.close();
   });
 
-  test('rouvrir une base déjà au schéma 5 ne recrée pas les catégories de départ supprimées ou renommées', () async {
+  test('rouvrir une base déjà au schéma 6 ne recrée pas les catégories de départ supprimées ou renommées', () async {
     final AppDatabase premiere = AppDatabase(NativeDatabase(fichier));
     await (premiere.update(premiere.categoriesProduit)..where((t) => t.cle.equals(CleCategorie.crochet))).write(
       const CategoriesProduitCompanion(nom: Value('Mes créations')),
@@ -266,7 +274,7 @@ void main() {
     await deuxieme.close();
   });
 
-  test('du schéma 4 au schéma 5 : le bloc-notes apparaît avec ses deux catégories de départ, rien d’autre ne bouge', () async {
+  test('du schéma 4 au schéma 6 : le bloc-notes apparaît avec ses deux catégories de départ, rien d’autre ne bouge', () async {
     final int clientId = await remplirBase();
 
     final AppDatabase rouverte = AppDatabase(
@@ -279,7 +287,7 @@ void main() {
       ),
     );
     final int version = (await rouverte.customSelect('PRAGMA user_version').getSingle()).read<int>('user_version');
-    expect(version, 5);
+    expect(version, 6);
 
     // Deux catégories de départ, aucune note, et les index.
     await verifierCategoriesNoteDeDepart(rouverte);
@@ -309,7 +317,7 @@ void main() {
     await rouverte.close();
   });
 
-  test('rouvrir une base déjà au schéma 5 ne recrée pas les catégories de notes supprimées ou renommées, et garde les notes', () async {
+  test('rouvrir une base déjà au schéma 6 ne recrée pas les catégories de notes supprimées ou renommées, et garde les notes', () async {
     final AppDatabase premiere = AppDatabase(NativeDatabase(fichier));
     final CategorieNote futures = (await premiere.select(premiere.categoriesNote).get()).firstWhere(
       (CategorieNote c) => c.nom == 'Futures commandes',
@@ -327,6 +335,83 @@ void main() {
     final Note note = (await deuxieme.select(deuxieme.notes).get()).single;
     expect(note.titre, 'Bonnet');
     expect(note.categorieId, futures.id);
+    await deuxieme.close();
+  });
+
+  test('du schéma 5 au schéma 6 : les pièces jointes apparaissent (table et index), les notes et le reste ne bougent pas', () async {
+    final int clientId = await remplirBase();
+    final AppDatabase premiere = AppDatabase(NativeDatabase(fichier));
+    await premiere.into(premiere.notes).insert(NotesCompanion.insert(titre: 'Poncho', contenu: const Value('Laine bleue')));
+    await premiere.close();
+
+    final AppDatabase rouverte = AppDatabase(
+      NativeDatabase(
+        fichier,
+        setup: (raw) {
+          retirerLesPiecesJointes(raw);
+          raw.execute('PRAGMA user_version = 5');
+        },
+      ),
+    );
+    final int version = (await rouverte.customSelect('PRAGMA user_version').getSingle()).read<int>('user_version');
+    expect(version, 6);
+
+    // La table existe, vide, avec son index.
+    expect(await rouverte.select(rouverte.piecesJointesNote).get(), isEmpty);
+    final List<String> index = (await rouverte
+            .customSelect("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'pieces_jointes_note'")
+            .get())
+        .map((r) => r.read<String>('name'))
+        .toList();
+    expect(index, contains('idx_pieces_jointes_note_note_id'));
+
+    // Rien d'autre ne bouge : la note, la vente, le client, les devis, le produit.
+    final Note note = (await rouverte.select(rouverte.notes).get()).single;
+    expect(note.titre, 'Poncho');
+    expect(note.contenu, 'Laine bleue');
+    expect((await rouverte.select(rouverte.ventes).get()).single.clientId, clientId);
+    expect((await rouverte.select(rouverte.devis).get()).single.numero, 'DEVIS-2026-0001');
+    expect((await rouverte.select(rouverte.produits).get()).single.nom, 'Doudou lapin');
+
+    // Et l'application sait s'en servir : une pièce jointe se range dans la note, et part avec elle.
+    await rouverte
+        .into(rouverte.piecesJointesNote)
+        .insert(
+          PiecesJointesNoteCompanion.insert(
+            noteId: note.id,
+            nomFichier: 'piece_1.pdf',
+            nomAffiche: 'Patron.pdf',
+            typeFichier: TypePieceJointe.document,
+            octets: 1200,
+          ),
+        );
+    expect((await rouverte.select(rouverte.piecesJointesNote).get()).single.nomAffiche, 'Patron.pdf');
+    await (rouverte.delete(rouverte.notes)..where((t) => t.id.equals(note.id))).go();
+    expect(await rouverte.select(rouverte.piecesJointesNote).get(), isEmpty);
+    await rouverte.close();
+  });
+
+  test('rouvrir une base déjà au schéma 6 garde ses pièces jointes', () async {
+    final AppDatabase premiere = AppDatabase(NativeDatabase(fichier));
+    final int noteId = await premiere.into(premiere.notes).insert(NotesCompanion.insert(titre: 'Bonnet'));
+    await premiere
+        .into(premiere.piecesJointesNote)
+        .insert(
+          PiecesJointesNoteCompanion.insert(
+            noteId: noteId,
+            nomFichier: 'piece_2.mp4',
+            nomAffiche: 'Tutoriel.mp4',
+            typeFichier: TypePieceJointe.video,
+            octets: 5000,
+          ),
+        );
+    await premiere.close();
+
+    final AppDatabase deuxieme = AppDatabase(NativeDatabase(fichier));
+    final PieceJointeNote piece = (await deuxieme.select(deuxieme.piecesJointesNote).get()).single;
+    expect(piece.noteId, noteId);
+    expect(piece.typeFichier, TypePieceJointe.video);
+    expect(piece.octets, 5000);
     await deuxieme.close();
   });
 }

@@ -1,7 +1,7 @@
 name: crochet_creations
 description: "Un p’tit crochet dans les stocks : stock, ventes, factures, devis et cours pour une créatrice auto-entrepreneuse."
 publish_to: "none"
-version: 0.17.0+20
+version: 0.18.0+21
 
 environment:
   # Drift 2.35 demande Dart 3.10 (Flutter 3.38 ou plus récent, canal « stable »).
@@ -37,6 +37,9 @@ dependencies:
   # Sauvegarde fiable (étape 3) : empreinte SHA-256 de chaque photo et PDF, et place libre sur le téléphone.
   crypto: ^3.0.6
   disk_space_plus: ^0.2.6
+
+  # Pièces jointes des notes (étape 4) : ouvrir une vidéo ou un document dans l'application du téléphone qui sait le lire.
+  open_filex: ^4.7.0
 
   # Les dépendances des étapes suivantes seront ajoutées au fur et à mesure,
   # pour ne pas alourdir l'application avant d'en avoir besoin.

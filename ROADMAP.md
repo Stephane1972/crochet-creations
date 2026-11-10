@@ -57,8 +57,8 @@ Plan validé par Stéphane, une pull request par étape (la facturation électro
 | 0 | Signature stable de l'APK (mises à jour sans perte de données, préalable à Google Drive) | terminée et validée (PR #17) |
 | 1 | Lieux de vente sur chaque vente (liste personnalisable, « Non renseigné » pour les anciennes ventes) | terminée et validée (PR #18) |
 | 2 | Bloc-notes avec catégories (Futures commandes, Documents entreprise, catégories personnelles) | terminée et validée (PR #19) |
-| 3 | Sauvegarde locale fiable : archive écrite en flux, liste des fichiers et empreintes, progression, contrôle de l'espace | **en attente de validation** |
-| 4 | Pièces jointes des notes : photos, vidéos, documents (limites affichées) | à faire |
+| 3 | Sauvegarde locale fiable : archive écrite en flux, liste des fichiers et empreintes, progression, contrôle de l'espace | **faite** (PR #20 fusionnée, 0.17.0) |
+| 4 | Pièces jointes des notes : photos, vidéos, documents (limites affichées) | **écrite, en attente de validation** (PR #21) |
 | 5 | Statistiques par mois, année, lieu de vente et catégorie (argent encaissé), graphique et tableau | à faire |
 | 6 | Google Drive, partie 1 : connexion, dossiers, envoi des fichiers, état | à faire |
 | 7 | Google Drive, partie 2 : sauvegardes versionnées, restauration, changement de téléphone | à faire |

@@ -75,7 +75,7 @@ crochet-creations/
 │   │       └── numero_document.dart          FACT-2026-0001, DEVIS-2026-0001, PRD-0001
 │   ├── data/
 │   │   ├── database/
-│   │   │   ├── tables.dart                   les 19 tables (contraintes, index)
+│   │   │   ├── tables.dart                   les 20 tables (contraintes, index)
 │   │   │   ├── app_database.dart             base, version du schéma, migrations
 │   │   │   ├── flux_en_direct.dart           lecture « en direct » de plusieurs tables (observerTables)
 │   │   │   └── app_database.g.dart           (généré par build_runner, non versionné)
@@ -119,7 +119,10 @@ crochet-creations/
 │   │   ├── stockage/
 │   │   │   ├── stockage_photos.dart          copie les photos dans le dossier privé de l'application
 │   │   │   ├── stockage_pdf.dart             range les PDF (factures, devis) : un fichier par numéro
-│   │   │   └── selecteur_photo.dart          choix d'une photo (galerie / appareil), remplaçable en test
+│   │   │   ├── selecteur_photo.dart          choix d'une photo (galerie / appareil), remplaçable en test
+│   │   │   ├── stockage_pieces_jointes.dart  range les pièces jointes des notes en flux, avec les limites de taille
+│   │   │   ├── selecteur_piece_jointe.dart   choix d'une photo, d'une vidéo ou d'un document (interface + sélecteurs Android)
+│   │   │   └── ouvreur_piece_jointe.dart     ouvre un fichier dans l'application du téléphone (interface + open_filex)
 │   │   └── providers.dart                    accès Riverpod à la base, aux repositories, aux photos et à l'horloge
 │   └── presentation/
 │       ├── common/                   placeholder_screen.dart, menu_tile.dart, choix_photo.dart (feuille de choix de photo), photo_retrouvee.dart
@@ -173,7 +176,8 @@ crochet-creations/
 │       ├── more/more_screen.dart             onglet « Plus »
 │       ├── notes/                            bloc-notes (voir « Bloc-notes »)
 │       │   ├── notes_screen.dart             Plus › Bloc-notes : liste, filtres par catégorie, « Nouvelle note »
-│       │   ├── note_form_screen.dart         une note : titre, catégorie, texte ; enregistrer, supprimer, abandonner
+│       │   ├── note_form_screen.dart         une note : titre, catégorie, texte, pièces jointes ; enregistrer, supprimer, abandonner
+│       │   ├── pieces_jointes_section.dart   section « Pièces jointes » du formulaire, feuille d'ajout, visionneuse de photo
 │       │   ├── categories_note_screen.dart   Réglages › Catégories de notes : ajouter, renommer, supprimer (en déplaçant les notes)
 │       │   ├── categorie_note_dialogues.dart boîte « nom de catégorie de notes » (création et renommage)
 │       │   ├── choix_categorie_note.dart     carte « Catégorie » et feuille de choix du formulaire d'une note
@@ -258,7 +262,9 @@ les produits : `domain/produits/`, `data/produits/`, `presentation/produits/`.
 - lieux de vente (`presentation/lieux/lieux_providers.dart`) : `lieuxVenteProvider` (liste en direct, dans l'ordre),
   `nombreVentesParLieuProvider` (écran Lieux de vente) ; `venteEnCoursProvider` porte aussi le lieu choisi dans le panier ;
 - bloc-notes (`presentation/notes/notes_providers.dart`) : `notesProvider` (notes en direct, la dernière modifiée en premier),
-  `categoriesNoteProvider` (catégories en direct, dans l'ordre), `nombreNotesParCategorieProvider` (écran Catégories de notes) ;
+  `categoriesNoteProvider` (catégories en direct, dans l'ordre), `nombreNotesParCategorieProvider` (écran Catégories de notes),
+  `nombrePiecesJointesParNoteProvider` (liste des notes) ; les pièces jointes ont leurs propres providers dans `data/providers.dart`
+  (`stockagePiecesJointesProvider`, `selecteurPieceJointeProvider`, `ouvreurPieceJointeProvider`), remplacés en test ;
 - `filtresProduitsProvider` : recherche, catégorie (clé), « Archivés », « À réapprovisionner ». Il vit au-dessus des écrans :
   le filtre choisi depuis l'accueil (« Stock faible ») s'applique à l'ouverture de l'onglet Produits ;
 - clients (`presentation/clients/clients_providers.dart`) : `clientsProvider` (tous les clients, archivés compris, en
@@ -318,7 +324,7 @@ Navigation Flutter standard (`Navigator` + routes nommées), sans bibliothèque 
 
 Un fichier `crochet_creations.sqlite` dans le stockage privé de l'application. Aucun serveur.
 
-### Les 19 tables
+### Les 20 tables
 
 | Table | Rôle |
 |-------|------|
@@ -341,6 +347,7 @@ Un fichier `crochet_creations.sqlite` dans le stockage privé de l'application. 
 | `depenses` | Date, catégorie, montant, fournisseur, photo du ticket, produit concerné |
 | `categories_note` | Catégories du bloc-notes (Futures commandes, Documents entreprise, les vôtres) : nom modifiable, ordre d'affichage |
 | `notes` | Une note : titre, texte, catégorie (vide = « Sans catégorie »), dates de création et de modification |
+| `pieces_jointes_note` | Une pièce jointe d'une note : nom du fichier rangé, nom affiché, type (photo, vidéo, document), taille |
 
 Relations principales :
 
@@ -563,6 +570,36 @@ différentes ne se confondent plus (test `test/data/flux_en_direct_test.dart`).
   suivantes du plan, rien n'est prévu dans cette étape.
 
 ## Clients (étape 4)
+
+### Pièces jointes des notes
+
+- **Une table, un dossier.** `pieces_jointes_note` (schéma **6**) : `note_id` (clé étrangère vers `notes`, **`ON DELETE CASCADE`**),
+  `nom_fichier` (**unique** : un fichier n'appartient qu'à une pièce jointe), `nom_affiche` (le nom d'origine, 120 caractères au plus),
+  `type_fichier` (`photo`, `video` ou `document`, contrainte `CHECK`), `octets` et `cree_le`. Les fichiers sont rangés dans
+  `<documents>/notes_pieces_jointes`. Comme pour les photos, la base ne garde **que des noms** : `StockagePiecesJointes.fichier` ramène
+  tout nom à son dernier morceau, rien ne peut faire sortir du dossier. L'index `idx_pieces_jointes_note_note_id` est créé avec la
+  table, et en SQL dans la migration 5 → 6.
+- **Limites** (`domain/pieces_jointes.dart`, affichées dans le formulaire et dans la feuille d'ajout) : **25 Mo** par photo et par
+  document, **150 Mo** par vidéo, **20 pièces jointes** par note. Le type vient de la **source** pour les photos et les vidéos
+  (appareil ou galerie) ; pour « Choisir un document », il est déduit de l'extension (`typePieceJointeDepuisNom` : une image choisie comme
+  document est reconnue comme photo, une vidéo comme vidéo, le reste est un document). Un fichier vide est refusé.
+- **Ranger sans passer par la mémoire.** `StockagePiecesJointes.enregistrer` copie le fichier choisi **en flux** (`FichierChoisi.lire`)
+  dans un `.tmp`, puis le renomme sous un nom unique (`piece_<horloge>_<n>.<extension sûre>`). La taille est contrôlée **deux fois** : celle
+  que le sélecteur annonce (refus avant de copier un octet) et celle qu'on constate en copiant (refus dès la limite dépassée, quand
+  le sélecteur ne la donne pas). Dans tous les cas d'échec (limite, lecture, disque plein) le `.tmp` est effacé ; un disque plein
+  donne un message clair.
+- **Le formulaire garde la main jusqu'à « Enregistrer ».** Les pièces ajoutées sont copiées tout de suite (la personne les voit), mais
+  `NoteRepository.creer/modifier` ne les écrit en base qu'à l'enregistrement, **dans la même transaction** que la note (tout ou rien :
+  trop de pièces ou une pièce trop grosse annulent aussi la note). Les pièces **retirées** ne sont effacées du téléphone
+  qu'**après** l'enregistrement ; si on abandonne, on efface les copies des pièces ajoutées, et seulement elles. Supprimer une note
+  supprime ses lignes (cascade) puis ses fichiers.
+- **Ouvrir.** Une **photo** s'affiche en plein écran dans l'application (`PhotoJointeScreen`, zoom). Une **vidéo** ou un **document**
+  s'ouvre dans l'application du téléphone qui sait le lire (`OuvreurPieceJointe`, paquet gratuit `open_filex`) : on évite ainsi un
+  lecteur de vidéo intégré, lourd dans l'APK. Sans application adaptée, un message le dit.
+- **Sauvegarde.** `notes_pieces_jointes` est le 4e dossier de l'archive ; `pieces_jointes_note.nom_fichier` est déclarée dans
+  `FormatSauvegarde.colonnesFichiers` comme **irremplaçable** : un fichier absent rend la sauvegarde **incomplète**. Les fichiers
+  provisoires (`.tmp`) ne sont jamais archivés. Une archive faite avant l'étape 4 (schéma 5, sans la table) se restaure : aucune pièce jointe.
+  Une vidéo n'est ni recompressée ni lue d'un bloc : l'archive et la restauration travaillent déjà en flux (étape 3).
 
 ### Règles de gestion retenues
 
@@ -872,11 +909,11 @@ aux statistiques. Les chiffres clés portent des `Key` (`stat-ca`, `stat-marge`�
 Un `.zip` avec `donnees.json`, `fichiers.json` (format 2) et les fichiers. `donnees.json` contient un **manifeste**
 (`application`, `format` = version de l'organisation du fichier (2), `versionSchema` = `AppDatabase.versionSchema`,
 `versionApplication`, `creeLe`, `nombreFichiers`, `lignes` par table, et depuis le format 2 `complete` et `fichiersAbsents`)
-puis `tables` : pour chacune des 19 tables, ses lignes lues par `SELECT * … ORDER BY id`, **telles que
+puis `tables` : pour chacune des 20 tables, ses lignes lues par `SELECT * … ORDER BY id`, **telles que
 SQLite les stocke** (dates en secondes, booléens 0/1, énumérations en texte). Rien n'est recalculé : une sauvegarde restaurée
-redonne exactement les mêmes lignes (un test le vérifie table par table). Les 19 lectures se font dans **une transaction** :
+redonne exactement les mêmes lignes (un test le vérifie table par table). Les 20 lectures se font dans **une transaction** :
 l'instantané est cohérent même si l'application écrit en même temps. Les fichiers sont rangés sous
-`fichiers/<dossier>/<nom>` (`photos_produits`, `factures`, `devis`) ; la base ne garde que des noms relatifs, ils retrouvent
+`fichiers/<dossier>/<nom>` (`photos_produits`, `factures`, `devis`, `notes_pieces_jointes`) ; la base ne garde que des noms relatifs, ils retrouvent
 donc leur place.
 
 `fichiers.json` donne, pour chaque fichier de l'archive, `{chemin: "dossier/nom", octets, sha256}`. Les fichiers sont ajoutés
@@ -912,8 +949,8 @@ copies de sécurité ; les manuelles ne sont supprimées que par la personne.
 Une seule sauvegarde ou restauration à la fois (`_enSerie` : file d'attente interne) : sinon l'une effacerait les fichiers
 provisoires de l'autre (la sauvegarde automatique du démarrage peut tomber pendant un appui sur « Sauvegarder maintenant »).
 
-1. **Lire la base** : les 19 tables dans une transaction.
-2. **Lister les fichiers** présents (`photos_produits`, `factures`, `devis`) et calculer pour chacun sa **taille et son SHA-256 en
+1. **Lire la base** : les 20 tables dans une transaction.
+2. **Lister les fichiers** présents (`photos_produits`, `factures`, `devis`, `notes_pieces_jointes`) et calculer pour chacun sa **taille et son SHA-256 en
    flux** (`sha256.bind(fichier.openRead())`, jamais le fichier entier en mémoire). Un fichier illisible n'est pas archivé. Les
    photos citées par les données mais absentes de cette liste donnent `fichiersAbsents` : la sauvegarde est **incomplète**.
 3. **Contrôler la place** : `ControleEspaceLibre.octetsLibres` (somme des fichiers + JSON + marge de 10 Mo). Mesure inconnue (`null`) :
@@ -1059,6 +1096,11 @@ Le cahier des charges ne tranchait pas ces points ; voici ce qui a été retenu 
   `schema_test` et `migration_schema_test` (version 5, migration 4 → 5, anciennes bases sans notes, catégories de départ non recréées),
   `service_sauvegarde_test` (aller-retour des catégories et des notes, archive d'avant le bloc-notes) et `notes_ecrans_test` (liste,
   filtres, nouvelle note, modification, suppression, écran Catégories de notes, déplacement des notes à la suppression d'une catégorie).
+- Pièces jointes des notes (étape 4 du plan d'évolution) : `pieces_jointes_notes_test` (limites par type, nom et extension, copie en flux,
+  refus avant et pendant la copie, fichier provisoire effacé, 20 pièces au plus, création / modification / suppression avec leurs
+  fichiers, flux en direct du décompte), `schema_test` et `migration_schema_test` (table, contraintes, cascade, version 6, migration 5 → 6),
+  `service_sauvegarde_test` (4e dossier, empreintes, restauration sur un autre téléphone, pièce absente = incomplète, `.tmp` ignoré,
+  archive du schéma 5) et `notes_ecrans_test` (limites affichées, ajout, refus, retrait, abandon, ouverture, nombre dans la liste).
 - Suppression d'un client ou d'un produit : `suppression_repository_test` (historique conservé, noms copiés, lignes détachées,
   inscriptions refusées), `migration_schema_test` (base du schéma 1 mise à jour sans perte), `service_sauvegarde_test`
   (archive du schéma 1), `export_csv_test` et `devis_repository_test` (client supprimé), `domain/usage_historique_test`.
@@ -1101,7 +1143,7 @@ Sauvegarde et export (étape 11) : `csv_test` (protection des cellules, montants
 téléphone et sur le même, copie de sécurité qui permet de revenir en arrière, archives refusées sans rien changer, restauration
 annulée en cas de colonne inconnue / contrainte / liaison cassée, écrans prévenus, sauvegarde automatique et rotation, export
 JSON), `export_csv_test` (contenu de chaque fichier, archive, BOM) et `sauvegarde_ecran_test` (parcours de l'écran).
-`test/data/aide_donnees.dart` remplit **les 19 tables** et compare deux états de la base ligne à ligne.
+`test/data/aide_donnees.dart` remplit les tables (sauf les pièces jointes, testées à part) et compare deux états de la base ligne à ligne.
 Sauvegarde fiable (étape 3 du plan d'évolution) : `service_sauvegarde_test` (colonnes qui citent des fichiers, `fichiers.json` avec
 tailles et SHA-256, gros fichier aller-retour, sauvegarde complète / incomplète — nom, liste, manifeste, restauration —, PDF absent non
 bloquant, archives du format 1, progression, place libre insuffisante, provisoire effacé, sauvegardes simultanées, archive abîmée refusée

@@ -206,7 +206,7 @@ class _SauvegardeScreenState extends ConsumerState<SauvegardeScreen> {
         title: const Text('Restauration terminée'),
         content: Text(
           '${_nombre(resultat.lignes, 'enregistrement', 'enregistrements')} et '
-          '${_nombre(resultat.fichiers, 'fichier', 'fichiers')} (photos, PDF) remis en place.'
+          '${_nombre(resultat.fichiers, 'fichier', 'fichiers')} (photos, PDF, pièces jointes) remis en place.'
           '${resultat.fichiersAbsents.isEmpty ? '' : '\n\n${_phraseRestaurationIncomplete(resultat.fichiersAbsents.length)}'}',
         ),
         actions: <Widget>[
@@ -287,7 +287,7 @@ class _SauvegardeScreenState extends ConsumerState<SauvegardeScreen> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Une sauvegarde contient toutes vos données, vos photos et vos PDF ; elle est vérifiée avant d’être '
+                    'Une sauvegarde contient toutes vos données, vos photos, vos PDF et les pièces jointes de vos notes ; elle est vérifiée avant d’être '
                     'rangée. L’application en fait une toute seule à l’ouverture, si la dernière date de plus d’un '
                     'jour (les 7 dernières sont gardées).',
                     style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
@@ -407,7 +407,7 @@ class _SauvegardeScreenState extends ConsumerState<SauvegardeScreen> {
                   leading: Icon(Icons.data_object_outlined, color: scheme.primary),
                   title: Text('Exporter en JSON (toutes les données)', style: theme.textTheme.titleSmall),
                   subtitle: Text(
-                    'Un seul fichier avec toutes les données, sans les photos ni les PDF. Pour les développeurs ; '
+                    'Un seul fichier avec toutes les données, sans les photos, les PDF ni les pièces jointes. Pour les développeurs ; '
                     'pour une vraie sauvegarde, utilisez « Sauvegarder maintenant ».',
                     style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
                   ),
@@ -457,30 +457,30 @@ class _SauvegardeScreenState extends ConsumerState<SauvegardeScreen> {
       _nombre(m.lignesDe('clients'), 'client', 'clients'),
       _nombre(m.lignesDe('ventes'), 'vente', 'ventes'),
       _nombre(m.lignesDe('factures'), 'facture', 'factures'),
-      _nombre(m.nombreFichiers, 'photo ou PDF', 'photos et PDF'),
+      _nombre(m.nombreFichiers, 'fichier (photo, PDF, pièce jointe)', 'fichiers (photos, PDF, pièces jointes)'),
     ].join(', ');
   }
 
   String _nombre(int n, String singulier, String pluriel) => '$n ${n > 1 ? pluriel : singulier}';
 
-  /// Annoncé juste après « Sauvegarder maintenant » quand des photos manquaient.
+  /// Annoncé juste après « Sauvegarder maintenant » quand des photos ou des pièces jointes manquaient.
   String _phraseSauvegardeIncomplete(int n) => n > 1
-      ? 'Sauvegarde créée, mais incomplète : $n photos citées par vos données sont introuvables sur le téléphone, '
-            'elles ne sont donc pas dans la sauvegarde.'
-      : 'Sauvegarde créée, mais incomplète : 1 photo citée par vos données est introuvable sur le téléphone, '
-            'elle n’est donc pas dans la sauvegarde.';
+      ? 'Sauvegarde créée, mais incomplète : $n fichiers (photos, pièces jointes) cités par vos données sont '
+            'introuvables sur le téléphone, ils ne sont donc pas dans la sauvegarde.'
+      : 'Sauvegarde créée, mais incomplète : 1 fichier (photo ou pièce jointe) cité par vos données est '
+            'introuvable sur le téléphone, il n’est donc pas dans la sauvegarde.';
 
   /// Dans la demande de confirmation d'une restauration.
   String _phraseArchiveIncomplete(int n) => n > 1
-      ? 'ATTENTION, cette sauvegarde est incomplète : $n photos manquaient déjà quand elle a été faite, '
-            'elles ne pourront pas être remises.'
-      : 'ATTENTION, cette sauvegarde est incomplète : 1 photo manquait déjà quand elle a été faite, '
-            'elle ne pourra pas être remise.';
+      ? 'ATTENTION, cette sauvegarde est incomplète : $n fichiers (photos, pièces jointes) manquaient déjà quand '
+            'elle a été faite, ils ne pourront pas être remis.'
+      : 'ATTENTION, cette sauvegarde est incomplète : 1 fichier (photo ou pièce jointe) manquait déjà quand '
+            'elle a été faite, il ne pourra pas être remis.';
 
   /// Dans le compte rendu d'une restauration.
   String _phraseRestaurationIncomplete(int n) => n > 1
-      ? '$n photos manquaient dans la sauvegarde : elles n’ont pas pu être remises.'
-      : '1 photo manquait dans la sauvegarde : elle n’a pas pu être remise.';
+      ? '$n fichiers (photos, pièces jointes) manquaient dans la sauvegarde : ils n’ont pas pu être remis.'
+      : '1 fichier (photo ou pièce jointe) manquait dans la sauvegarde : il n’a pas pu être remis.';
 }
 
 class _TitreSection extends StatelessWidget {
@@ -505,8 +505,8 @@ class CarteProgressionSauvegarde extends StatelessWidget {
 
   String get _libelle => switch (progression.etape) {
     EtapeSauvegarde.lectureDonnees => 'Lecture de vos données',
-    EtapeSauvegarde.empreintes => 'Contrôle de vos photos et PDF',
-    EtapeSauvegarde.ecritureFichiers => 'Copie des photos et PDF dans la sauvegarde',
+    EtapeSauvegarde.empreintes => 'Contrôle de vos photos, PDF et pièces jointes',
+    EtapeSauvegarde.ecritureFichiers => 'Copie des photos, PDF et pièces jointes dans la sauvegarde',
     EtapeSauvegarde.verification => 'Vérification de la sauvegarde',
     EtapeSauvegarde.controleFichiers => 'Contrôle des fichiers de la sauvegarde',
     EtapeSauvegarde.copieDeSecurite => 'Copie de sécurité de vos données actuelles',
@@ -582,7 +582,7 @@ class _LigneSauvegarde extends StatelessWidget {
           ),
           if (!sauvegarde.complete)
             Text(
-              'Incomplète : des photos manquaient',
+              'Incomplète : des fichiers manquaient',
               style: theme.textTheme.bodyMedium?.copyWith(color: scheme.error),
             ),
         ],

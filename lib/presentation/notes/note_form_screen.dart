@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -5,16 +8,27 @@ import '../../core/widgets/dialogues.dart';
 import '../../data/database/app_database.dart';
 import '../../data/providers.dart';
 import '../../data/repositories/note_repository.dart';
+import '../../data/stockage/ouvreur_piece_jointe.dart';
+import '../../data/stockage/selecteur_piece_jointe.dart';
+import '../../data/stockage/stockage_pieces_jointes.dart';
+import '../../domain/enums.dart';
 import '../../domain/notes.dart';
+import '../../domain/pieces_jointes.dart';
 import 'choix_categorie_note.dart';
 import 'notes_providers.dart';
+import 'pieces_jointes_section.dart';
 
 enum _ActionNote { supprimer }
 
 /// Création et modification d'une note. Sans [noteId] : nouvelle note.
 ///
-/// Un titre (obligatoire), un texte (facultatif) et une catégorie (facultative : « Sans catégorie »).
-/// Une note se supprime définitivement, après confirmation.
+/// Un titre (obligatoire), un texte (facultatif), une catégorie (facultative : « Sans catégorie ») et des pièces jointes
+/// (photos, vidéos, documents : voir `pieces_jointes.dart` pour les limites).
+/// Une note se supprime définitivement, avec ses pièces jointes, après confirmation.
+///
+/// Les pièces jointes ajoutées sont copiées dans le téléphone tout de suite, mais ne font partie de la note qu'à
+/// « Enregistrer » ; celles qu'on retire ne sont effacées qu'à « Enregistrer » aussi. Si on abandonne, les copies
+/// des pièces ajoutées sont effacées.
 class NoteFormScreen extends ConsumerStatefulWidget {
   const NoteFormScreen({super.key, this.noteId});
 
@@ -32,6 +46,15 @@ class _NoteFormScreenState extends ConsumerState<NoteFormScreen> {
 
   int? _categorieId;
 
+  /// Pièces jointes déjà enregistrées avec la note, celles qu'on a retirées (effacées à « Enregistrer »), et celles
+  /// qu'on vient d'ajouter (rangées dans le téléphone, enregistrées avec la note à « Enregistrer »).
+  List<PieceJointeNote> _piecesExistantes = <PieceJointeNote>[];
+  final Set<int> _piecesRetirees = <int>{};
+  final List<PieceRangee> _piecesAjoutees = <PieceRangee>[];
+  bool _ajoutEnCours = false;
+  bool _enregistree = false;
+  late final StockagePiecesJointes _stockage;
+
   bool _chargement = true;
   bool _introuvable = false;
   bool _erreurChargement = false;
@@ -44,6 +67,7 @@ class _NoteFormScreenState extends ConsumerState<NoteFormScreen> {
   @override
   void initState() {
     super.initState();
+    _stockage = ref.read(stockagePiecesJointesProvider);
     if (_creation) {
       _chargement = false;
     } else {
@@ -53,6 +77,10 @@ class _NoteFormScreenState extends ConsumerState<NoteFormScreen> {
 
   @override
   void dispose() {
+    // On quitte sans avoir enregistré : les copies des pièces ajoutées n'ont plus de raison d'être.
+    if (!_enregistree && _piecesAjoutees.isNotEmpty) {
+      unawaited(_stockage.supprimerTous(_piecesAjoutees.map((PieceRangee p) => p.nomFichier).toList()));
+    }
     _titre.dispose();
     _contenu.dispose();
     super.dispose();
@@ -60,7 +88,9 @@ class _NoteFormScreenState extends ConsumerState<NoteFormScreen> {
 
   Future<void> _charger() async {
     try {
-      final Note? note = await ref.read(noteRepositoryProvider).obtenir(widget.noteId!);
+      final NoteRepository repo = ref.read(noteRepositoryProvider);
+      final Note? note = await repo.obtenir(widget.noteId!);
+      final List<PieceJointeNote> pieces = note == null ? <PieceJointeNote>[] : await repo.listerPiecesJointes(note.id);
       if (!mounted) return;
       if (note == null) {
         setState(() {
@@ -73,6 +103,7 @@ class _NoteFormScreenState extends ConsumerState<NoteFormScreen> {
         _titre.text = note.titre;
         _contenu.text = note.contenu;
         _categorieId = note.categorieId;
+        _piecesExistantes = pieces;
         _chargement = false;
       });
     } catch (erreur, pile) {
@@ -101,10 +132,23 @@ class _NoteFormScreenState extends ConsumerState<NoteFormScreen> {
     try {
       final NoteRepository repo = ref.read(noteRepositoryProvider);
       if (_creation) {
-        await repo.creer(titre: _titre.text, contenu: _contenu.text, categorieId: _categorieId);
+        await repo.creer(
+          titre: _titre.text,
+          contenu: _contenu.text,
+          categorieId: _categorieId,
+          piecesJointes: _piecesAjoutees,
+        );
       } else {
-        await repo.modifier(widget.noteId!, titre: _titre.text, contenu: _contenu.text, categorieId: _categorieId);
+        await repo.modifier(
+          widget.noteId!,
+          titre: _titre.text,
+          contenu: _contenu.text,
+          categorieId: _categorieId,
+          ajouts: _piecesAjoutees,
+          retraits: _piecesRetirees,
+        );
       }
+      _enregistree = true; // les pièces ajoutées font maintenant partie de la note : on ne les efface plus
 
       if (!mounted) return;
       _termine = true;
@@ -155,6 +199,92 @@ class _NoteFormScreenState extends ConsumerState<NoteFormScreen> {
     if (!abandonner || !mounted) return;
     setState(() => _termine = true); // plus rien à protéger : on peut quitter
     Navigator.of(context).pop();
+  }
+
+  // --- Pièces jointes ---------------------------------------------------------
+
+  /// Les pièces jointes affichées : celles de la note (sauf les retirées), puis celles qu'on vient d'ajouter.
+  List<PieceAffichee> get _pieces => <PieceAffichee>[
+    for (final PieceJointeNote p in _piecesExistantes)
+      if (!_piecesRetirees.contains(p.id))
+        PieceAffichee(
+          id: p.id,
+          nomFichier: p.nomFichier,
+          nomAffiche: p.nomAffiche,
+          type: p.typeFichier,
+          octets: p.octets,
+        ),
+    for (final PieceRangee p in _piecesAjoutees)
+      PieceAffichee(nomFichier: p.nomFichier, nomAffiche: p.nomAffiche, type: p.type, octets: p.octets),
+  ];
+
+  Future<void> _ajouterPieceJointe() async {
+    if (_ajoutEnCours || _enCours) return;
+    final String? trop = erreurNombrePiecesJointes(_pieces.length + 1);
+    if (trop != null) {
+      afficherMessage(context, trop);
+      return;
+    }
+    final SourcePieceJointe? source = await demanderSourcePieceJointe(context);
+    if (source == null || !mounted) return;
+
+    setState(() => _ajoutEnCours = true);
+    try {
+      final FichierChoisi? choisi = await ref.read(selecteurPieceJointeProvider).choisir(source);
+      if (choisi == null) return;
+      final PieceRangee rangee = await _stockage.enregistrer(choisi);
+      if (!mounted) {
+        await _stockage.supprimer(rangee.nomFichier);
+        return;
+      }
+      setState(() {
+        _piecesAjoutees.add(rangee);
+        _modifie = true;
+      });
+    } catch (erreur, pile) {
+      debugPrint('Ajout de la pièce jointe impossible : $erreur\n$pile');
+      if (mounted) afficherMessage(context, messageErreur(erreur));
+    } finally {
+      if (mounted) setState(() => _ajoutEnCours = false);
+    }
+  }
+
+  void _retirerPieceJointe(PieceAffichee piece) {
+    setState(() {
+      _modifie = true;
+      if (piece.id != null) {
+        // Déjà enregistrée : retirée de la liste, effacée seulement à « Enregistrer ».
+        _piecesRetirees.add(piece.id!);
+      } else {
+        // Pas encore enregistrée : la copie n'a plus de raison d'être.
+        _piecesAjoutees.removeWhere((PieceRangee p) => p.nomFichier == piece.nomFichier);
+        unawaited(_stockage.supprimer(piece.nomFichier));
+      }
+    });
+  }
+
+  Future<void> _ouvrirPieceJointe(PieceAffichee piece) async {
+    final File fichier = _stockage.fichier(piece.nomFichier);
+    if (piece.type == TypePieceJointe.photo) {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (BuildContext context) => PhotoJointeScreen(fichier: fichier, titre: piece.nomAffiche),
+        ),
+      );
+      return;
+    }
+    final ResultatOuverture resultat = await ref.read(ouvreurPieceJointeProvider).ouvrir(fichier);
+    if (!mounted) return;
+    switch (resultat) {
+      case ResultatOuverture.ouvert:
+        break;
+      case ResultatOuverture.aucuneApplication:
+        afficherMessage(context, 'Aucune application du téléphone ne sait ouvrir ce fichier.');
+      case ResultatOuverture.introuvable:
+        afficherMessage(context, 'Ce fichier est introuvable sur le téléphone.');
+      case ResultatOuverture.echec:
+        afficherMessage(context, 'Impossible d’ouvrir ce fichier.');
+    }
   }
 
   // --- Interface --------------------------------------------------------------
@@ -247,6 +377,15 @@ class _NoteFormScreenState extends ConsumerState<NoteFormScreen> {
             keyboardType: TextInputType.multiline,
             textCapitalization: TextCapitalization.sentences,
             decoration: const InputDecoration(labelText: 'Texte', alignLabelWithHint: true),
+          ),
+          const SizedBox(height: 24),
+          SectionPiecesJointes(
+            pieces: _pieces,
+            fichierDe: (PieceAffichee p) => _stockage.fichier(p.nomFichier),
+            occupe: _ajoutEnCours,
+            onAjouter: _ajouterPieceJointe,
+            onOuvrir: _ouvrirPieceJointe,
+            onRetirer: _retirerPieceJointe,
           ),
         ],
       ),

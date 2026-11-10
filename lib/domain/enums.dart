@@ -3,7 +3,7 @@
 /// ⚠️ Dans la base de données, chaque valeur est enregistrée sous son **nom Dart**
 /// (par exemple `bouclesOreilles`). Renommer une valeur ici sans migration rendrait
 /// illisibles les données déjà enregistrées. Ajouter une valeur à la fin est sans risque.
-/// Les noms de `NatureLigne`, `RemiseType`, `StatutFacture` et `TypeCompteur` sont aussi
+/// Les noms de `NatureLigne`, `RemiseType`, `StatutFacture`, `TypeCompteur` et `TypePieceJointe` sont aussi
 /// écrits dans des contraintes SQL (voir `tables.dart`) : ne pas les renommer.
 library;
 
@@ -178,4 +178,15 @@ enum TypeCompteur {
   const TypeCompteur(this.prefixe, {required this.parAnnee});
   final String prefixe;
   final bool parAnnee;
+}
+
+/// Nature d'une pièce jointe d'une note. Elle décide de la taille maximale (voir `pieces_jointes.dart`).
+enum TypePieceJointe {
+  photo('Photo', 'photos'),
+  video('Vidéo', 'vidéos'),
+  document('Document', 'documents');
+
+  const TypePieceJointe(this.libelle, this.libellePluriel);
+  final String libelle;
+  final String libellePluriel;
 }

@@ -235,8 +235,8 @@ void main() {
 
     await toucher(tester, dansEcran(find.text('Sauvegarder maintenant')));
     await attendre(tester, find.textContaining('Sauvegarde créée, mais incomplète'));
-    expect(find.textContaining('1 photo citée par vos données est introuvable'), findsOneWidget);
-    await attendre(tester, dansEcran(find.text('Incomplète : des photos manquaient')));
+    expect(find.textContaining('1 fichier (photo ou pièce jointe) cité par vos données est introuvable'), findsOneWidget);
+    await attendre(tester, dansEcran(find.text('Incomplète : des fichiers manquaient')));
 
     final List<SauvegardeLocale> liste = await env.travailler(tester, () => env.sauvegarde.lister());
     expect(liste.single.complete, isFalse);
@@ -256,11 +256,11 @@ void main() {
 
     await choisirDansMenu(tester, 'crochet-creations-manuelle-2026-10-31-150000-incomplete.zip', 'Restaurer');
     expect(dansDialogue(find.textContaining('ATTENTION, cette sauvegarde est incomplète')), findsOneWidget);
-    expect(dansDialogue(find.textContaining('1 photo manquait déjà')), findsOneWidget);
+    expect(dansDialogue(find.textContaining('1 fichier (photo ou pièce jointe) manquait déjà')), findsOneWidget);
 
     await toucher(tester, dansDialogue(find.text('Restaurer')));
     await attendre(tester, find.text('Restauration terminée'));
-    expect(dansDialogue(find.textContaining('1 photo manquait dans la sauvegarde')), findsOneWidget);
+    expect(dansDialogue(find.textContaining('1 fichier (photo ou pièce jointe) manquait dans la sauvegarde')), findsOneWidget);
     await toucher(tester, dansDialogue(find.text('Retour à l’accueil')));
 
     await env.fermer(tester);
@@ -274,7 +274,7 @@ void main() {
     );
 
     await montrer(const ProgressionSauvegarde(EtapeSauvegarde.empreintes, 12, 340));
-    expect(find.text('Étape 2 sur 4 : Contrôle de vos photos et PDF'), findsOneWidget);
+    expect(find.text('Étape 2 sur 4 : Contrôle de vos photos, PDF et pièces jointes'), findsOneWidget);
     expect(find.text('12 sur 340 fichiers'), findsOneWidget);
     expect(find.text('Ne fermez pas l’application avant la fin.'), findsOneWidget);
 

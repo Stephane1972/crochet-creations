@@ -34,6 +34,7 @@ part 'app_database.g.dart';
     Depenses,
     CategoriesNote,
     Notes,
+    PiecesJointesNote,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -44,7 +45,7 @@ class AppDatabase extends _$AppDatabase {
 
   /// Version du schéma. **À augmenter à chaque modification de `tables.dart`**,
   /// avec l'étape de migration correspondante dans [migration] (voir ARCHITECTURE.md).
-  static const int versionSchema = 5;
+  static const int versionSchema = 6;
 
   @override
   int get schemaVersion => versionSchema;
@@ -127,6 +128,13 @@ class AppDatabase extends _$AppDatabase {
         await customStatement('CREATE INDEX IF NOT EXISTS idx_notes_categorie_id ON notes (categorie_id)');
         await customStatement('CREATE INDEX IF NOT EXISTS idx_notes_modifie_le ON notes (modifie_le)');
         await insererCategoriesNoteDeDepart();
+      }
+      // Version 6 : les pièces jointes des notes. Une nouvelle table, aucune donnée existante touchée.
+      if (from < 6) {
+        await m.createTable(piecesJointesNote);
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_pieces_jointes_note_note_id ON pieces_jointes_note (note_id)',
+        );
       }
     },
 

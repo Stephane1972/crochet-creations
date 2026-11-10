@@ -25,9 +25,12 @@ import 'repositories/vente_repository.dart';
 import 'sauvegarde/export_csv.dart';
 import 'sauvegarde/selecteur_fichier.dart';
 import 'sauvegarde/service_sauvegarde.dart';
+import 'stockage/ouvreur_piece_jointe.dart';
 import 'stockage/selecteur_photo.dart';
+import 'stockage/selecteur_piece_jointe.dart';
 import 'stockage/stockage_pdf.dart';
 import 'stockage/stockage_photos.dart';
+import 'stockage/stockage_pieces_jointes.dart';
 
 /// Base de données ouverte par `main()` au démarrage (voir `lib/main.dart`).
 /// Les tests la remplacent par une base en mémoire.
@@ -65,8 +68,26 @@ final categorieNoteRepositoryProvider = Provider<CategorieNoteRepository>(
 );
 
 final noteRepositoryProvider = Provider<NoteRepository>(
-  (ref) => NoteRepository(ref.watch(appDatabaseProvider)),
+  (ref) => NoteRepository(
+    ref.watch(appDatabaseProvider),
+    stockagePiecesJointes: ref.watch(stockagePiecesJointesProvider),
+  ),
 );
+
+/// Dossier des pièces jointes des notes, fourni au démarrage (voir `lib/main.dart`).
+/// Les tests le remplacent par un dossier temporaire.
+final stockagePiecesJointesProvider = Provider<StockagePiecesJointes>((ref) {
+  throw UnimplementedError(
+    'stockagePiecesJointesProvider doit être fourni au démarrage (overrides du ProviderScope).',
+  );
+});
+
+/// Appareil photo, galerie et sélecteur de fichiers, pour joindre un fichier à une note. Les tests le remplacent par
+/// un faux sélecteur.
+final selecteurPieceJointeProvider = Provider<SelecteurPieceJointe>((ref) => SelecteurPieceJointeSysteme());
+
+/// Ouverture d'une vidéo ou d'un document dans une autre application. Les tests le remplacent par un faux ouvreur.
+final ouvreurPieceJointeProvider = Provider<OuvreurPieceJointe>((ref) => const OuvreurPieceJointeSysteme());
 
 final clientRepositoryProvider = Provider<ClientRepository>(
   (ref) => ClientRepository(ref.watch(appDatabaseProvider)),

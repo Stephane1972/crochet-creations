@@ -16,6 +16,7 @@ import 'data/sauvegarde/service_sauvegarde.dart';
 import 'data/stockage/selecteur_photo.dart';
 import 'data/stockage/stockage_pdf.dart';
 import 'data/stockage/stockage_photos.dart';
+import 'data/stockage/stockage_pieces_jointes.dart';
 import 'presentation/common/photo_retrouvee.dart';
 import 'presentation/startup/erreur_demarrage_app.dart';
 
@@ -43,6 +44,11 @@ Future<void> main() async {
       Directory('${documents.path}${Platform.pathSeparator}devis'),
     );
 
+    // Pièces jointes des notes (photos, vidéos, documents) : un dossier à part, dans le même espace privé.
+    final StockagePiecesJointes piecesJointes = StockagePiecesJointes(
+      Directory('${documents.path}${Platform.pathSeparator}notes_pieces_jointes'),
+    );
+
     // Sauvegardes : un dossier à part, et un dossier pour les fichiers d'export avant partage.
     final ServiceSauvegarde sauvegarde = ServiceSauvegarde(
       base: base,
@@ -51,6 +57,7 @@ Future<void> main() async {
       dossierPhotos: photos.dossier,
       dossierFactures: factures.dossier,
       dossierDevis: devis.dossier,
+      dossierPiecesJointes: piecesJointes.dossier,
       espaceLibre: const ControleEspaceLibreSysteme(),
     );
 
@@ -66,6 +73,7 @@ Future<void> main() async {
           stockagePhotosProvider.overrideWithValue(photos),
           stockageFacturesProvider.overrideWithValue(factures),
           stockageDevisProvider.overrideWithValue(devis),
+          stockagePiecesJointesProvider.overrideWithValue(piecesJointes),
           serviceSauvegardeProvider.overrideWithValue(sauvegarde),
           modeThemeInitialProvider.overrideWithValue(modeInitial),
           modeThemeStoreProvider.overrideWithValue(parametres),

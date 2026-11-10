@@ -31,7 +31,8 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
 - Le schéma de la base passe en **version 6** : table `pieces_jointes_note` (la pièce pointe vers sa note, supprimée avec elle ; le nom du
   fichier rangé est unique). Migration automatique depuis le schéma 5, rien d'autre ne bouge. La sauvegarde contient désormais 20 tables.
 - Nouvelle dépendance gratuite : `open_filex` (ouvrir un fichier avec l'application du téléphone).
-- Le numéro de version de l'application passe à 0.18.0 (build 21).
+- Le numéro de version de l'application passe à 0.18.0 (build 21). La mention « en attente de validation » de l'étape 3 est retirée
+  du titre de la version 0.17.0 (étape 3 validée et fusionnée).
 
 ### Inchangé volontairement
 - Pas de lecteur de vidéo intégré (il alourdirait l'application) : la vidéo s'ouvre dans l'application du téléphone.
@@ -39,7 +40,7 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
   devient un souci.
 - Aucune sauvegarde ni partage sur Google Drive pour l'instant (étapes 6 à 8).
 
-## [0.17.0] — Sauvegarde locale fiable (en attente de validation)
+## [0.17.0] — Sauvegarde locale fiable
 
 ### Ajouté
 - **Une sauvegarde qui ne passe plus par la mémoire** : l'archive `.zip` est écrite **fichier après fichier** directement sur le

@@ -6,7 +6,33 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
 
 ## [Non publié]
 
-## [0.18.0] — Pièces jointes des notes (en attente de validation)
+## [0.19.0] — Analyse détaillée des statistiques (en attente de validation)
+
+### Ajouté
+- **Un écran « Analyse détaillée »** (*Plus → Statistiques → Analyse détaillée*) : l'**argent encaissé** regroupé **par année, par mois, par
+  lieu de vente ou par catégorie**, en **graphique** (une barre par ligne, avec le montant et la part en %) et en **tableau** (argent encaissé,
+  coût de la matière, marge estimée, et le total).
+- **Des filtres qui se croisent** : année, mois, lieu de vente (dont « Non renseigné ») et catégorie (dont « Sans catégorie »). Exemples :
+  les doudous vendus au Marché mois par mois en 2026 ; les ventes de chaque lieu pour un même mois de toutes les années. « Toutes les
+  années » est un choix de la liste des années.
+- **Les mêmes règles que l'écran Statistiques** : l'argent compte à la date du paiement, les remboursements sont déduits, une remise est
+  répartie au prorata des lignes, le coût de la matière est celui relevé à la vente. Pour une même période, les chiffres sont **identiques au
+  centime près** à ceux de l'écran Statistiques ; la somme des lignes est toujours égale à l'argent encaissé.
+- « Sans catégorie » regroupe les lignes libres, les cours et les frais de port, pour que le total corresponde au chiffre d'affaires.
+- L'écran se met à jour tout seul quand une vente, un paiement, un produit ou un lieu change.
+
+### Modifié
+- L'écran Statistiques gagne une carte « Analyse détaillée » qui ouvre le nouvel écran. Rien d'autre ne change dans ses calculs.
+- Le numéro de version de l'application passe à 0.19.0 (build 22). La mention « en attente de validation » de l'étape 4 est retirée du
+  titre de la version 0.18.0 (étape 4 validée et fusionnée).
+
+### Inchangé volontairement
+- Pas de bibliothèque de graphiques : les barres sont dessinées avec les composants de base de Flutter (aucune dépendance ajoutée,
+  fonctionne hors connexion).
+- Pas de schéma de base modifié : l'analyse lit les ventes, les paiements, les produits et les lieux existants (schéma 6).
+- Les dépenses restent présentées à part, dans l'écran Statistiques.
+
+## [0.18.0] — Pièces jointes des notes
 
 ### Ajouté
 - **Des pièces jointes dans les notes** : photos, vidéos et documents. Dans l'écran d'une note, **Ajouter une pièce jointe** propose

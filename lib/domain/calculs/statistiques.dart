@@ -58,6 +58,7 @@ class VenteCompta {
     required this.paiements,
     this.remiseCentimes = 0,
     this.fraisPortCentimes = 0,
+    this.lieuId,
   });
 
   final DateTime date;
@@ -66,6 +67,9 @@ class VenteCompta {
   final List<PaiementCompta> paiements;
   final int remiseCentimes;
   final int fraisPortCentimes;
+
+  /// Lieu de vente (`null` : « Non renseigné »). Sert à l'analyse détaillée (`analyse_ventes.dart`).
+  final int? lieuId;
 }
 
 /// Une dépense (non archivée).

@@ -77,6 +77,21 @@ class _StatistiquesScreenState extends ConsumerState<StatistiquesScreen> {
             const SizedBox(height: 12),
             _CategoriesRentables(stats: donnees.periode(_periode)),
             const SizedBox(height: 12),
+            _Section(
+              titre: 'Analyse détaillée',
+              legende: 'Par année, mois, lieu de vente ou catégorie, avec graphique et tableau.',
+              onTap: () => Navigator.of(context).pushNamed(AppRoutes.analyse),
+              enfants: const <Widget>[
+                Row(
+                  key: Key('ouvrir-analyse'),
+                  children: <Widget>[
+                    Expanded(child: Text('Ouvrir l’analyse')),
+                    Icon(Icons.chevron_right),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
             _Depenses(stats: donnees.periode(_periode)),
             const SizedBox(height: 12),
             const _StockFaible(),

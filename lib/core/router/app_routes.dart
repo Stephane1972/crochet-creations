@@ -51,6 +51,9 @@ abstract final class AppRoutes {
   // Statistiques (étape 10)
   static const String statistiques = '/statistiques';
 
+  // Analyse détaillée de l'argent encaissé (étape 5 de l'évolution) : par année, mois, lieu ou catégorie.
+  static const String analyse = '/statistiques/analyse';
+
   // Bloc-notes. La modification d'une note reçoit l'identifiant de la note (un entier) dans `arguments`.
   static const String notes = '/notes';
   static const String noteNouvelle = '/notes/nouvelle';

@@ -72,17 +72,35 @@ class StatistiquesRepository {
     () => calculer(maintenant: horloge?.call()),
   );
 
+  /// Toutes les ventes avec leurs lignes et leurs paiements, de tout temps : la matière de l'analyse détaillée, qui
+  /// se calcule ensuite en mémoire (`calculerAnalyse`) à chaque changement de filtre.
+  Future<List<VenteCompta>> toutesLesVentes() => _ventesComptables(null);
+
+  /// [toutesLesVentes], relues automatiquement à chaque vente, paiement, produit ou lieu modifié.
+  Stream<List<VenteCompta>> observerToutesLesVentes() => observerTables(
+    _db,
+    <ResultSetImplementation>{
+      _db.ventes,
+      _db.lignesVente,
+      _db.paiements,
+      _db.produits,
+      _db.lieuxVente,
+    },
+    toutesLesVentes,
+  );
+
   // --- Lecture ----------------------------------------------------------------
 
   /// Les ventes qui comptent à partir de [depuis] : celles faites depuis cette date, et les plus anciennes dont un
-  /// paiement ou un remboursement est arrivé depuis (leur argent compte à la date où il a été encaissé).
-  Future<List<VenteCompta>> _ventesComptables(DateTime depuis) async {
-    final List<Paiement> paiements = await (_db.select(
-      _db.paiements,
-    )..where((t) => t.datePaiement.isBiggerOrEqualValue(depuis))).get();
-    final List<Vente> recentes = await (_db.select(
-      _db.ventes,
-    )..where((t) => t.dateVente.isBiggerOrEqualValue(depuis))).get();
+  /// paiement ou un remboursement est arrivé depuis (leur argent compte à la date où il a été encaissé). Sans
+  /// [depuis] : toutes les ventes et tous les paiements.
+  Future<List<VenteCompta>> _ventesComptables(DateTime? depuis) async {
+    final List<Paiement> paiements = await (_db.select(_db.paiements)
+          ..where((t) => depuis == null ? const Constant(true) : t.datePaiement.isBiggerOrEqualValue(depuis)))
+        .get();
+    final List<Vente> recentes = await (_db.select(_db.ventes)
+          ..where((t) => depuis == null ? const Constant(true) : t.dateVente.isBiggerOrEqualValue(depuis)))
+        .get();
 
     final Map<int, Vente> ventes = <int, Vente>{for (final Vente v in recentes) v.id: v};
     final List<int> manquantes = <int>{
@@ -99,6 +117,8 @@ class StatistiquesRepository {
     final Map<int, String> categories = <int, String>{
       for (final Produit p in await _db.select(_db.produits).get()) p.id: p.categorie,
     };
+    // Un lieu qui n'existe plus (cela ne devrait pas arriver : supprimer un lieu déplace ses ventes) vaut « Non renseigné ».
+    final Set<int> lieux = <int>{for (final LieuVente l in await _db.select(_db.lieuxVente).get()) l.id};
 
     final Map<int, List<LigneCompta>> lignesParVente = <int, List<LigneCompta>>{};
     for (final List<int> lot in _enLots(ventes.keys.toList())) {
@@ -142,6 +162,7 @@ class StatistiquesRepository {
           paiements: paiementsParVente[v.id] ?? <PaiementCompta>[],
           remiseCentimes: v.remiseCentimes,
           fraisPortCentimes: v.fraisPortCentimes,
+          lieuId: lieux.contains(v.lieuId) ? v.lieuId : null,
         ),
     ];
   }

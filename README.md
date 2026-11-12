@@ -95,7 +95,7 @@ Le développement se fait en 12 étapes validées une par une (détail dans [ROA
 - **Les ventes déjà enregistrées restent « Non renseigné »** : rien n'est rattaché à un lieu sans que vous l'ayez choisi.
 - Deux lieux ne peuvent pas porter le même nom (sans tenir compte des majuscules, des accents ni des espaces) ; 60 caractères au plus ;
   « Non renseigné » est réservé.
-- L'**export CSV** des ventes a une colonne « Lieu de vente ». Les **statistiques par lieu** viendront à l'étape suivante du plan.
+- L'**export CSV** des ventes a une colonne « Lieu de vente ». Les **statistiques par lieu** sont dans l'écran *Analyse détaillée* (voir plus bas).
 - Le schéma de la base passe en **version 4** (table `lieux_vente`, colonne `ventes.lieu_id`, migration automatique) ; les
   anciennes sauvegardes se restaurent normalement.
 
@@ -131,6 +131,17 @@ Le développement se fait en 12 étapes validées une par une (détail dans [ROA
 - Le schéma de la base passe en **version 6** (table `pieces_jointes_note`, migration automatique). La **sauvegarde** emporte les pièces
   jointes (dossier `notes_pieces_jointes`) ; si l'un de ces fichiers manque sur le téléphone, la sauvegarde est signalée **incomplète**.
   Les anciennes sauvegardes se restaurent normalement (sans pièce jointe). Nouvelle dépendance gratuite : `open_filex`.
+
+### Analyse détaillée des statistiques (étape 5 de l'évolution)
+
+- *Plus → Statistiques → Analyse détaillée* : l'**argent encaissé** regroupé **par année, par mois, par lieu de vente ou par catégorie**,
+  en **graphique** (une barre par ligne) et en **tableau** (argent encaissé, coût de la matière, marge estimée, total).
+- Quatre **filtres qui se croisent** : *Année* (ou « Toutes les années »), *Mois*, *Lieu de vente* (dont « Non renseigné ») et
+  *Catégorie* (dont « Sans catégorie »). Par exemple : les doudous vendus au Marché, mois par mois, en 2026.
+- Les **mêmes règles que l'écran Statistiques** : un paiement compte à la date où il est reçu, un remboursement se déduit, une remise est
+  répartie sur les lignes, le coût de la matière est celui relevé à la vente. Les chiffres sont identiques, au centime près, à ceux de
+  l'écran Statistiques pour une même période. « Sans catégorie » regroupe les lignes libres, les cours et les frais de port.
+- Aucune dépendance ajoutée (les barres sont dessinées avec Flutter), aucun changement de la base.
 
 ### Ce que contient l'étape 11 : sauvegarde et export
 

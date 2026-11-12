@@ -72,6 +72,7 @@ crochet-creations/
 │   │       ├── panier.dart                   panier d'une vente : lignes, stock, remise, frais de port, paiement saisi
 │   │       ├── stock.dart                    alerte de stock, produit « sur commande »
 │   │       ├── statistiques.dart             argent encaissé par période, parts, marge, classements, niveaux de franchise de TVA
+│   │       ├── analyse_ventes.dart           analyse détaillée : regroupement par année, mois, lieu ou catégorie, filtres croisés
 │   │       └── numero_document.dart          FACT-2026-0001, DEVIS-2026-0001, PRD-0001
 │   ├── data/
 │   │   ├── database/
@@ -145,6 +146,7 @@ crochet-creations/
 │       │   └── sauvegarde_providers.dart     liste des sauvegardes du téléphone
 │       ├── statistiques/                     statistiques (voir « Statistiques »)
 │       │   ├── statistiques_screen.dart      écran Statistiques : période, chiffres, classements (écran 20)
+│       │   ├── analyse_screen.dart           écran Analyse détaillée : regroupement, filtres, graphique en barres, tableau
 │       │   ├── franchise_tva_carte.dart      carte de franchise de TVA (accueil et statistiques)
 │       │   └── statistiques_providers.dart   flux Riverpod des statistiques
 │       ├── depenses/                         dépenses (voir « Dépenses »)
@@ -532,8 +534,8 @@ différentes ne se confondent plus (test `test/data/flux_en_direct_test.dart`).
   d'une vente, même annulée (`VenteRepository.changerLieu` ne modifie que le lieu : ni montants, ni stock, ni paiements, ni
   facture).
 - **Sauvegarde et exports.** `lieux_vente` est la 17e table de l'archive, placée **avant** `ventes` (`FormatSauvegarde.tables`) ;
-  l'export CSV des ventes gagne une colonne « Lieu de vente » (le nom, « Non renseigné » si vide). Les statistiques par lieu viennent
-  à une étape suivante : cette étape ne change aucun calcul.
+  l'export CSV des ventes gagne une colonne « Lieu de vente » (le nom, « Non renseigné » si vide). Les statistiques par lieu sont dans
+  l'écran Analyse détaillée (voir « Analyse détaillée »).
 
 ### Bloc-notes
 
@@ -902,6 +904,41 @@ période (`SegmentedButton`, état local), puis des cartes ; le stock faible lit
 impayées ouvrent la liste des factures. `FranchiseTvaCarte` (barres, pourcentage, étiquettes, message) sert à l'accueil et
 aux statistiques. Les chiffres clés portent des `Key` (`stat-ca`, `stat-marge`…) pour les tests.
 
+## Analyse détaillée (étape 5 de l'évolution)
+
+### Calculs (`domain/calculs/analyse_ventes.dart`)
+
+Des fonctions pures, testées sans base, qui réutilisent les briques de `statistiques.dart` (`composantsDeVente`,
+`repartirProportionnellement`, `diviserArrondi`). `calculerAnalyse(ventes, dimension, filtre, ordreLieux, ordreCategories)` renvoie une
+`AnalyseVentes` : des `LigneAnalyse` (argent encaissé, coût matière, marge) selon la `DimensionAnalyse` (`annee`, `mois`, `lieu`,
+`categorie`). Le `FiltreAnalyse` croise une année, un mois, un lieu et une catégorie ; `ChoixFiltre<T>` distingue « tous », « une valeur »
+et « sans » (vente sans lieu, article sans catégorie) et se compare par valeur (utile aux listes déroulantes).
+
+- **Mêmes règles que l'écran Statistiques.** Pour chaque vente, les paiements retenus (date dans le filtre) sont additionnés **dans la fenêtre
+  du regroupement** — l'année, le mois, ou toute la période filtrée pour un regroupement par lieu ou par catégorie — puis répartis entre
+  les éléments de la vente au prorata de leur valeur, le coût matière étant imputé dans la même proportion. Pour une même période, les
+  chiffres sont donc **identiques au centime près** à ceux de `calculerStatsPeriode` (un test le vérifie sur une vente remisée, payée en
+  trois fois, avec port et cours). La somme des lignes est toujours l'argent encaissé.
+- **Lignes.** Par mois avec une année choisie : les douze mois (ou le seul mois choisi), les mois vides à zéro ; sans année : du premier au
+  dernier mois qui a de l'argent (ceux du milieu à zéro). Par année : de la première à la dernière année qui a de l'argent. Par lieu et par
+  catégorie : classées par argent encaissé décroissant, à égalité dans l'ordre habituel des lieux ou des catégories, « Non renseigné » et
+  « Sans catégorie » en dernier ; une ligne sans aucun argent n'apparaît pas.
+- **« Sans catégorie »** : lignes libres, cours et frais de port (leur `categorie` est vide), pour que le total par catégorie soit le chiffre
+  d'affaires.
+- **Lieu.** `VenteCompta.lieuId` (vide = « Non renseigné »). Le dépôt ramène à « Non renseigné » un identifiant qui ne correspondrait plus
+  à aucun lieu.
+
+### Le dépôt et les écrans
+
+`StatistiquesRepository.toutesLesVentes` charge **toutes** les ventes avec lignes et paiements (le même chargement que les statistiques, sans
+borne de date) ; `observerToutesLesVentes` les relit à chaque écriture dans `ventes`, `lignes_vente`, `paiements`, `produits` ou
+`lieux_vente`. `ventesAnalyseProvider` expose ce flux ; `AnalyseScreen` garde ses choix dans son état local (regroupement, année — l'année en
+cours au départ, `0` = toutes —, mois, lieu, catégorie) et appelle `calculerAnalyse` à chaque affichage : changer un filtre ne relit pas la
+base. Un lieu ou une catégorie supprimés entre-temps reviennent à « tous ». Le graphique est fait de composants de base (`Container` et
+`FractionallySizedBox`), sans bibliothèque de graphiques. Les éléments portent des `Key` (`analyse-par-lieu`, `analyse-filtre-annee`,
+`graphique-montant-0`, `tableau-encaisse-0`, `tableau-total-encaisse`…) pour les tests. Route : `AppRoutes.analyse`, ouverte depuis la carte
+« Analyse détaillée » de l'écran Statistiques.
+
 ## Sauvegarde et export (étape 11)
 
 ### L'archive (`ServiceSauvegarde`, `FormatSauvegarde`)
@@ -1137,6 +1174,11 @@ ventes, catégories, dépenses, niveaux de franchise), `statistiques_repository_
 mémoire, vente annulée réellement remboursée, semaine à cheval sur deux années, dépenses archivées, factures impayées,
 flux en direct) et `statistiques_ecrans_test` (écran vide, changement de période, stock faible et factures impayées,
 alerte de franchise en direct, tuiles de l'accueil).
+
+Analyse détaillée (étape 5 de l'évolution) : `analyse_ventes_test` (choix d'un filtre, années avec encaissements, regroupements par
+lieu, catégorie, mois et année, filtres croisés, remise, remboursement, lignes libres / cours / frais de port, **cohérence au centime
+près avec `calculerStatsPeriode`**, cas limites) et `analyse_ecrans_test` (accès depuis les statistiques, mois par mois, par lieu avec parts et
+barres, par catégorie, par année, filtres croisés, message sans résultat, base vide, mise à jour en direct).
 
 Sauvegarde et export (étape 11) : `csv_test` (protection des cellules, montants), `service_sauvegarde_test` (liste des tables
 = celles de la base et dans l'ordre des clés étrangères, contenu de l'archive, nommage, **aller-retour complet** sur un autre

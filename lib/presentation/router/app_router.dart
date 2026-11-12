@@ -28,6 +28,7 @@ import '../sauvegarde/sauvegarde_screen.dart';
 import '../settings/settings_screen.dart';
 import '../shell/main_shell.dart';
 import '../splash/splash_screen.dart';
+import '../statistiques/analyse_screen.dart';
 import '../statistiques/statistiques_screen.dart';
 import '../ventes/panier_screen.dart';
 import '../ventes/vente_confirmation_screen.dart';
@@ -129,6 +130,8 @@ abstract final class AppRouter {
         return _page(settings, const DepenseFormScreen());
       case AppRoutes.statistiques:
         return _page(settings, const StatistiquesScreen());
+      case AppRoutes.analyse:
+        return _page(settings, const AnalyseScreen());
       case AppRoutes.depenseModifier:
         final int? idDepense = _identifiant(settings);
         return _page(

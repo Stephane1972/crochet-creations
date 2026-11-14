@@ -31,6 +31,9 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
 ### Modifié
 - Le texte « À propos » des réglages précise que Google Drive est en option. Le numéro de version passe à 0.20.0 (build 23). La mention
   « en attente de validation » est retirée du titre de la version 0.19.0 (étape 5 validée et fusionnée).
+- **Construction de l'APK (CI) sous Java 21** au lieu de Java 17 : depuis le passage du canal stable de Flutter à la version 3.50 (plugin
+  Android Gradle 9), le contrôle « lint » d'Android plantait sous Java 17 (`NoSuchMethodError … List.removeLast`) et la construction de
+  l'APK échouait, y compris sur `main` après la fusion de l'étape 5. Aucun changement dans l'application.
 
 ### Inchangé volontairement
 - Pas de schéma de base modifié (schéma 6), pas de changement du format de sauvegarde : le bilan du dernier envoi est un petit fichier à part.

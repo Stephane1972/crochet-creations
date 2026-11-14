@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../domain/document_devis.dart';
 import '../domain/document_facture.dart';
 import 'database/app_database.dart';
+import 'drive/compte_google.dart';
+import 'drive/service_drive.dart';
 import 'partage/service_documents.dart';
 import 'partage/service_partage_fichiers.dart';
 import 'pdf/devis_pdf.dart';
@@ -190,6 +192,22 @@ final horlogeProvider = Provider<DateTime Function()>((ref) => DateTime.now);
 final serviceSauvegardeProvider = Provider<ServiceSauvegarde>((ref) {
   throw UnimplementedError(
     'serviceSauvegardeProvider doit être fourni au démarrage (overrides du ProviderScope).',
+  );
+});
+
+/// La connexion au compte Google (Google Drive, étape 6 de l'évolution), fournie au démarrage (voir `lib/main.dart`) :
+/// la même instance sert à l'écran de connexion et à l'envoi. Les tests la remplacent par une fausse connexion.
+final compteGoogleProvider = Provider<CompteGoogle>((ref) {
+  throw UnimplementedError(
+    'compteGoogleProvider doit être fourni au démarrage (overrides du ProviderScope).',
+  );
+});
+
+/// Envoi des fichiers vers Google Drive, à la demande, fourni au démarrage (voir `lib/main.dart`).
+/// Les tests le remplacent par un service qui parle à un faux Drive, dans un dossier temporaire.
+final serviceDriveProvider = Provider<ServiceDrive>((ref) {
+  throw UnimplementedError(
+    'serviceDriveProvider doit être fourni au démarrage (overrides du ProviderScope).',
   );
 });
 

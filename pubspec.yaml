@@ -1,7 +1,7 @@
 name: crochet_creations
 description: "Un p’tit crochet dans les stocks : stock, ventes, factures, devis et cours pour une créatrice auto-entrepreneuse."
 publish_to: "none"
-version: 0.19.0+22
+version: 0.20.0+23
 
 environment:
   # Drift 2.35 demande Dart 3.10 (Flutter 3.38 ou plus récent, canal « stable »).
@@ -40,6 +40,12 @@ dependencies:
 
   # Pièces jointes des notes (étape 4) : ouvrir une vidéo ou un document dans l'application du téléphone qui sait le lire.
   open_filex: ^4.7.0
+
+  # Google Drive, partie 1 (étape 6) : connexion au compte Google (droit « fichiers créés par l'application » seulement),
+  # API Drive et requêtes réseau. Tout est gratuit.
+  google_sign_in: ^7.2.0
+  googleapis: ^19.0.0
+  http: ^1.6.0
 
   # Les dépendances des étapes suivantes seront ajoutées au fur et à mesure,
   # pour ne pas alourdir l'application avant d'en avoir besoin.

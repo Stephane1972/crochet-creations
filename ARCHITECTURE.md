@@ -39,6 +39,7 @@ crochet-creations/
 │   ├── app.dart                      MaterialApp : thèmes, langue française, routes
 │   ├── core/
 │   │   ├── constants/app_constants.dart      nom, version, seuils de TVA, mention « art. 293 B »
+│   │   ├── constants/google_config.dart      ID client Web du projet Google Cloud (vide tant que Google n'est pas configuré)
 │   │   ├── router/app_routes.dart            noms des routes
 │   │   ├── theme/
 │   │   │   ├── app_colors.dart               palette de la charte + teintes dérivées
@@ -66,6 +67,7 @@ crochet-creations/
 │   │   ├── regles_depenses.dart              montant, date non future, mois et bornes de mois
 │   │   ├── document_facture.dart             DocumentFacture : tout ce qui s'imprime sur une facture (sans PDF ni base)
 │   │   ├── document_devis.dart               DocumentDevis : tout ce qui s'imprime sur un devis (réutilise les lignes et parties de la facture)
+│   │   ├── drive_envoi.dart                  envoi vers Drive, sans réseau : dossiers, comparaison téléphone / Drive (planifierEnvoi), bilan d'un envoi
 │   │   └── calculs/
 │   │       ├── totaux.dart                   sous-total, remise, frais de port, total
 │   │       ├── statut_paiement.dart          payée / partielle / impayée / remboursée
@@ -109,6 +111,10 @@ crochet-creations/
 │   │   │   ├── construire_document.dart      facture ou devis + profil → DocumentFacture / DocumentDevis
 │   │   │   └── ressources_pdf.dart           polices Poppins et logo lus dans les ressources
 │   │   ├── partage/service_documents.dart    partage (share_plus) et impression (printing), remplaçables en test
+│   │   ├── drive/
+│   │   │   ├── compte_google.dart            connexion au compte Google (interface CompteGoogle + google_sign_in), erreurs lisibles (ErreurDrive)
+│   │   │   ├── client_drive.dart             opérations Drive : trouver / créer un dossier, lister, envoyer en flux (interface ClientDrive + API Drive v3)
+│   │   │   └── service_drive.dart            vérifier et envoyer à la demande, arrêt, bilan du dernier envoi gardé dans un petit fichier
 │   │   ├── sauvegarde/
 │   │   │   ├── format_sauvegarde.dart        contenu d'une archive (format 2), tables dans l'ordre, colonnes qui citent des fichiers, modèles de progression
 │   │   │   ├── service_sauvegarde.dart       sauvegarder (en flux, avec empreintes), lister, sauvegarde automatique, restaurer (avec contrôle), export JSON
@@ -141,6 +147,9 @@ crochet-creations/
 │       │   ├── cours_form_screen.dart        création / modification d'un cours
 │       │   ├── cours_providers.dart          flux Riverpod (liste par filtre, fiche)
 │       │   └── cours_widgets.dart            photo du cours, créneau, places, étiquettes de statut et de paiement
+│       ├── drive/                            Google Drive (voir « Google Drive »)
+│       │   ├── drive_screen.dart             écran Réglages › Google Drive : connexion, vérifier / envoyer, bilan du dernier envoi
+│       │   └── drive_providers.dart          compte connecté, état de la vérification et de l'envoi, dernier bilan
 │       ├── sauvegarde/                       sauvegarde et export (voir « Sauvegarde et export »)
 │       │   ├── sauvegarde_screen.dart        écran Sauvegarde et export : sauvegarder, restaurer, exporter (écran 23)
 │       │   └── sauvegarde_providers.dart     liste des sauvegardes du téléphone
@@ -1042,6 +1051,64 @@ remplacent (faux partage, faux sélecteur, dossiers temporaires). Une opération
 métier s'affiche telle quelle, sinon une phrase générale. Le sélecteur de fichiers donne une **copie de travail** (recopiée en flux
 dans le dossier temporaire : le sélecteur 13 ne donne plus de chemin) que l'écran supprime après la restauration.
 
+## Google Drive (étape 6 de l'évolution)
+
+Envoi **à la demande** des photos, factures, devis et pièces jointes vers le Drive de la personne. Trois principes : **copier, jamais
+supprimer ni partager** ; **Drive est la mémoire** (aucun registre de « ce qui est déjà parti » sur le téléphone) ; **un fichier qui
+échoue n'empêche pas les autres**.
+
+### Les couches
+
+- `domain/drive_envoi.dart` (sans réseau ni fichier) : `DossierDrive` (les quatre dossiers : nom sur le téléphone — celui de l'archive de
+  sauvegarde —, nom sur Drive, et si on compare le contenu), `planifierEnvoi` (compare les fichiers du téléphone à ceux de Drive),
+  `RapportEnvoi` / `ErreurEnvoi` (le bilan, en JSON), `porteeDrive` (`drive.file`), `nomDossierRacineDrive`.
+- `data/drive/compte_google.dart` : `CompteGoogle` (`configure`, `restaurer`, `seConnecter`, `seDeconnecter`, `jetonAcces`,
+  `invaliderJeton`) et `CompteGoogleReel` (`google_sign_in` 7 : `initialize(serverClientId)`, `authenticate()`, puis
+  `authorizeScopes([drive.file])` ; le jeton d'accès est gardé 30 minutes). `ErreurDrive` porte un **message lisible tel quel**, avec deux
+  drapeaux : `autorisationAExpire` (inutile de réessayer : se reconnecter) et `annulee` (la personne a fermé la fenêtre : pas une panne).
+- `data/drive/client_drive.dart` : `ClientDrive` (`trouverDossier`, `creerDossier`, `lister`, `envoyer`) — **aucune méthode de
+  suppression ni de partage** — et `ClientDriveGoogle` (API Drive v3 du paquet `googleapis`, requêtes authentifiées par le jeton du
+  compte). Un refus 401 est retenté une fois avec un jeton neuf ; toute erreur sort en `ErreurDrive` (429 / 403 de débit, quota plein, API non
+  activée, 404, 5xx, pas d'Internet, délai dépassé, fichier illisible). L'envoi est **« reprenable » et en flux** (`ResumableUploadOptions`,
+  `File.openRead`) : un fichier n'est jamais entièrement en mémoire et un fichier à moitié envoyé n'est jamais créé.
+- `data/drive/service_drive.dart` : `ServiceDrive` (`verifier`, `envoyer`, `dernierBilan`).
+
+### Comparer et envoyer
+
+- **Dossiers sur Drive** : « Un p’tit crochet dans les stocks » à la racine de « Mon Drive », puis ses quatre sous-dossiers, retrouvés par
+  leur nom (hors corbeille) ou créés. `verifier` ne crée rien ; `envoyer` crée ce qui manque.
+- **Comparaison** (`planifierEnvoi`) : un fichier du téléphone est **déjà sur Drive** s'il existe un fichier de même nom, de même taille et,
+  pour les factures et les devis (un PDF régénéré peut garder la même taille), de même **SHA-256**, noté à l'envoi dans les propriétés du
+  fichier Drive (`appProperties['sha256']`). Même nom mais différent : le contenu du fichier Drive est **remplacé** (Drive garde l'ancienne
+  version dans l'historique). Sinon : créé. Les photos et pièces jointes ne sont jamais modifiées après leur ajout : nom et taille
+  suffisent, ce qui évite de relire des vidéos de 150 Mo. Les fichiers de Drive absents du téléphone sont ignorés.
+- **Fichiers ignorés** : `.tmp`, fichiers cachés (nom commençant par un point) et sous-dossiers du téléphone (copies en cours).
+- **Boucle d'envoi** : un fichier après l'autre, dans l'ordre des dossiers puis des noms. Un échec est noté dans le bilan et l'envoi continue ;
+  il s'arrête **tout de suite** si l'autorisation a expiré, et **après trois échecs de suite** (`echecsAvantArret`). La demande d'arrêt
+  (`AnnulationEnvoi`) est prise en compte **à la fin du fichier en cours**. Une erreur pendant la préparation (Google injoignable) sort en
+  exception : rien n'est parti et le bilan d'avant reste.
+- **Le bilan** (`<documents>/drive/dernier_envoi.json`) est écrit à la fin de chaque envoi (fichier provisoire renommé : jamais à moitié
+  écrit). Il est **hors de la base et hors de la sauvegarde** : le schéma reste 6.
+
+### Écran
+
+`DriveScreen` (route `AppRoutes.drive`, entrée *Réglages › Google Drive*) a trois cartes : **Connexion à Google** (non configuré /
+non connecté / connecté), **Envoyer sur Drive** (visible une fois connecté : Vérifier, Envoyer maintenant, progression et Arrêter,
+résultat) et **Dernier envoi**. `profilGoogleProvider` (`AsyncNotifier`) retrouve le compte déjà connecté au premier affichage et passe
+à « non connecté » si la connexion est perdue en cours d'envoi. `envoiDriveProvider` (`Notifier`) porte l'état (`PhaseEnvoi` : repos,
+vérification, vérifié, envoi, terminé, erreur) : l'envoi **continue si l'on quitte l'écran** tant que l'application reste ouverte ; la
+progression n'est rafraîchie qu'au plus toutes les 150 ms. Les éléments portent des `Key` (`drive-connecter`, `drive-envoyer`,
+`drive-verifier`, `drive-progression-texte`, `drive-fin-envoi`, `drive-bilan-resume`, `drive-bilan-erreur-0`…) pour les tests.
+
+### Branchement et configuration
+
+`main.dart` construit `CompteGoogleReel`, `ClientDriveGoogle` et `ServiceDrive` (les quatre dossiers de fichiers, le fichier du bilan) et
+les fournit par `compteGoogleProvider` et `serviceDriveProvider`, que les tests remplacent par un faux compte et un faux Drive en mémoire.
+`core/constants/google_config.dart` porte l'**ID client Web** (`--dart-define=GOOGLE_WEB_CLIENT_ID` ou la constante du fichier) : tant qu'il
+est vide, `CompteGoogle.configure` est faux et l'écran explique que Google n'est pas configuré, sans rien casser. `tool/setup_android.sh`
+ajoute la permission `INTERNET` au manifeste (`flutter create` ne la déclare que pour le débogage). La configuration Google Cloud (projet,
+API Drive, écran de consentement avec le seul droit `drive.file`, accès Android et Web) est décrite dans le README.
+
 ## Dossier `android/`
 
 Le dossier `android/` n'est pas versionné. `tool/setup_android.sh` le crée avec `flutter create`,
@@ -1084,6 +1151,7 @@ dans Google Cloud pour la connexion à Google Drive (étapes suivantes). Les deu
 | Factures PDF | `pdf` (mise en page), `printing` (aperçu et impression), `share_plus` (partage) ; PDF rangés dans le dossier privé, nom du fichier en base | étape 6 |
 | Sauvegarde et export | `archive` (fabriquer et lire les `.zip` ; depuis l'étape 3 du plan d'évolution, **en flux** : `ZipFileEncoder`, `InputFileStream`, `OutputFileStream`) et `file_picker` (choisir un fichier à restaurer, sélecteur du système sans permission) ; partage par `share_plus` | étape 11 |
 | Sauvegarde fiable | `crypto` (SHA-256 des fichiers, en flux) ; `disk_space_plus` (place libre du téléphone, derrière l'interface `ControleEspaceLibre` : une mesure impossible est traitée comme « inconnue » et ne bloque jamais une sauvegarde) | étape 3 du plan d'évolution |
+| Google Drive | `google_sign_in` (connexion, Android : Google Play Services), `googleapis` (API Drive v3) et `http` ; droit `drive.file` seulement ; ID client Web non secret ; gratuit (voir « Google Drive ») | étape 6 du plan d'évolution |
 | Dépendances des étapes suivantes | arriveront avec les étapes qui s'en servent | à venir |
 
 ### Hypothèses du schéma, à confirmer
@@ -1179,6 +1247,15 @@ Analyse détaillée (étape 5 de l'évolution) : `analyse_ventes_test` (choix d'
 lieu, catégorie, mois et année, filtres croisés, remise, remboursement, lignes libres / cours / frais de port, **cohérence au centime
 près avec `calculerStatsPeriode`**, cas limites) et `analyse_ecrans_test` (accès depuis les statistiques, mois par mois, par lieu avec parts et
 barres, par catégorie, par année, filtres croisés, message sans résultat, base vide, mise à jour en direct).
+
+Google Drive (étape 6 de l'évolution) : `drive_envoi_test` (comparaison téléphone / Drive : nouveau, déjà là, taille ou contenu différent,
+doublons, fichiers de Drive en trop ; bilan en JSON, relu avec tolérance), `service_drive_test` (vérifier sans rien créer, dossiers créés une
+fois, envoi complet, second envoi vide, fichier modifié remplacé, fichiers ignorés, échec isolé, arrêt après trois échecs, arrêt immédiat
+si l'autorisation expire, demande d'arrêt, bilan gardé), `client_drive_test` (types de fichiers, requêtes protégées, dossiers, pages,
+jeton neuf après un 401, erreurs traduites, envoi en flux avec la progression, compte sans ID client Web) et `drive_ecrans_test` (accès
+depuis les réglages, non configuré, connexion, annulation, panne, déjà connecté, vérifier, envoyer, second envoi, bilan à l'ouverture,
+fichier refusé, autorisation expirée, Google injoignable, arrêter, déconnexion). Le faux compte et le faux Drive sont dans
+`test/data/aide_drive.dart` : aucun test n'utilise le réseau.
 
 Sauvegarde et export (étape 11) : `csv_test` (protection des cellules, montants), `service_sauvegarde_test` (liste des tables
 = celles de la base et dans l'ordre des clés étrangères, contenu de l'archive, nommage, **aller-retour complet** sur un autre

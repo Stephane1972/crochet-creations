@@ -6,7 +6,8 @@ cours de crochet.
 
 Elle permet de gérer le **catalogue et le stock**, les **clients**, les **ventes**, les **factures PDF**,
 les **devis**, les **cours et inscriptions**, les **dépenses**, des **statistiques simples**
-et les **sauvegardes**. Elle fonctionne **entièrement hors ligne**, sans serveur.
+et les **sauvegardes**. Elle fonctionne **entièrement hors ligne**, sans serveur ; l'envoi des fichiers vers **Google Drive**
+est une option, qui ne part que sur demande.
 
 > Nom de l'application : « Un p’tit crochet dans les stocks » (elle s'appelait « Crochet & Créations » : le nom du dépôt GitHub
 > et le nom technique `crochet_creations` n'ont pas changé).
@@ -143,6 +144,66 @@ Le développement se fait en 12 étapes validées une par une (détail dans [ROA
   l'écran Statistiques pour une même période. « Sans catégorie » regroupe les lignes libres, les cours et les frais de port.
 - Aucune dépendance ajoutée (les barres sont dessinées avec Flutter), aucun changement de la base.
 
+### Google Drive, partie 1 (étape 6 de l'évolution)
+
+- *Réglages → Google Drive* : **Se connecter à Google**, puis **Envoyer maintenant** copie sur votre Drive, dans le dossier
+  « Un p’tit crochet dans les stocks », les **photos des produits**, les **factures**, les **devis** et les **pièces jointes des notes**
+  (quatre sous-dossiers : « Photos des produits », « Factures », « Devis », « Notes - pièces jointes »).
+- **Rien ne part tout seul** : l'envoi se lance par le bouton, et seulement par lui. L'envoi automatique viendra à l'étape suivante.
+- **Vérifier** compare le téléphone et Drive **sans rien envoyer** : « 12 fichiers à envoyer (8,4 Mo) », dossier par dossier.
+- **Drive est la mémoire** : ce qui est déjà sur Drive (même nom, même taille ; pour les factures et les devis, même contenu) n'est pas
+  renvoyé. Un téléphone neuf ou une application réinstallée ne renvoie donc rien pour rien. Une facture ou un devis régénéré remplace le
+  fichier de Drive (Drive garde l'ancienne version dans l'historique du fichier).
+- **Un fichier qui échoue n'empêche pas les autres** ; l'envoi s'arrête seulement si la connexion à Google est perdue ou après trois
+  échecs de suite. Le **bilan du dernier envoi** (date, fichiers envoyés, déjà sur Drive, échecs détaillés) reste affiché ; relancer
+  l'envoi ne renvoie que ce qui manque. **Arrêter** interrompt l'envoi à la fin du fichier en cours.
+- **Jamais de suppression, jamais de partage** : l'application ne sait ni supprimer ni partager un fichier sur Drive. Elle ne demande à
+  Google que le droit de voir et de gérer **les fichiers qu'elle a elle-même créés** (`drive.file`), jamais le reste de votre Drive.
+- Gardez l'application ouverte et l'écran allumé pendant un gros envoi (les vidéos peuvent être lourdes). Se déconnecter n'efface rien sur Drive.
+- Aucun changement de la base (schéma 6) ni de la sauvegarde. Nouvelles dépendances gratuites : `google_sign_in`, `googleapis`, `http`. La
+  permission Internet est ajoutée à l'application (elle ne sert qu'à cet envoi).
+
+#### Configurer Google Cloud (une seule fois, gratuit, environ 15 minutes)
+
+Pour qu'une application Android puisse demander à Google l'accès à votre Drive, Google exige qu'elle soit déclarée dans un « projet »
+Google Cloud. C'est gratuit : aucune carte bancaire n'est demandée pour l'API Drive et la connexion. Sans cette configuration,
+l'application fonctionne normalement ; l'écran *Google Drive* indique simplement que la connexion n'est pas encore configurée.
+Les noms ci-dessous sont ceux de la console Google Cloud (en français ou en anglais selon votre compte) ; ils changent parfois un peu.
+
+1. **Ouvrir la console** : https://console.cloud.google.com, avec le compte Google dont vous voulez utiliser le Drive. Accepter les
+   conditions si Google les propose.
+2. **Créer un projet** : en haut, le sélecteur de projet → **Nouveau projet** → nom « Un p'tit crochet » → **Créer**, puis le choisir.
+3. **Activer l'API Google Drive** : menu ☰ → **API et services** → **Bibliothèque** → chercher « Google Drive API » → **Activer**.
+4. **Configurer l'écran de consentement** (menu ☰ → **API et services** → **Écran de consentement OAuth**, aussi appelé *Google Auth
+   Platform*) → **Commencer** :
+   - *Nom de l'application* : « Un p'tit crochet dans les stocks » ; *adresse e-mail d'assistance* : la vôtre ;
+   - *Audience* (public) : **Externe** ; *coordonnées* : votre adresse e-mail ; accepter la politique de données → **Créer**.
+5. **Déclarer le seul droit demandé** : **Accès aux données** (*Data Access*) → **Ajouter ou supprimer des niveaux d'accès** → cocher
+   (ou coller dans « Ajouter manuellement ») `https://www.googleapis.com/auth/drive.file` (« Afficher, modifier, créer et supprimer
+   uniquement les fichiers Google Drive spécifiques que vous utilisez avec cette application ») → **Enregistrer**. Ne cochez aucun autre droit.
+6. **Publier l'application** : **Audience** → **Publier l'application** → confirmer. En mode « Test », Google fait **expirer l'autorisation
+   au bout de 7 jours** (il faudrait se reconnecter chaque semaine). Avec ce seul droit, aucune vérification par Google n'est nécessaire ;
+   et publier ne rend rien public : l'application ne sert qu'à vous. Si Google propose la vérification, vous pouvez ignorer.
+   (Si vous ne publiez pas : ajoutez votre adresse comme **utilisateur test** dans *Audience*, sinon la connexion sera refusée.)
+7. **Créer l'accès « Android »** : **Clients** → **Créer un client** → type d'application **Android** :
+   - *Nom* : « Android » ;
+   - *Nom du package* : `fr.crochetcreations.crochet_creations` (exactement) ;
+   - *Empreinte du certificat SHA-1* : celle affichée dans les **notes de la pré-version** de l'APK (voir « Signature de
+     l'application » plus bas : ligne « Certificat SHA-1 »). C'est celle de la clé de signature stable ; elle ne change plus d'un APK à l'autre.
+   → **Créer**.
+8. **Créer l'accès « Application Web »** : **Clients** → **Créer un client** → type **Application Web** → nom « Web » → **Créer**.
+   Copier l'**ID client** affiché (il se termine par `.apps.googleusercontent.com`). Ignorer le « code secret » : il ne sert pas ici.
+9. **Donner l'ID client Web à l'application** : il est écrit dans `lib/core/constants/google_config.dart` (constante
+   `_clientWebParDefaut`) ; envoyez-le-moi et je le fais, ou, pour une construction locale, ajoutez
+   `--dart-define=GOOGLE_WEB_CLIENT_ID=VOTRE_ID` à `flutter run` / `flutter build`. Ce n'est **pas un secret** : il est visible dans toute
+   application Android qui utilise Google. Ne publiez en revanche jamais un « code secret » ni un fichier de clé.
+
+**Si la connexion échoue** : l'écran *Google Drive* affiche la raison. Les causes habituelles sont (a) le **nom du package** ou
+l'**empreinte SHA-1** de l'accès Android qui ne correspondent pas à l'APK installé (recopier la SHA-1 des notes de la pré-version,
+sans espace), (b) l'**ID client Web** manquant ou celui d'un autre type d'accès, (c) l'**API Google Drive** non activée dans le projet,
+(d) l'application non publiée et votre adresse absente des utilisateurs test. Un changement dans la console peut mettre quelques
+minutes à se propager.
+
 ### Ce que contient l'étape 11 : sauvegarde et export
 
 - **Écran « Sauvegarde et export »** (écran 23, *Plus → Réglages → Sauvegarde et export*) : sauvegarder, partager, restaurer
@@ -172,7 +233,8 @@ Le développement se fait en 12 étapes validées une par une (détail dans [ROA
   `05/03/2026`, accents corrects). Un CSV sert à lire ou à calculer, **pas à restaurer** : pour cela, il faut une sauvegarde.
 - **Export JSON** : toutes les données dans un seul fichier, sans photos ni PDF (pour un usage technique).
 - Tout se fait **sans connexion** : aucun service en ligne. Pour une vraie sécurité, partagez de temps en temps une
-  sauvegarde hors du téléphone : si le téléphone est perdu, les sauvegardes qu'il contient le sont aussi.
+  sauvegarde hors du téléphone : si le téléphone est perdu, les sauvegardes qu'il contient le sont aussi. (L'envoi des **sauvegardes**
+  vers Google Drive viendra à l'étape 7 du plan d'évolution ; l'étape 6 envoie les photos, factures, devis et pièces jointes.)
 
 ### Ce que contient l'étape 10 : statistiques
 
@@ -394,7 +456,7 @@ par un avertissement) ; si la clé est vraiment incomplète ou le mot de passe f
 **Vérification** : dans les notes de la pré-version et dans le résumé de l'exécution (onglet *Actions*), l'empreinte du
 certificat est affichée, avec le verdict « Conforme à l'empreinte attendue ». Cette empreinte SHA-256 est aussi enregistrée dans
 `tool/signature_attendue.txt` : si elle diffère, la construction est marquée en échec. L'empreinte **SHA-1** affichée est celle
-que demandera Google Cloud pour la connexion à Google Drive.
+que demandera Google Cloud pour la connexion à Google Drive (voir « Configurer Google Cloud » plus haut).
 
 **À conserver précieusement** : le fichier `.p12` et son mot de passe (gestionnaire de mots de passe, clé USB). GitHub ne
 permet pas de relire un secret. Perdre la clé n'est pas dramatique, mais oblige à en créer une nouvelle et donc à

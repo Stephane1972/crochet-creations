@@ -9,6 +9,9 @@ import 'package:path_provider/path_provider.dart';
 import 'app.dart';
 import 'core/theme/theme_mode_provider.dart';
 import 'data/database/app_database.dart';
+import 'data/drive/client_drive.dart';
+import 'data/drive/compte_google.dart';
+import 'data/drive/service_drive.dart';
 import 'data/providers.dart';
 import 'data/repositories/parametres_repository.dart';
 import 'data/sauvegarde/espace_libre.dart';
@@ -17,6 +20,7 @@ import 'data/stockage/selecteur_photo.dart';
 import 'data/stockage/stockage_pdf.dart';
 import 'data/stockage/stockage_photos.dart';
 import 'data/stockage/stockage_pieces_jointes.dart';
+import 'domain/drive_envoi.dart';
 import 'presentation/common/photo_retrouvee.dart';
 import 'presentation/startup/erreur_demarrage_app.dart';
 
@@ -61,6 +65,20 @@ Future<void> main() async {
       espaceLibre: const ControleEspaceLibreSysteme(),
     );
 
+    // Google Drive (étape 6) : envoi à la demande des photos, factures, devis et pièces jointes. Le dernier bilan est un
+    // petit fichier à part (hors de la base et de la sauvegarde).
+    final CompteGoogleReel compteGoogle = CompteGoogleReel();
+    final ServiceDrive drive = ServiceDrive(
+      client: ClientDriveGoogle(compteGoogle),
+      dossiers: <DossierDrive, Directory>{
+        DossierDrive.photos: photos.dossier,
+        DossierDrive.factures: factures.dossier,
+        DossierDrive.devis: devis.dossier,
+        DossierDrive.notes: piecesJointes.dossier,
+      },
+      fichierBilan: File('${documents.path}${Platform.pathSeparator}drive${Platform.pathSeparator}dernier_envoi.json'),
+    );
+
     // Photo prise juste avant qu'Android ferme l'application (rare) : retrouvée une seule fois, ici, puis proposée
     // dans la feuille de choix de photo.
     final String? photoRetrouvee = await SelecteurPhotoSysteme().retrouverPhotoPerdue();
@@ -75,6 +93,8 @@ Future<void> main() async {
           stockageDevisProvider.overrideWithValue(devis),
           stockagePiecesJointesProvider.overrideWithValue(piecesJointes),
           serviceSauvegardeProvider.overrideWithValue(sauvegarde),
+          compteGoogleProvider.overrideWithValue(compteGoogle),
+          serviceDriveProvider.overrideWithValue(drive),
           modeThemeInitialProvider.overrideWithValue(modeInitial),
           modeThemeStoreProvider.overrideWithValue(parametres),
         ],

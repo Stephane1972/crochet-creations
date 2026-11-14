@@ -5,6 +5,7 @@ import 'dart:typed_data';
 
 import 'package:crochet_creations/app.dart';
 import 'package:crochet_creations/data/database/app_database.dart';
+import 'package:crochet_creations/data/drive/service_drive.dart';
 import 'package:crochet_creations/data/providers.dart';
 import 'package:crochet_creations/data/repositories/categorie_note_repository.dart';
 import 'package:crochet_creations/data/repositories/categorie_repository.dart';
@@ -34,6 +35,7 @@ import 'package:crochet_creations/domain/calculs/panier.dart';
 import 'package:crochet_creations/domain/categories_produit.dart';
 import 'package:crochet_creations/domain/document_devis.dart';
 import 'package:crochet_creations/domain/document_facture.dart';
+import 'package:crochet_creations/domain/drive_envoi.dart';
 import 'package:crochet_creations/domain/enums.dart';
 import 'package:crochet_creations/presentation/common/photo_retrouvee.dart';
 import 'package:crochet_creations/presentation/factures/factures_providers.dart';
@@ -43,6 +45,8 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import '../data/aide_drive.dart';
 
 /// Faux appareil photo : choisit toujours le fichier [chemin] (ou annule si `null`).
 class FauxSelecteurPhoto implements SelecteurPhoto {
@@ -226,6 +230,20 @@ class EnvironnementTest {
   final FauxSelecteurFichier selecteurFichier = FauxSelecteurFichier();
   final FauxSelecteurPieceJointe selecteurPieceJointe = FauxSelecteurPieceJointe();
   final FauxOuvreurPieceJointe ouvreurPieceJointe = FauxOuvreurPieceJointe();
+  /// Faux compte Google et faux Drive : aucun réseau, aucune fenêtre de connexion.
+  final FauxCompteGoogle compteGoogle = FauxCompteGoogle();
+  final FauxClientDrive clientDrive = FauxClientDrive();
+  late final ServiceDrive serviceDrive = ServiceDrive(
+    client: clientDrive,
+    dossiers: <DossierDrive, Directory>{
+      DossierDrive.photos: dossierPhotos,
+      DossierDrive.factures: dossierFactures,
+      DossierDrive.devis: dossierDevis,
+      DossierDrive.notes: dossierPiecesJointes,
+    },
+    fichierBilan: File('${dossier.path}/drive/dernier_envoi.json'),
+    horloge: () => maintenant ?? DateTime.now(),
+  );
   late final ServiceSauvegarde sauvegarde = ServiceSauvegarde(
     base: db,
     dossierSauvegardes: Directory('${dossier.path}/sauvegardes'),
@@ -286,6 +304,8 @@ class EnvironnementTest {
     serviceDocumentsProvider.overrideWithValue(documents),
     serviceSauvegardeProvider.overrideWithValue(sauvegarde),
     servicePartageFichiersProvider.overrideWithValue(partageFichiers),
+    compteGoogleProvider.overrideWithValue(compteGoogle),
+    serviceDriveProvider.overrideWithValue(serviceDrive),
     selecteurFichierSauvegardeProvider.overrideWithValue(selecteurFichier),
     horlogeProvider.overrideWithValue(() => maintenant ?? DateTime.now()),
     // L'aperçu réel rasterise le PDF avec le moteur d'impression d'Android : ici, on en affiche le texte.

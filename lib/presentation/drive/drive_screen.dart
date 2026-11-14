@@ -416,11 +416,11 @@ class _CarteDernierEnvoi extends ConsumerWidget {
         ),
         const SizedBox(height: 4),
         if (rapport.complet)
-          Row(
+          const Row(
             children: <Widget>[
-              const Icon(Icons.check_circle_outline, size: 18),
-              const SizedBox(width: 6),
-              const Expanded(child: Text('Tout est sur Drive.', key: Key('drive-bilan-etat'))),
+              Icon(Icons.check_circle_outline, size: 18),
+              SizedBox(width: 6),
+              Expanded(child: Text('Tout est sur Drive.', key: Key('drive-bilan-etat'))),
             ],
           )
         else

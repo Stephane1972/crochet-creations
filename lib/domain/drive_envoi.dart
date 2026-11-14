@@ -1,8 +1,8 @@
-/// Google Drive, partie 1 (étape 6 de l'évolution) : quels fichiers du téléphone partent vers Drive.
-///
-/// Des règles pures, testées sans réseau ni téléphone. L'envoi ne fait que **copier** : rien n'est jamais supprimé ni rendu
-/// public sur Drive. Drive est la mémoire de ce qui est déjà parti : on compare les fichiers du téléphone à ceux du dossier
-/// Drive (nom, taille et, pour les PDF, empreinte), sans aucune table de suivi sur le téléphone.
+// Google Drive, partie 1 (étape 6 de l'évolution) : quels fichiers du téléphone partent vers Drive.
+//
+// Des règles pures, testées sans réseau ni téléphone. L'envoi ne fait que **copier** : rien n'est jamais supprimé ni rendu
+// public sur Drive. Drive est la mémoire de ce qui est déjà parti : on compare les fichiers du téléphone à ceux du dossier
+// Drive (nom, taille et, pour les PDF, empreinte), sans aucune table de suivi sur le téléphone.
 
 /// Nom du dossier principal créé dans « Mon Drive ».
 const String nomDossierRacineDrive = 'Un p’tit crochet dans les stocks';

@@ -237,7 +237,7 @@ void main() {
         _Cas(404, _erreurJson(404, 'File not found'), 'introuvable'),
         _Cas(429, _erreurJson(429, 'Too Many Requests'), 'ralentir'),
         _Cas(503, _erreurJson(503, 'Backend Error'), 'momentanément indisponible'),
-        _Cas(500, '<html>Erreur</html>', 'momentanément indisponible'),
+        const _Cas(500, '<html>Erreur</html>', 'momentanément indisponible'),
         _Cas(400, _erreurJson(400, 'Invalid query'), 'erreur (400)'),
       ];
 

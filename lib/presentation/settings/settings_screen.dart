@@ -107,6 +107,13 @@ class SettingsScreen extends ConsumerWidget {
                   description: 'Sauvegarder, exporter et restaurer vos données.',
                   route: AppRoutes.sauvegarde,
                 ),
+                Divider(indent: 56),
+                MenuTile(
+                  icone: Icons.cloud_upload_outlined,
+                  titre: 'Google Drive',
+                  description: 'Envoyer photos, factures, devis et pièces jointes sur votre Drive.',
+                  route: AppRoutes.drive,
+                ),
               ],
             ),
           ),
@@ -126,7 +133,7 @@ class SettingsScreen extends ConsumerWidget {
                         Text(AppConstants.nomApplication, style: theme.textTheme.titleSmall),
                         Text(
                           'Version ${AppConstants.version} · étape 12 sur 12 · '
-                          'fonctionne sans connexion',
+                          'fonctionne sans connexion (Google Drive en option)',
                           style: theme.textTheme.bodyMedium?.copyWith(
                             color: scheme.onSurfaceVariant,
                           ),

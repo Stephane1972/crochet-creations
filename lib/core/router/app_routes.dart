@@ -63,6 +63,7 @@ abstract final class AppRoutes {
   static const String reglages = '/reglages';
   static const String monEntreprise = '/reglages/entreprise';
   static const String sauvegarde = '/reglages/sauvegarde';
+  static const String drive = '/reglages/google-drive';
   static const String categories = '/reglages/categories';
   static const String lieuxVente = '/reglages/lieux-de-vente';
   static const String categoriesNote = '/reglages/categories-notes';

@@ -6,7 +6,37 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
 
 ## [Non publié]
 
-## [0.19.0] — Analyse détaillée des statistiques (en attente de validation)
+## [0.20.0] — Google Drive, partie 1 : connexion et envoi des fichiers (en attente de validation)
+
+### Ajouté
+- **Un écran « Google Drive »** (*Réglages → Google Drive*) : **Se connecter à Google**, **Vérifier**, **Envoyer maintenant**, **Arrêter**, et le
+  **bilan du dernier envoi**.
+- **Envoi à la demande** des **photos des produits**, des **factures**, des **devis** et des **pièces jointes des notes** vers le Drive de
+  la personne, dans un dossier « Un p’tit crochet dans les stocks » (sous-dossiers « Photos des produits », « Factures », « Devis »,
+  « Notes - pièces jointes »). **Rien ne part tout seul** : seul le bouton lance un envoi (l'envoi automatique viendra à l'étape suivante).
+- **Drive est la mémoire** : un fichier déjà sur Drive (même nom et même taille ; pour les factures et les devis, même contenu, vérifié par
+  une empreinte SHA-256 notée sur le fichier Drive) n'est pas renvoyé. Un téléphone neuf ou une application réinstallée ne renvoie rien
+  pour rien. Une facture ou un devis régénéré remplace le fichier de Drive (Drive garde l'ancienne version).
+- **Vérifier** compare le téléphone et Drive sans rien envoyer ni créer : nombre de fichiers et taille à envoyer, dossier par dossier.
+- **Un fichier qui échoue n'empêche pas les autres.** L'envoi s'arrête si la connexion à Google est perdue ou après trois échecs de suite ;
+  le bilan (date, envoyés, déjà sur Drive, échecs nommés) est gardé sur le téléphone et relancer ne renvoie que ce qui manque.
+  *Arrêter* interrompt l'envoi à la fin du fichier en cours ; l'envoi continue si l'on quitte l'écran (application ouverte).
+- **Jamais de suppression, jamais de partage** : l'application n'a aucune opération « supprimer » ni « partager » sur Drive, et ne demande à
+  Google que le droit de gérer **les fichiers qu'elle a créés** (`drive.file`), jamais le reste du Drive.
+- **Un guide pas à pas** dans le README (« Configurer Google Cloud ») : projet gratuit, API Drive, écran de consentement avec ce seul droit,
+  accès Android (nom du package + empreinte SHA-1 des notes de la pré-version) et accès Web (ID client). Tant que Google n'est pas configuré,
+  l'écran l'explique et l'application fonctionne normalement.
+- Dépendances gratuites : `google_sign_in`, `googleapis`, `http`. Permission Internet ajoutée par `tool/setup_android.sh` (elle ne sert qu'à cet envoi).
+
+### Modifié
+- Le texte « À propos » des réglages précise que Google Drive est en option. Le numéro de version passe à 0.20.0 (build 23). La mention
+  « en attente de validation » est retirée du titre de la version 0.19.0 (étape 5 validée et fusionnée).
+
+### Inchangé volontairement
+- Pas de schéma de base modifié (schéma 6), pas de changement du format de sauvegarde : le bilan du dernier envoi est un petit fichier à part.
+- Les sauvegardes ne partent pas encore sur Drive (étape 7), pas de synchronisation de la base, pas de partage (étape 8).
+
+## [0.19.0] — Analyse détaillée des statistiques
 
 ### Ajouté
 - **Un écran « Analyse détaillée »** (*Plus → Statistiques → Analyse détaillée*) : l'**argent encaissé** regroupé **par année, par mois, par

@@ -50,6 +50,14 @@ fi
 echo "→ Nom affiché sous l'icône : $NOM_AFFICHE"
 sed -i "s|android:label=\"[^\"]*\"|android:label=\"$NOM_AFFICHE\"|" "$MANIFEST"
 
+echo "→ Permission Internet (Google Drive)"
+# `flutter create` ne déclare Internet que pour le débogage : sans cette ligne, une application installée depuis l'APK
+# ne pourrait joindre ni Google ni Drive. Elle ne sert qu'à l'envoi vers Drive, demandé par la personne.
+if ! grep -q 'android.permission.INTERNET' "$MANIFEST"; then
+  sed -i '0,/<manifest[^>]*>/s||&\n    <uses-permission android:name="android.permission.INTERNET"/>|' "$MANIFEST"
+fi
+grep -q 'android.permission.INTERNET' "$MANIFEST" || { echo "✗ Permission Internet non ajoutée au manifeste" >&2; exit 1; }
+
 echo "→ Signature de l'APK"
 python3 tool/patch_signature_android.py
 

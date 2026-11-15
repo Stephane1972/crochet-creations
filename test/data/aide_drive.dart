@@ -101,10 +101,23 @@ class FauxClientDrive implements ClientDrive {
   /// regarder l'écran, puis de le laisser finir).
   Future<void> Function(String nom)? pauseEnvoi;
 
+  /// Si défini, le téléchargement du fichier [nom] échoue avec cette erreur (retourne `null` : il réussit).
+  ErreurDrive? Function(String nom)? echecTelechargement;
+
+  /// Si défini, l'envoi du fichier [nom] est accepté mais Drive ne le garde pas (pour tester la vérification d'une sauvegarde
+  /// qu'on ne retrouve pas).
+  bool Function(String nom)? oublierEnvoi;
+
+  /// Si défini, chaque téléchargement attend la fin de ce que retourne cette fonction.
+  Future<void> Function(String nom)? pauseTelechargement;
+
   int dossiersCrees = 0;
 
   /// Noms des fichiers envoyés (créés ou mis à jour), dans l'ordre.
   final List<String> envoyes = <String>[];
+
+  /// Noms des fichiers téléchargés, dans l'ordre.
+  final List<String> telecharges = <String>[];
 
   void _verifierPanne() {
     final ErreurDrive? erreur = panne;
@@ -154,6 +167,10 @@ class FauxClientDrive implements ClientDrive {
     if (erreur != null) throw erreur;
     final List<int> octets = await fichier.readAsBytes();
     progression?.call(octets.length);
+    if (oublierEnvoi?.call(nom) ?? false) {
+      envoyes.add(nom);
+      return;
+    }
     if (idExistant == null) {
       final String id = 'fichier-${++_suite}';
       fichiers[id] = FichierDriveFaux(id: id, nom: nom, dossierId: dossierId, contenu: octets, empreinte: empreinte);
@@ -164,6 +181,24 @@ class FauxClientDrive implements ClientDrive {
       existant.versions++;
     }
     envoyes.add(nom);
+  }
+
+  @override
+  Future<void> telecharger({
+    required String id,
+    required File destination,
+    void Function(int octetsRecus)? progression,
+  }) async {
+    _verifierPanne();
+    final FichierDriveFaux? fichier = fichiers[id];
+    if (fichier == null) throw const ErreurDrive('Le fichier ou le dossier est introuvable sur Drive.');
+    await pauseTelechargement?.call(fichier.nom);
+    final ErreurDrive? erreur = echecTelechargement?.call(fichier.nom);
+    if (erreur != null) throw erreur;
+    await destination.parent.create(recursive: true);
+    await destination.writeAsBytes(fichier.contenu);
+    progression?.call(fichier.contenu.length);
+    telecharges.add(fichier.nom);
   }
 
   // --- Pour vérifier -----------------------------------------------------------

@@ -8,7 +8,7 @@ import '../../domain/drive_envoi.dart';
 import 'compte_google.dart';
 
 /// Les opérations sur Drive dont l'application a besoin : retrouver ou créer un dossier, lister ses fichiers, envoyer un
-/// fichier. Rien d'autre : **aucune suppression, aucun partage**.
+/// fichier, télécharger un fichier. Rien d'autre : **aucune suppression, aucun partage**.
 abstract class ClientDrive {
   /// Identifiant du dossier [nom] (dans [parentId], ou à la racine de « Mon Drive »), `null` s'il n'existe pas.
   Future<String?> trouverDossier(String nom, {String? parentId});
@@ -30,6 +30,16 @@ abstract class ClientDrive {
     String? empreinte,
     String? idExistant,
     void Function(int octetsEnvoyes)? progression,
+  });
+
+  /// Télécharge le fichier Drive [id] vers [destination], en flux (jamais entièrement en mémoire). Le fichier est écrit
+  /// sous un nom provisoire puis renommé : [destination] n'existe jamais à moitié écrit, et un fichier déjà là est remplacé
+  /// seulement si le téléchargement est complet. [progression] reçoit le nombre d'octets reçus.
+  /// Lève une [ErreurDrive] en cas d'échec (rien n'est alors laissé).
+  Future<void> telecharger({
+    required String id,
+    required File destination,
+    void Function(int octetsRecus)? progression,
   });
 }
 
@@ -250,6 +260,58 @@ class ClientDriveGoogle implements ClientDrive {
         uploadOptions: drive.ResumableUploadOptions(),
         $fields: 'id',
       );
+    }
+  });
+
+  @override
+  Future<void> telecharger({
+    required String id,
+    required File destination,
+    void Function(int octetsRecus)? progression,
+  }) => _executer(() async {
+    await destination.parent.create(recursive: true);
+    final File provisoire = File('${destination.path}.tmp');
+    IOSink? sortie;
+    Future<void> nettoyer() async {
+      try {
+        await sortie?.close();
+      } catch (_) {
+        // Le fichier provisoire est effacé juste après : peu importe l'état de sa fermeture.
+      }
+      try {
+        if (await provisoire.exists()) await provisoire.delete();
+      } on FileSystemException {
+        // Un fichier provisoire oublié est écrasé au prochain essai.
+      }
+    }
+
+    try {
+      // Un nouveau flux et un nouveau fichier provisoire à chaque tentative.
+      final Object reponse = await _api.files.get(id, downloadOptions: drive.DownloadOptions.fullMedia);
+      if (reponse is! drive.Media) throw const ErreurDrive('Google Drive n’a pas renvoyé le contenu du fichier.');
+      final IOSink fichierEcrit = provisoire.openWrite();
+      sortie = fichierEcrit;
+      int recus = 0;
+      await for (final List<int> morceau in reponse.stream) {
+        fichierEcrit.add(morceau);
+        recus += morceau.length;
+        progression?.call(recus);
+      }
+      await fichierEcrit.flush();
+      await fichierEcrit.close();
+      sortie = null;
+      final int? annonce = reponse.length;
+      if (annonce != null && annonce != recus) {
+        throw const ErreurDrive('Le téléchargement s’est arrêté avant la fin. Réessayez.');
+      }
+      if (await destination.exists()) await destination.delete();
+      await provisoire.rename(destination.path);
+    } on FileSystemException catch (erreur) {
+      await nettoyer();
+      throw ErreurDrive('Impossible d’écrire le fichier sur le téléphone (place insuffisante ?) : ${erreur.message}');
+    } catch (_) {
+      await nettoyer();
+      rethrow;
     }
   });
 }

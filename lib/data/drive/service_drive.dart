@@ -67,10 +67,14 @@ class AnnulationEnvoi {
 /// Ce qu'un envoi a donné : le bilan, et pourquoi il s'est arrêté avant la fin (`null` : il est allé jusqu'au bout, ou
 /// la personne l'a arrêté).
 class ResultatEnvoi {
-  const ResultatEnvoi({required this.rapport, this.arret});
+  const ResultatEnvoi({required this.rapport, this.arret, this.confirmes = const <String>{}});
 
   final RapportEnvoi rapport;
   final ErreurDrive? arret;
+
+  /// Les fichiers qui sont sur Drive à la fin de l'envoi (déjà là, ou envoyés), sous la forme `dossier/nom`
+  /// (`photos_produits/photo_1.jpg`). La sauvegarde des données ne liste que ceux-là.
+  final Set<String> confirmes;
 }
 
 /// Envoi des fichiers de l'application vers Google Drive, à la demande.
@@ -161,7 +165,7 @@ class ServiceDrive {
 
   /// Retrouve (ou crée, si [creer]) le dossier principal puis ses sous-dossiers. Un dossier absent (et non créé) n'a pas
   /// d'entrée dans le résultat.
-  Future<Map<DossierDrive, String>> _dossiersDrive({required bool creer}) async {
+  Future<Map<DossierDrive, String>> dossiersDrive({required bool creer}) async {
     String? racine = await _client.trouverDossier(nomDossierRacineDrive);
     if (racine == null) {
       if (!creer) return const <DossierDrive, String>{};
@@ -180,7 +184,7 @@ class ServiceDrive {
 
   /// Compare le téléphone et Drive, **sans rien envoyer ni créer**. Lève une [ErreurDrive] si Drive est injoignable.
   Future<VerificationDrive> verifier() async {
-    final Map<DossierDrive, String> ids = await _dossiersDrive(creer: false);
+    final Map<DossierDrive, String> ids = await dossiersDrive(creer: false);
     final List<PlanDossier> plans = <PlanDossier>[];
     for (final DossierDrive dossier in DossierDrive.values) {
       final String? id = ids[dossier];
@@ -195,11 +199,19 @@ class ServiceDrive {
   /// dernier bilan reste celui d'avant. Ensuite, tout se passe dans le bilan.
   Future<ResultatEnvoi> envoyer({void Function(ProgressionEnvoi progression)? progression, AnnulationEnvoi? annulation}) async {
     progression?.call(const ProgressionEnvoi.preparation());
-    final Map<DossierDrive, String> ids = await _dossiersDrive(creer: true);
+    final Map<DossierDrive, String> ids = await dossiersDrive(creer: true);
     final List<PlanDossier> plans = <PlanDossier>[];
+    final Set<String> confirmes = <String>{};
     for (final DossierDrive dossier in DossierDrive.values) {
       final List<FichierDistant> distants = await _client.lister(ids[dossier]!);
-      plans.add(planifierEnvoi(dossier: dossier, locaux: await _lireLocaux(dossier), distants: distants));
+      final List<FichierLocal> locaux = await _lireLocaux(dossier);
+      final PlanDossier plan = planifierEnvoi(dossier: dossier, locaux: locaux, distants: distants);
+      plans.add(plan);
+      // Ce qui n'est pas à envoyer est déjà sur Drive.
+      final Set<String> aEnvoyer = plan.aEnvoyer.map((EnvoiPrevu e) => e.fichier.nom).toSet();
+      for (final FichierLocal local in locaux) {
+        if (!aEnvoyer.contains(local.nom)) confirmes.add('${dossier.nomLocal}/${local.nom}');
+      }
     }
 
     final int fichiersTotal = plans.fold(0, (int s, PlanDossier p) => s + p.aEnvoyer.length);
@@ -241,6 +253,7 @@ class ServiceDrive {
             progression: (int lus) => signaler(prevu.fichier.nom, lus),
           );
           envoyes++;
+          confirmes.add('${plan.dossier.nomLocal}/${prevu.fichier.nom}');
           octetsEnvoyes += prevu.fichier.octets;
           echecsDAffilee = 0;
         } on ErreurDrive catch (erreur) {
@@ -274,6 +287,6 @@ class ServiceDrive {
       interrompu: interrompu,
     );
     await _enregistrerBilan(rapport);
-    return ResultatEnvoi(rapport: rapport, arret: arret);
+    return ResultatEnvoi(rapport: rapport, arret: arret, confirmes: confirmes);
   }
 }

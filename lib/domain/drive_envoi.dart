@@ -13,7 +13,8 @@ const String porteeDrive = 'https://www.googleapis.com/auth/drive.file';
 /// Propriété ajoutée à chaque fichier envoyé : son empreinte SHA-256, pour reconnaître un PDF modifié.
 const String proprieteEmpreinteDrive = 'sha256';
 
-/// Les quatre dossiers de fichiers de l'application qui partent vers Drive (les sauvegardes viendront à l'étape suivante).
+/// Les quatre dossiers de fichiers de l'application qui partent vers Drive (les sauvegardes des données ont leur propre dossier, voir
+/// `drive_sauvegardes.dart`).
 enum DossierDrive {
   photos('photos_produits', 'Photos des produits', false),
   factures('factures', 'Factures', true),

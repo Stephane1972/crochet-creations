@@ -6,7 +6,44 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
 
 ## [Non publié]
 
-## [0.20.0] — Google Drive, partie 1 : connexion et envoi des fichiers (en attente de validation)
+## [0.21.0] — Google Drive, partie 2 : sauvegardes, restauration, changement de téléphone (en attente de validation)
+
+### Ajouté
+- **« Sauvegarder mes données sur Drive »** (*Réglages → Google Drive*) : **Sauvegarder maintenant sur Drive** envoie, dans le dossier
+  « Sauvegardes » du Drive, une **petite sauvegarde datée** (`crochet-creations-sauvegarde-AAAA-MM-JJ-HHMMSS.zip`) : les **données seules**
+  (toutes les tables) et la **liste des photos, PDF et pièces jointes** (chemin, taille, empreinte SHA-256). Les fichiers eux-mêmes ne sont pas
+  recopiés : ils sont dans leurs dossiers Drive (partie 1), **complétés avant chaque sauvegarde**.
+- **Trois étapes avec progression** : envoi des fichiers manquants, lecture des données, envoi de la sauvegarde puis **vérification sur Drive**
+  (retrouvée par son nom et sa taille). *Arrêter* interrompt l'envoi des fichiers ; **aucune sauvegarde de données n'est alors ajoutée**.
+- **Rien de neuf, rien d'ajouté** : si les données et la liste des fichiers sont identiques à la dernière sauvegarde de Drive (empreinte notée
+  sur le fichier Drive), aucune nouvelle sauvegarde n'est envoyée ; la date de la dernière vérification est affichée.
+- **Un fichier qui n'a pas pu partir** n'est pas listé dans la sauvegarde et est signalé sur l'écran ; relancer le renvoie.
+- **Envoi automatique** (interrupteur, **désactivé au départ**) : à l'ouverture de l'application, au plus une fois par jour, seulement si
+  quelque chose a changé, et seulement si Google est connecté. Rien ne tourne en arrière-plan. Un échec est dit sur l'écran *Google Drive* et
+  retenté à l'ouverture suivante (il n'est pas compté comme un passage).
+- **« Restaurer depuis Drive »** (écran *Réglages → Google Drive → Restaurer depuis Drive…*, aussi pour **changer de téléphone** : même compte
+  Google, puis restaurer la plus récente) : liste des sauvegardes (la plus récente d'abord), **téléchargement de la petite sauvegarde**,
+  **confirmation** (enregistrements, fichiers, taille), puis **téléchargement et contrôle (taille + SHA-256) de chaque photo, PDF et pièce
+  jointe depuis leurs dossiers Drive avant de toucher aux données**, **copie de sécurité** de l'état actuel, remplacement transactionnel,
+  retour à l'accueil. Pas de réseau : **rien n'est modifié**, on recommence. Fichier absent de Drive, de taille différente ou abîmé : il
+  n'est pas remis en place et la fin de la restauration le signale (un PDF qui peut être refait n'est pas signalé).
+- **Tout est gardé sur Drive** : l'application n'efface aucune sauvegarde (toujours aucune suppression ni aucun partage sur Drive).
+- Le **téléchargement** d'un fichier Drive (écrit dans un fichier provisoire, taille vérifiée, puis renommé) rejoint le client Drive.
+
+### Modifié
+- Restaurer une sauvegarde « données seules » depuis *Sauvegarde et export* est refusé avec un message qui renvoie vers *Google Drive →
+  Restaurer depuis Drive*. Les sauvegardes locales (archives complètes) ne changent pas.
+- Le service de sauvegarde sépare la lecture / l'écriture des données seules et réutilise, pour la restauration, le même remplacement
+  transactionnel (copie de sécurité, base, fichiers) que la restauration locale.
+- Le numéro de version passe à 0.21.0 (build 24). La mention « en attente de validation » est retirée du titre de la version 0.20.0
+  (étape 6 validée et fusionnée).
+
+### Inchangé volontairement
+- Pas de schéma de base modifié (schéma 6) ; le format des archives locales (format 2) est inchangé. L'état des sauvegardes Drive (réglage,
+  dernière sauvegarde, dernière vérification) est un petit fichier à part (`drive/sauvegardes_drive.json`).
+- Pas de partage et pas d'exports vers Drive (étape 8) ; droit Google toujours limité à `drive.file`. L'ID client Web de Google reste à renseigner.
+
+## [0.20.0] — Google Drive, partie 1 : connexion et envoi des fichiers
 
 ### Ajouté
 - **Un écran « Google Drive »** (*Réglages → Google Drive*) : **Se connecter à Google**, **Vérifier**, **Envoyer maintenant**, **Arrêter**, et le

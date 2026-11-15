@@ -68,6 +68,7 @@ crochet-creations/
 │   │   ├── document_facture.dart             DocumentFacture : tout ce qui s'imprime sur une facture (sans PDF ni base)
 │   │   ├── document_devis.dart               DocumentDevis : tout ce qui s'imprime sur un devis (réutilise les lignes et parties de la facture)
 │   │   ├── drive_envoi.dart                  envoi vers Drive, sans réseau : dossiers, comparaison téléphone / Drive (planifierEnvoi), bilan d'un envoi
+│   │   ├── drive_sauvegardes.dart            sauvegardes sur Drive, sans réseau : noms datés, liste, état gardé (envoi automatique, dernière sauvegarde), envoiAutomatiqueDu
 │   │   └── calculs/
 │   │       ├── totaux.dart                   sous-total, remise, frais de port, total
 │   │       ├── statut_paiement.dart          payée / partielle / impayée / remboursée
@@ -114,7 +115,8 @@ crochet-creations/
 │   │   ├── drive/
 │   │   │   ├── compte_google.dart            connexion au compte Google (interface CompteGoogle + google_sign_in), erreurs lisibles (ErreurDrive)
 │   │   │   ├── client_drive.dart             opérations Drive : trouver / créer un dossier, lister, envoyer en flux (interface ClientDrive + API Drive v3)
-│   │   │   └── service_drive.dart            vérifier et envoyer à la demande, arrêt, bilan du dernier envoi gardé dans un petit fichier
+│   │   │   ├── service_drive.dart            vérifier et envoyer à la demande, arrêt, bilan du dernier envoi gardé dans un petit fichier
+│   │   │   └── service_sauvegarde_drive.dart sauvegarder les données sur Drive (données seules + liste des fichiers), envoi automatique, restaurer depuis Drive
 │   │   ├── sauvegarde/
 │   │   │   ├── format_sauvegarde.dart        contenu d'une archive (format 2), tables dans l'ordre, colonnes qui citent des fichiers, modèles de progression
 │   │   │   ├── service_sauvegarde.dart       sauvegarder (en flux, avec empreintes), lister, sauvegarde automatique, restaurer (avec contrôle), export JSON
@@ -148,8 +150,9 @@ crochet-creations/
 │       │   ├── cours_providers.dart          flux Riverpod (liste par filtre, fiche)
 │       │   └── cours_widgets.dart            photo du cours, créneau, places, étiquettes de statut et de paiement
 │       ├── drive/                            Google Drive (voir « Google Drive »)
-│       │   ├── drive_screen.dart             écran Réglages › Google Drive : connexion, vérifier / envoyer, bilan du dernier envoi
-│       │   └── drive_providers.dart          compte connecté, état de la vérification et de l'envoi, dernier bilan
+│       │   ├── drive_screen.dart             écran Réglages › Google Drive : connexion, vérifier / envoyer, sauvegarder mes données, bilan du dernier envoi
+│       │   ├── drive_restauration_screen.dart écran Restaurer depuis Drive : liste, confirmation, progression, compte rendu
+│       │   └── drive_providers.dart          compte connecté, état de la vérification, de l'envoi et de la sauvegarde, dernier bilan
 │       ├── sauvegarde/                       sauvegarde et export (voir « Sauvegarde et export »)
 │       │   ├── sauvegarde_screen.dart        écran Sauvegarde et export : sauvegarder, restaurer, exporter (écran 23)
 │       │   └── sauvegarde_providers.dart     liste des sauvegardes du téléphone
@@ -1051,7 +1054,7 @@ remplacent (faux partage, faux sélecteur, dossiers temporaires). Une opération
 métier s'affiche telle quelle, sinon une phrase générale. Le sélecteur de fichiers donne une **copie de travail** (recopiée en flux
 dans le dossier temporaire : le sélecteur 13 ne donne plus de chemin) que l'écran supprime après la restauration.
 
-## Google Drive (étape 6 de l'évolution)
+## Google Drive (étapes 6 et 7 de l'évolution)
 
 Envoi **à la demande** des photos, factures, devis et pièces jointes vers le Drive de la personne. Trois principes : **copier, jamais
 supprimer ni partager** ; **Drive est la mémoire** (aucun registre de « ce qui est déjà parti » sur le téléphone) ; **un fichier qui
@@ -1108,6 +1111,60 @@ les fournit par `compteGoogleProvider` et `serviceDriveProvider`, que les tests 
 est vide, `CompteGoogle.configure` est faux et l'écran explique que Google n'est pas configuré, sans rien casser. `tool/setup_android.sh`
 ajoute la permission `INTERNET` au manifeste (`flutter create` ne la déclare que pour le débogage). La configuration Google Cloud (projet,
 API Drive, écran de consentement avec le seul droit `drive.file`, accès Android et Web) est décrite dans le README.
+
+### Partie 2 (étape 7) : sauvegardes des données sur Drive et restauration
+
+Même principes qu'en partie 1 (**copier, jamais supprimer ni partager**, droit `drive.file`) et un de plus : **ne jamais annoncer une
+sauvegarde dont les fichiers manqueraient**.
+
+**Format d'une sauvegarde Drive : « données seules »** (`ServiceSauvegarde.lireDonneesSeules` / `ecrireDonneesSeules`) : un `.zip` qui
+ne contient que `donnees.json` (manifeste + tables ; le manifeste porte `donneesSeules: true`, `nombreFichiers`, `complete`,
+`fichiersAbsents`) et `fichiers.json` (`{format, fichiers: [{chemin, octets, sha256}]}`), **sans** `fichiers/…`. Les photos, factures, devis et
+pièces jointes sont déjà dans leurs dossiers Drive (partie 1). Un tel `.zip` n'est **pas** restaurable localement : `examiner` / `restaurer`
+lèvent `DonneeInvalide` avec un message qui renvoie vers *Google Drive › Restaurer depuis Drive*. Les empreintes SHA-256 des fichiers ne
+sont calculées qu'à l'écriture du `.zip`.
+
+**Empreinte des données** (`DonneesSeules.empreinte`) : SHA-256 de `jsonEncode({tables, fichiers: [[chemin, octets], …]})` — sans la date et sans
+relire les fichiers. Elle est notée sur le fichier Drive (`appProperties['sha256']`) ; égale à celle de la dernière sauvegarde de Drive, la
+sauvegarde est « déjà à jour » et rien n'est envoyé.
+
+**`ServiceSauvegardeDrive`** (`data/drive/service_sauvegarde_drive.dart`) :
+- `sauvegarder({progression, annulation})` : (1) `ServiceDrive.envoyer` (les fichiers ; il retourne les fichiers `confirmes` = déjà sur Drive ou
+  envoyés), (2) si l'envoi s'est arrêté (`arret` ou `interrompu`) → issue `interrompue`, **pas de sauvegarde de données** ; sinon
+  `lireDonneesSeules(confirmes)` (un fichier qui n'a pas pu partir est **exclu** de la liste et rapporté), (3) dossier « Sauvegardes » sous le
+  dossier racine, comparaison des empreintes, sinon écriture du `.zip` dans `<documents>/drive/travail/sauvegardes/`, envoi avec l'empreinte,
+  **vérification par `lister` (nom + taille)**. Issues : `faite`, `dejaAJour`, `interrompue`.
+- `listerSauvegardes` (les noms `crochet-creations-sauvegarde-AAAA-MM-JJ-HHMMSS.zip`, de la plus récente à la plus ancienne ; les autres noms
+  sont ignorés), `preparerRestauration` (télécharge le petit `.zip` dans `travail/restauration/` et l'examine, **sans rien modifier**),
+  `restaurer` (voir ci-dessous), `abandonnerRestauration`.
+- État : `<documents>/drive/sauvegardes_drive.json` (`EtatSauvegardesDrive` : `envoiAutomatique` — faux au départ —, `derniereVerification`,
+  `derniere`, `fichiersNonEnvoyes`), lu avec tolérance, écrit par une file (jamais deux écritures à la fois) et par fichier provisoire renommé.
+  Hors base et hors sauvegarde : schéma 6 inchangé.
+- **Exclusion** : un drapeau interne refuse deux opérations Drive à la fois (`ErreurDrive` « Une opération sur Drive est déjà en cours… ») ;
+  côté écran, `envoiDriveProvider` et `sauvegardeDriveProvider` se bloquent mutuellement et les boutons sont désactivés.
+- **Envoi automatique** : `envoiAutomatiqueDu(etat, maintenant)` (domaine) est vrai si le réglage est actif et si rien n'est passé depuis un
+  jour (une horloge revenue en arrière ne bloque pas). `main.dart` lance, après la sauvegarde locale automatique,
+  `sauvegardeDriveProvider.notifier.lancerSiBesoin()` (qui vérifie aussi que Google est connecté). Un échec ne met pas à jour
+  `derniereVerification` : il est retenté à l'ouverture suivante, et il est dit sur l'écran Drive, jamais ailleurs.
+
+**Restauration depuis Drive** (`ServiceSauvegarde.restaurerDonneesSeules`) : lit l'archive, `_verifierPlace`, prépare les dossiers provisoires, puis
+appelle `recuperer` (fourni par `ServiceSauvegardeDrive._recuperer`) qui **télécharge chaque fichier listé directement dans le dossier provisoire**
+(pas de seconde archive : l'espace nécessaire reste celui des fichiers) : le fichier Drive retenu a le même nom **et la même taille** (un PDF
+refait depuis est une autre version), puis taille et SHA-256 sont contrôlés. Absent, de taille différente ou abîmé : laissé de côté ; erreur
+de Drive ou de réseau : **tout est abandonné, rien n'est touché**. Puis le `_appliquer` commun avec la restauration locale : copie de sécurité
+(`avantRestauration`), remplacement transactionnel de la base, installation des fichiers. Les fichiers non remis en place que les données
+citent sont rapportés dans `ResultatRestauration.fichiersAbsents` ; un PDF qui peut être régénéré n'est pas rapporté.
+
+**Client Drive** : `ClientDrive.telecharger({id, destination, progression})` (`files.get` avec `DownloadOptions.fullMedia`, flux écrit dans
+`<destination>.tmp`, longueur vérifiée, puis renommé ; une erreur d'écriture devient une `ErreurDrive` lisible). Toujours **aucune
+suppression ni partage**.
+
+**Écrans** : `DriveScreen` gagne la carte **Sauvegarder mes données sur Drive** (interrupteur, dernière sauvegarde, dernière vérification, fichiers non
+envoyés, progression en trois étapes, Arrêter, résultat) ; `DriveRestaurationScreen` (route `AppRoutes.driveRestauration`) : liste, confirmation
+(`confirmer`), progression, compte rendu, retour à l'accueil (`PopScope` : on ne quitte pas l'écran pendant l'opération ; le mode jour / nuit
+et la vente en cours sont relus après la restauration). `sauvegardeDriveProvider` (`Notifier`, `PhaseSauvegardeDrive`) continue si l'on quitte
+l'écran ; progression rafraîchie au plus toutes les 150 ms. Les éléments portent des `Key` (`drive-sauvegarder`, `drive-restaurer`,
+`drive-auto-interrupteur`, `drive-sauvegarde-fin`, `drive-sauvegarde-$i`, `drive-restauration-erreur`…) pour les tests.
 
 ## Dossier `android/`
 
@@ -1252,10 +1309,21 @@ Google Drive (étape 6 de l'évolution) : `drive_envoi_test` (comparaison télé
 doublons, fichiers de Drive en trop ; bilan en JSON, relu avec tolérance), `service_drive_test` (vérifier sans rien créer, dossiers créés une
 fois, envoi complet, second envoi vide, fichier modifié remplacé, fichiers ignorés, échec isolé, arrêt après trois échecs, arrêt immédiat
 si l'autorisation expire, demande d'arrêt, bilan gardé), `client_drive_test` (types de fichiers, requêtes protégées, dossiers, pages,
-jeton neuf après un 401, erreurs traduites, envoi en flux avec la progression, compte sans ID client Web) et `drive_ecrans_test` (accès
+jeton neuf après un 401, erreurs traduites, envoi en flux avec la progression, compte sans ID client Web ; en partie 2 :
+téléchargement en flux dans un fichier provisoire, fichier remplacé seulement s'il est complet, coupure, introuvable, pas d'Internet) et `drive_ecrans_test` (accès
 depuis les réglages, non configuré, connexion, annulation, panne, déjà connecté, vérifier, envoyer, second envoi, bilan à l'ouverture,
 fichier refusé, autorisation expirée, Google injoignable, arrêter, déconnexion). Le faux compte et le faux Drive sont dans
 `test/data/aide_drive.dart` : aucun test n'utilise le réseau.
+
+Google Drive, partie 2 (étape 7) : `drive_sauvegardes_test` (noms datés et dates impossibles refusées, liste triée, état en JSON relu avec
+tolérance, `envoiAutomatiqueDu` : désactivé, jamais passé, un jour, horloge revenue en arrière), `service_sauvegarde_drive_test` (sauvegarde
+complète et vérifiée, « déjà à jour », fichier refusé exclu de la liste, arrêt sans sauvegarde de données, autorisation expirée, exclusion de deux
+opérations, envoi automatique et état gardé, liste des sauvegardes ; restauration sur un téléphone neuf et sur le même, fichier absent,
+PDF refait, photo non partie, coupure du réseau sans rien toucher, `.zip` illisible, dossiers introuvables, place insuffisante, abandon ;
+`.zip` de Drive refusé par la restauration locale ; empreinte des données, écriture, archive complète refusée), `drive_ecrans_test` (la
+carte et l'écran de restauration : sauvegarder, rien de neuf, interrupteur, panne, fichier refusé, arrêt, blocage mutuel, envoi automatique ;
+liste, erreur et « Réessayer », restaurer, renoncer, coupure du réseau, retour bloqué pendant l'opération) et `drive_sauvegarde_auto_test`
+(l'ouverture de l'application : activé, désactivé, non connecté, une fois par jour, échec retenté).
 
 Sauvegarde et export (étape 11) : `csv_test` (protection des cellules, montants), `service_sauvegarde_test` (liste des tables
 = celles de la base et dans l'ordre des clés étrangères, contenu de l'archive, nommage, **aller-retour complet** sur un autre

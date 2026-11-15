@@ -149,7 +149,7 @@ Le développement se fait en 12 étapes validées une par une (détail dans [ROA
 - *Réglages → Google Drive* : **Se connecter à Google**, puis **Envoyer maintenant** copie sur votre Drive, dans le dossier
   « Un p’tit crochet dans les stocks », les **photos des produits**, les **factures**, les **devis** et les **pièces jointes des notes**
   (quatre sous-dossiers : « Photos des produits », « Factures », « Devis », « Notes - pièces jointes »).
-- **Rien ne part tout seul** : l'envoi se lance par le bouton, et seulement par lui. L'envoi automatique viendra à l'étape suivante.
+- **Rien ne part tout seul** : l'envoi se lance par le bouton, et seulement par lui. L'envoi automatique des *sauvegardes* est un réglage à part (partie 2), désactivé au départ.
 - **Vérifier** compare le téléphone et Drive **sans rien envoyer** : « 12 fichiers à envoyer (8,4 Mo) », dossier par dossier.
 - **Drive est la mémoire** : ce qui est déjà sur Drive (même nom, même taille ; pour les factures et les devis, même contenu) n'est pas
   renvoyé. Un téléphone neuf ou une application réinstallée ne renvoie donc rien pour rien. Une facture ou un devis régénéré remplace le
@@ -204,6 +204,38 @@ sans espace), (b) l'**ID client Web** manquant ou celui d'un autre type d'accès
 (d) l'application non publiée et votre adresse absente des utilisateurs test. Un changement dans la console peut mettre quelques
 minutes à se propager.
 
+### Google Drive, partie 2 (étape 7 de l'évolution)
+
+- *Réglages → Google Drive → Sauvegarder mes données sur Drive* (visible une fois connecté à Google) : **Sauvegarder maintenant sur
+  Drive** envoie sur votre Drive, dans le dossier « Sauvegardes » (sous « Un p’tit crochet dans les stocks »), une **petite sauvegarde
+  datée** de toutes vos données (produits, clients, ventes, factures, devis, cours, dépenses, notes, réglages) avec la **liste de vos
+  photos, PDF et pièces jointes**. Les photos et documents eux-mêmes **ne sont pas recopiés dans la sauvegarde** : ils sont déjà dans leurs
+  dossiers Drive (partie 1), qui sont **complétés avant chaque sauvegarde**. Une sauvegarde pèse donc quelques dizaines de Ko, pas des Mo.
+- La sauvegarde se fait en trois étapes, avec une barre de progression : (1) envoi des fichiers qui ne sont pas encore sur Drive,
+  (2) lecture des données et préparation de la sauvegarde, (3) envoi puis **vérification sur Drive** (le fichier est retrouvé, avec la bonne
+  taille). **Arrêter** (pendant l'étape 1) interrompt l'envoi ; dans ce cas, aucune sauvegarde des données n'est ajoutée, pour ne jamais
+  annoncer une sauvegarde dont les fichiers manqueraient.
+- **Si rien n'a changé** depuis la dernière sauvegarde, aucune nouvelle sauvegarde n'est ajoutée (« Rien de neuf : la dernière sauvegarde
+  sur Drive est à jour ») ; l'écran indique la date de la dernière vérification.
+- **Un fichier qui n'a pas pu partir** n'empêche pas la sauvegarde, mais n'est **pas listé** dedans, et l'écran le dit (« 1 fichier n’a pas pu
+  partir sur Drive… Relancez la sauvegarde »). Relancer ajoute une sauvegarde qui le liste.
+- **Envoi automatique** (interrupteur, **désactivé au départ**) : à l'ouverture de l'application, **au plus une fois par jour**, et seulement
+  si quelque chose a changé, la sauvegarde sur Drive se fait toute seule, à condition d'être connecté à Google. **Rien ne tourne en
+  arrière-plan** : l'application doit être ouverte. Un échec (pas de réseau) est dit sur l'écran *Google Drive* et retenté à l'ouverture
+  suivante.
+- **Tout est gardé** : chaque sauvegarde reste sur Drive, l'application n'en supprime aucune (vous pouvez les supprimer vous-même dans Drive).
+- **Restaurer / changer de téléphone** : *Google Drive → Restaurer depuis Drive…* liste les sauvegardes (la plus récente en premier).
+  Sur un téléphone neuf : installez l'application (même signature, voir plus bas), **connectez-vous au même compte Google**, puis restaurez la
+  plus récente. Avant de remplacer quoi que ce soit, l'application **télécharge la petite sauvegarde**, dit ce qu'elle contient (nombre
+  d'enregistrements, de fichiers, taille) et **demande confirmation**. Elle **retélécharge ensuite chaque photo, PDF et pièce jointe depuis
+  leurs dossiers Drive et les contrôle** (taille et empreinte SHA-256) **avant de toucher à vos données**. Si le réseau coupe, **rien n'est
+  modifié** et vous pouvez recommencer ; un fichier absent de Drive ou abîmé n'est pas remis en place et est **signalé** à la fin. Une copie
+  de sécurité de l'état actuel est faite juste avant le remplacement (elle reste dans *Sauvegarde et export*). Prévoyez le Wi‑Fi si vous avez
+  beaucoup de photos.
+- Une sauvegarde « données seules » de Drive ne se restaure **que** par ce chemin : si on la choisit dans *Sauvegarde et export*, un message
+  l'explique et renvoie vers *Google Drive → Restaurer depuis Drive*. Les sauvegardes locales (archives complètes avec photos) ne changent pas.
+- **Jamais de suppression, jamais de partage** (comme en partie 1) : droit `drive.file` seulement. Aucun changement de la base (schéma 6).
+
 ### Ce que contient l'étape 11 : sauvegarde et export
 
 - **Écran « Sauvegarde et export »** (écran 23, *Plus → Réglages → Sauvegarde et export*) : sauvegarder, partager, restaurer
@@ -233,8 +265,8 @@ minutes à se propager.
   `05/03/2026`, accents corrects). Un CSV sert à lire ou à calculer, **pas à restaurer** : pour cela, il faut une sauvegarde.
 - **Export JSON** : toutes les données dans un seul fichier, sans photos ni PDF (pour un usage technique).
 - Tout se fait **sans connexion** : aucun service en ligne. Pour une vraie sécurité, partagez de temps en temps une
-  sauvegarde hors du téléphone : si le téléphone est perdu, les sauvegardes qu'il contient le sont aussi. (L'envoi des **sauvegardes**
-  vers Google Drive viendra à l'étape 7 du plan d'évolution ; l'étape 6 envoie les photos, factures, devis et pièces jointes.)
+  sauvegarde hors du téléphone : si le téléphone est perdu, les sauvegardes qu'il contient le sont aussi. (Une copie de vos **données** peut aussi partir sur Google Drive,
+  à la demande ou une fois par jour : voir « Google Drive, partie 2 ».)
 
 ### Ce que contient l'étape 10 : statistiques
 

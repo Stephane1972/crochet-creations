@@ -443,9 +443,9 @@ void main() {
       expect(lendemain!.issue, IssueSauvegardeDrive.dejaAJour);
       expect(drive.nomsDans(nomDossierSauvegardesDrive), hasLength(1));
 
-      // Le jour suivant, des données ont changé : une nouvelle sauvegarde.
+      // Un jour après ce dernier passage (le 15 à 18 h 30), des données ont changé : une nouvelle sauvegarde.
       await tel.db.insererClient(nom: 'Martin');
-      tel.maintenant = DateTime(2026, 11, 16, 9);
+      tel.maintenant = DateTime(2026, 11, 16, 19);
       final ResultatSauvegardeDrive? suivant = await tel.service.sauvegarderSiBesoin();
       expect(suivant!.issue, IssueSauvegardeDrive.faite);
       expect(drive.nomsDans(nomDossierSauvegardesDrive), hasLength(2));

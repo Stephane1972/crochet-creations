@@ -727,7 +727,7 @@ void main() {
       expect(cle('drive-sauvegarde-arret'), findsNothing); // arrêt voulu : pas une panne
       expect(env.clientDrive.envoyes, hasLength(1));
       expect(env.clientDrive.nomsDans(nomDossierSauvegardesDrive), isEmpty);
-      expect(texte(tester, 'drive-aucune-sauvegarde'), 'Aucune sauvegarde sur Drive pour l’instant.');
+      await attendreTexte(tester, 'drive-aucune-sauvegarde', 'Aucune sauvegarde sur Drive pour l’instant.');
       expect(cle('drive-sauvegarder'), findsOneWidget);
 
       await env.fermer(tester);

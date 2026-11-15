@@ -455,7 +455,7 @@ class _CarteSauvegardes extends ConsumerWidget {
       contenu.add(
         _texteDiscret(
           context,
-          memoire.isLoading ? 'Lecture du réglage…' : 'Aucune sauvegarde sur Drive pour l’instant.',
+          reglages == null && memoire.isLoading ? 'Lecture du réglage…' : 'Aucune sauvegarde sur Drive pour l’instant.',
           key: const Key('drive-aucune-sauvegarde'),
         ),
       );

@@ -1,7 +1,11 @@
+import 'dart:io';
+
 import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../core/constants/google_config.dart';
 import '../../domain/drive_envoi.dart';
+import '../../domain/id_client_google.dart';
+import 'stockage_client_web.dart';
 
 /// Le compte Google connecté.
 class ProfilGoogle {
@@ -32,6 +36,23 @@ abstract class CompteGoogle {
   /// Vrai si l'application connaît l'ID client Web du projet Google Cloud (voir `google_config.dart`).
   bool get configure;
 
+  /// L'ID client Web utilisé (vide : aucun).
+  String get clientWeb;
+
+  /// Vrai si l'ID utilisé a été saisi dans l'application (sinon il a été fourni avec elle, ou il n'y en a pas).
+  bool get clientWebEnregistre;
+
+  /// Vrai si un nouvel ID n'est pris en compte qu'après avoir fermé complètement l'application : Google ne se laisse
+  /// configurer qu'une fois par lancement.
+  bool get redemarrageNecessaire;
+
+  /// Enregistre l'ID client Web saisi (nettoyé et vérifié ici) sur le téléphone, et l'utilise. Lève une [ErreurDrive] si
+  /// ce n'est pas un ID client ou si l'enregistrement échoue.
+  Future<void> enregistrerClientWeb(String saisie);
+
+  /// Oublie l'ID enregistré : l'application revient à celui qui lui a été fourni (s'il y en a un).
+  Future<void> oublierClientWeb();
+
   /// Retrouve, sans rien afficher, le compte déjà connecté (au lancement). `null` : il faut se connecter.
   Future<ProfilGoogle?> restaurer();
 
@@ -50,28 +71,82 @@ abstract class CompteGoogle {
 
 /// [CompteGoogle] réel : `google_sign_in` (Android : Google Play Services).
 class CompteGoogleReel implements CompteGoogle {
-  CompteGoogleReel({String? clientWeb}) : _clientWeb = clientWeb ?? clientWebGoogle;
+  /// [clientWeb] : l'ID fourni avec l'application ; [clientWebEnregistre] : celui que la personne a saisi (il passe avant) et
+  /// que [stockage] garde d'un lancement à l'autre.
+  CompteGoogleReel({String? clientWeb, String? clientWebEnregistre, StockageClientWeb? stockage})
+    : _clientWebFourni = clientWeb ?? clientWebGoogle,
+      _clientWebSaisi = (clientWebEnregistre ?? '').isEmpty ? null : clientWebEnregistre,
+      _stockage = stockage;
 
-  final String _clientWeb;
+  final String _clientWebFourni;
+  final StockageClientWeb? _stockage;
+  String? _clientWebSaisi;
   GoogleSignInAccount? _compte;
   Future<void>? _initialisation;
+
+  /// L'ID avec lequel Google a été configuré depuis le lancement (`null` : pas encore).
+  String? _clientWebInitialise;
   String? _jeton;
   DateTime? _jetonValideJusqua;
 
   /// Durée pendant laquelle un jeton est réutilisé (il est valable environ une heure).
   static const Duration _dureeJeton = Duration(minutes: 30);
 
+  String get _clientWeb => _clientWebSaisi ?? _clientWebFourni;
+
   @override
   bool get configure => _clientWeb.isNotEmpty;
 
-  Future<void> _initialiser() async {
+  @override
+  String get clientWeb => _clientWeb;
+
+  @override
+  bool get clientWebEnregistre => _clientWebSaisi != null;
+
+  @override
+  bool get redemarrageNecessaire => _clientWebInitialise != null && _clientWebInitialise != _clientWeb;
+
+  @override
+  Future<void> enregistrerClientWeb(String saisie) async {
+    final String id = nettoyerIdClientWeb(saisie);
+    final String? probleme = erreurIdClientWeb(id);
+    if (probleme != null) throw ErreurDrive(probleme);
     try {
-      await (_initialisation ??= GoogleSignIn.instance.initialize(serverClientId: _clientWeb));
+      await _stockage?.ecrire(id);
+    } on FileSystemException {
+      throw const ErreurDrive('Impossible d’enregistrer l’ID sur le téléphone : y a-t-il encore de la place ?');
+    }
+    _clientWebSaisi = id;
+    invaliderJeton();
+  }
+
+  @override
+  Future<void> oublierClientWeb() async {
+    await _stockage?.effacer();
+    _clientWebSaisi = null;
+    invaliderJeton();
+  }
+
+  Future<void> _initialiser() async {
+    if (redemarrageNecessaire) {
+      throw const ErreurDrive(
+        'Le nouvel ID client Web sera pris en compte au prochain lancement : fermez complètement l’application '
+        '(retirez-la des applications récentes), puis rouvrez-la.',
+      );
+    }
+    try {
+      await (_initialisation ??= _initialiserAvec(_clientWeb));
     } catch (_) {
       // En cas d'échec, la prochaine tentative recommence au lieu de rejouer l'erreur.
       _initialisation = null;
+      _clientWebInitialise = null;
       rethrow;
     }
+  }
+
+  Future<void> _initialiserAvec(String id) {
+    _clientWebInitialise = id;
+    return GoogleSignIn.instance.initialize(serverClientId: id);
   }
 
   void _memoriser(String jeton) {

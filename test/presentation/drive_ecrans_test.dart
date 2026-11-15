@@ -7,6 +7,7 @@ import 'package:crochet_creations/data/database/app_database.dart';
 import 'package:crochet_creations/data/drive/compte_google.dart';
 import 'package:crochet_creations/data/sauvegarde/format_sauvegarde.dart';
 import 'package:crochet_creations/domain/drive_sauvegardes.dart';
+import 'package:crochet_creations/domain/id_client_google.dart';
 import 'package:crochet_creations/presentation/drive/drive_providers.dart';
 import 'package:crochet_creations/presentation/drive/drive_restauration_screen.dart';
 import 'package:crochet_creations/presentation/drive/drive_screen.dart';
@@ -277,6 +278,166 @@ void main() {
       expect(cle('drive-envoyer'), findsNothing);
       expect(cle('drive-fin-envoi'), findsNothing);
       expect(env.clientDrive.fichiers.length, surDrive); // rien n'est supprimé sur Drive
+
+      await env.fermer(tester);
+    });
+  });
+
+  group('ID client Web', () {
+    const String id = '123456789012-abcdefghijklmnopqrstuvwxyz012345$suffixeIdClientGoogle';
+    const String autreId = '987654321098-zyxwvutsrqponmlkjihgfedcba543210$suffixeIdClientGoogle';
+
+    Future<void> saisirEtEnregistrer(WidgetTester tester, String saisie) async {
+      await tester.enterText(cle('drive-client-web-champ'), saisie);
+      await tester.pump();
+      await toucher(tester, cle('drive-client-web-enregistrer'));
+    }
+
+    testWidgets('pas encore configuré : coller l’ID suffit, sans nouvelle version de l’application', (
+      WidgetTester tester,
+    ) async {
+      final EnvironnementTest env = await EnvironnementTest.creer(tester);
+      env.compteGoogle.configure = false;
+      await ouvrirEcran(tester, env);
+
+      expect(cle('drive-client-web-champ'), findsOneWidget);
+      expect(texte(tester, 'drive-client-web-etat'), startsWith('Aucun ID client Web n’est enregistré'));
+      expect(cle('drive-client-web-oublier'), findsNothing);
+      expect(cle('drive-connecter'), findsNothing);
+
+      // Ce qu'on colle peut venir avec des espaces et un retour à la ligne.
+      await saisirEtEnregistrer(tester, '  $id \n');
+
+      expect(env.compteGoogle.idEnregistre, id);
+      expect(cle('drive-client-web-erreur'), findsNothing);
+      expect(texte(tester, 'drive-client-web-ok'), 'ID enregistré. Vous pouvez vous connecter à Google.');
+      expect(texte(tester, 'drive-client-web-etat'), 'ID enregistré sur ce téléphone :');
+      expect(texte(tester, 'drive-client-web-id'), id);
+      expect(cle('drive-non-configure'), findsNothing);
+      expect(cle('drive-connecter'), findsOneWidget);
+      expect(cle('drive-client-web-oublier'), findsOneWidget);
+
+      // La connexion devient possible ; une fois connecté, la carte de l'ID disparaît.
+      await toucher(tester, cle('drive-connecter'));
+      expect(texte(tester, 'drive-compte'), 'stef@exemple.fr');
+      expect(cle('drive-client-web-champ'), findsNothing);
+
+      await env.fermer(tester);
+    });
+
+    testWidgets('ce qui n’est pas un ID client est refusé, avec la raison, et rien n’est enregistré', (
+      WidgetTester tester,
+    ) async {
+      final EnvironnementTest env = await EnvironnementTest.creer(tester);
+      env.compteGoogle.configure = false;
+      await ouvrirEcran(tester, env);
+
+      await saisirEtEnregistrer(tester, 'bonjour');
+      expect(
+        texte(tester, 'drive-client-web-erreur'),
+        'Ce n’est pas un ID client Google : il doit se terminer par .apps.googleusercontent.com.',
+      );
+
+      await saisirEtEnregistrer(tester, '');
+      expect(texte(tester, 'drive-client-web-erreur'), startsWith('Collez l’ID client Web'));
+
+      expect(env.compteGoogle.idEnregistre, isNull);
+      expect(cle('drive-client-web-ok'), findsNothing);
+      expect(cle('drive-non-configure'), findsOneWidget);
+      expect(cle('drive-connecter'), findsNothing);
+
+      await env.fermer(tester);
+    });
+
+    testWidgets('le « code secret » est refusé : il ne doit jamais être collé', (WidgetTester tester) async {
+      final EnvironnementTest env = await EnvironnementTest.creer(tester);
+      env.compteGoogle.configure = false;
+      await ouvrirEcran(tester, env);
+
+      await saisirEtEnregistrer(tester, '${debutCodeSecretGoogle}AbCdEfGhIjKlMnOpQrStUvWxYz12');
+
+      expect(texte(tester, 'drive-client-web-erreur'), startsWith('Ceci est un « code secret »'));
+      expect(env.compteGoogle.idEnregistre, isNull);
+
+      await env.fermer(tester);
+    });
+
+    testWidgets('un enregistrement impossible sur le téléphone est dit', (WidgetTester tester) async {
+      final EnvironnementTest env = await EnvironnementTest.creer(tester);
+      env.compteGoogle.configure = false;
+      env.compteGoogle.erreurDEnregistrement = const ErreurDrive('Impossible d’enregistrer l’ID sur le téléphone.');
+      await ouvrirEcran(tester, env);
+
+      await saisirEtEnregistrer(tester, id);
+
+      expect(texte(tester, 'drive-client-web-erreur'), 'Impossible d’enregistrer l’ID sur le téléphone.');
+      expect(cle('drive-client-web-ok'), findsNothing);
+      expect(cle('drive-non-configure'), findsOneWidget);
+
+      await env.fermer(tester);
+    });
+
+    testWidgets('un ID déjà enregistré s’affiche dans le champ et peut être corrigé', (WidgetTester tester) async {
+      final EnvironnementTest env = await EnvironnementTest.creer(tester);
+      env.compteGoogle.idEnregistre = id;
+      await ouvrirEcran(tester, env);
+
+      expect(tester.widget<TextField>(cle('drive-client-web-champ')).controller!.text, id);
+      expect(texte(tester, 'drive-client-web-etat'), 'ID enregistré sur ce téléphone :');
+      expect(texte(tester, 'drive-client-web-id'), id);
+      expect(cle('drive-connecter'), findsOneWidget);
+
+      await saisirEtEnregistrer(tester, autreId);
+
+      expect(env.compteGoogle.idEnregistre, autreId);
+      expect(texte(tester, 'drive-client-web-id'), autreId);
+
+      await env.fermer(tester);
+    });
+
+    testWidgets('« Oublier l’ID enregistré » : la connexion n’est plus configurée', (WidgetTester tester) async {
+      final EnvironnementTest env = await EnvironnementTest.creer(tester);
+      env.compteGoogle.configure = false;
+      await ouvrirEcran(tester, env);
+      await saisirEtEnregistrer(tester, id);
+      expect(cle('drive-connecter'), findsOneWidget);
+
+      await toucher(tester, cle('drive-client-web-oublier'));
+
+      expect(env.compteGoogle.idEnregistre, isNull);
+      expect(cle('drive-non-configure'), findsOneWidget);
+      expect(cle('drive-connecter'), findsNothing);
+      expect(cle('drive-client-web-oublier'), findsNothing);
+      expect(tester.widget<TextField>(cle('drive-client-web-champ')).controller!.text, isEmpty);
+
+      await env.fermer(tester);
+    });
+
+    testWidgets('un ID fourni avec l’application est annoncé comme tel, sans bouton pour l’oublier', (
+      WidgetTester tester,
+    ) async {
+      final EnvironnementTest env = await EnvironnementTest.creer(tester);
+      await ouvrirEcran(tester, env); // configuré d'origine, rien d'enregistré
+
+      expect(texte(tester, 'drive-client-web-etat'), 'ID fourni avec l’application :');
+      expect(tester.widget<TextField>(cle('drive-client-web-champ')).controller!.text, isEmpty);
+      expect(cle('drive-client-web-oublier'), findsNothing);
+      expect(cle('drive-connecter'), findsOneWidget);
+
+      await env.fermer(tester);
+    });
+
+    testWidgets('un nouvel ID qui demande de relancer l’application le dit', (WidgetTester tester) async {
+      final EnvironnementTest env = await EnvironnementTest.creer(tester);
+      env.compteGoogle.redemarrageNecessaire = true;
+      await ouvrirEcran(tester, env);
+
+      expect(texte(tester, 'drive-client-web-redemarrage'), startsWith('Fermez complètement l’application'));
+
+      await saisirEtEnregistrer(tester, id);
+
+      expect(texte(tester, 'drive-client-web-ok'), contains('fermez complètement l’application'));
+      expect(cle('drive-client-web-redemarrage'), findsNothing);
 
       await env.fermer(tester);
     });

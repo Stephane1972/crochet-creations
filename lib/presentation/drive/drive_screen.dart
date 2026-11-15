@@ -9,6 +9,7 @@ import '../../data/drive/service_sauvegarde_drive.dart';
 import '../../data/providers.dart';
 import '../../domain/drive_envoi.dart';
 import '../../domain/drive_sauvegardes.dart';
+import '../../domain/id_client_google.dart';
 import '../../domain/pieces_jointes.dart';
 import 'drive_providers.dart';
 
@@ -30,6 +31,7 @@ class DriveScreen extends ConsumerWidget {
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: <Widget>[
           const _CarteConnexion(),
+          if (!connecte) ...<Widget>[const SizedBox(height: 12), const _CarteClientWeb()],
           if (connecte) ...<Widget>[
             const SizedBox(height: 12),
             const _CarteEnvoi(),
@@ -108,7 +110,7 @@ class _CarteConnexionState extends ConsumerState<_CarteConnexion> {
 
   @override
   Widget build(BuildContext context) {
-    final bool configure = ref.watch(compteGoogleProvider).configure;
+    final bool configure = ref.watch(clientWebProvider).configure;
     final AsyncValue<ProfilGoogle?> profil = ref.watch(profilGoogleProvider);
     final bool occupe = ref.watch(envoiDriveProvider).occupe || ref.watch(sauvegardeDriveProvider).occupe;
 
@@ -117,7 +119,7 @@ class _CarteConnexionState extends ConsumerState<_CarteConnexion> {
         titre: 'Connexion à Google',
         enfants: <Widget>[
           Text(
-            'La connexion à Google n’est pas encore configurée dans cette version de l’application.',
+            'La connexion à Google n’est pas encore configurée : renseignez l’ID client Web dans la carte ci-dessous.',
             key: const Key('drive-non-configure'),
             style: Theme.of(context).textTheme.bodyMedium,
           ),
@@ -198,6 +200,152 @@ class _CarteConnexionState extends ConsumerState<_CarteConnexion> {
           key: const Key('drive-deconnecter'),
           onPressed: occupe ? null : () => ref.read(profilGoogleProvider.notifier).seDeconnecter(),
           child: const Text('Se déconnecter'),
+        ),
+      ],
+    );
+  }
+}
+
+/// L'ID client Web du projet Google Cloud, à coller ici : il évite de reconstruire l'application pour le lui donner.
+class _CarteClientWeb extends ConsumerStatefulWidget {
+  const _CarteClientWeb();
+
+  @override
+  ConsumerState<_CarteClientWeb> createState() => _CarteClientWebState();
+}
+
+class _CarteClientWebState extends ConsumerState<_CarteClientWeb> {
+  late final TextEditingController _champ;
+  String? _erreur;
+  bool _enregistre = false;
+  bool _occupe = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final EtatClientWeb etat = ref.read(clientWebProvider);
+    _champ = TextEditingController(text: etat.surLeTelephone ? etat.id : '');
+  }
+
+  @override
+  void dispose() {
+    _champ.dispose();
+    super.dispose();
+  }
+
+  Future<void> _enregistrer() async {
+    setState(() {
+      _occupe = true;
+      _erreur = null;
+      _enregistre = false;
+    });
+    final String? erreur = await ref.read(clientWebProvider.notifier).enregistrer(_champ.text);
+    if (!mounted) return;
+    setState(() {
+      _occupe = false;
+      _erreur = erreur;
+      _enregistre = erreur == null;
+      if (erreur == null) _champ.text = ref.read(clientWebProvider).id;
+    });
+  }
+
+  Future<void> _oublier() async {
+    setState(() {
+      _occupe = true;
+      _erreur = null;
+      _enregistre = false;
+    });
+    final String? erreur = await ref.read(clientWebProvider.notifier).oublier();
+    if (!mounted) return;
+    setState(() {
+      _occupe = false;
+      _erreur = erreur;
+      if (erreur == null) _champ.clear();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final EtatClientWeb etat = ref.watch(clientWebProvider);
+    final ThemeData theme = Theme.of(context);
+
+    return _Carte(
+      titre: 'ID client Web Google',
+      enfants: <Widget>[
+        Text(
+          etat.configure
+              ? (etat.surLeTelephone ? 'ID enregistré sur ce téléphone :' : 'ID fourni avec l’application :')
+              : 'Aucun ID client Web n’est enregistré : la connexion à Google est impossible.',
+          key: const Key('drive-client-web-etat'),
+          style: theme.textTheme.bodyMedium,
+        ),
+        if (etat.configure) ...<Widget>[
+          const SizedBox(height: 4),
+          Text(etat.id, key: const Key('drive-client-web-id'), style: theme.textTheme.bodySmall),
+        ],
+        const SizedBox(height: 8),
+        _texteDiscret(
+          context,
+          'Dans la console Google Cloud : API et services → Identifiants → l’accès de type « Application Web » → copiez '
+          'l’« ID client » (il se termine par $suffixeIdClientGoogle) et collez-le ici. Ce n’est pas un secret ; ne collez '
+          'jamais le « code secret ».',
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          key: const Key('drive-client-web-champ'),
+          controller: _champ,
+          enabled: !_occupe,
+          minLines: 1,
+          maxLines: 3,
+          autocorrect: false,
+          enableSuggestions: false,
+          decoration: const InputDecoration(
+            labelText: 'ID client Web',
+            hintText: '123456789012-xxxxxxxx$suffixeIdClientGoogle',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        if (_erreur != null) ...<Widget>[
+          const SizedBox(height: 8),
+          _texteErreur(context, _erreur!, key: const Key('drive-client-web-erreur')),
+        ],
+        if (_enregistre) ...<Widget>[
+          const SizedBox(height: 8),
+          Text(
+            etat.redemarrageNecessaire
+                ? 'ID enregistré. Pour qu’il soit pris en compte, fermez complètement l’application (retirez-la des '
+                      'applications récentes), puis rouvrez-la.'
+                : 'ID enregistré. Vous pouvez vous connecter à Google.',
+            key: const Key('drive-client-web-ok'),
+            style: theme.textTheme.bodyMedium,
+          ),
+        ] else if (etat.redemarrageNecessaire) ...<Widget>[
+          const SizedBox(height: 8),
+          _texteErreur(
+            context,
+            'Fermez complètement l’application (retirez-la des applications récentes), puis rouvrez-la : le nouvel ID '
+            'sera alors pris en compte.',
+            key: const Key('drive-client-web-redemarrage'),
+          ),
+        ],
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: <Widget>[
+            FilledButton.icon(
+              key: const Key('drive-client-web-enregistrer'),
+              onPressed: _occupe ? null : _enregistrer,
+              icon: const Icon(Icons.save_outlined),
+              label: const Text('Enregistrer l’ID'),
+            ),
+            if (etat.surLeTelephone)
+              TextButton(
+                key: const Key('drive-client-web-oublier'),
+                onPressed: _occupe ? null : _oublier,
+                child: const Text('Oublier l’ID enregistré'),
+              ),
+          ],
         ),
       ],
     );

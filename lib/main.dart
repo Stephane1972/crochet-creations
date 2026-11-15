@@ -13,6 +13,7 @@ import 'data/drive/client_drive.dart';
 import 'data/drive/compte_google.dart';
 import 'data/drive/service_drive.dart';
 import 'data/drive/service_sauvegarde_drive.dart';
+import 'data/drive/stockage_client_web.dart';
 import 'data/providers.dart';
 import 'data/repositories/parametres_repository.dart';
 import 'data/sauvegarde/espace_libre.dart';
@@ -69,7 +70,15 @@ Future<void> main() async {
 
     // Google Drive (étape 6) : envoi à la demande des photos, factures, devis et pièces jointes. Le dernier bilan est un
     // petit fichier à part (hors de la base et de la sauvegarde).
-    final CompteGoogleReel compteGoogle = CompteGoogleReel();
+    // L'ID client Web saisi dans l'écran Google Drive est un petit fichier du téléphone, relu à chaque lancement.
+    final String dossierDrive = '${documents.path}${Platform.pathSeparator}drive';
+    final StockageClientWeb stockageClientWeb = StockageClientWeb(
+      File('$dossierDrive${Platform.pathSeparator}client_web.txt'),
+    );
+    final CompteGoogleReel compteGoogle = CompteGoogleReel(
+      stockage: stockageClientWeb,
+      clientWebEnregistre: await stockageClientWeb.lire(),
+    );
     final ServiceDrive drive = ServiceDrive(
       client: ClientDriveGoogle(compteGoogle),
       dossiers: <DossierDrive, Directory>{
@@ -83,7 +92,6 @@ Future<void> main() async {
 
     // Google Drive (étape 7) : sauvegardes des données sur Drive et restauration. Le réglage « envoi automatique » et le dernier
     // bilan sont, eux aussi, de petits fichiers à part ; les téléchargements de travail passent par un dossier provisoire.
-    final String dossierDrive = '${documents.path}${Platform.pathSeparator}drive';
     final ServiceSauvegardeDrive sauvegardeDrive = ServiceSauvegardeDrive(
       client: ClientDriveGoogle(compteGoogle),
       envoi: drive,

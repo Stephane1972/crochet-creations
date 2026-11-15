@@ -45,6 +45,63 @@ class ProfilGoogleNotifier extends AsyncNotifier<ProfilGoogle?> {
   void connexionPerdue() => state = const AsyncData<ProfilGoogle?>(null);
 }
 
+/// L'ID client Web de Google Cloud utilisé par l'application (voir `google_config.dart`) : ce que la personne a saisi dans
+/// l'écran Google Drive, sinon celui qui a été fourni avec l'application.
+class EtatClientWeb {
+  const EtatClientWeb({required this.id, required this.surLeTelephone, required this.redemarrageNecessaire});
+
+  /// L'ID utilisé (vide : aucun, la connexion à Google est alors impossible).
+  final String id;
+
+  /// Vrai si cet ID a été saisi dans l'application.
+  final bool surLeTelephone;
+
+  /// Vrai si l'application doit être fermée complètement, puis rouverte, pour prendre en compte le nouvel ID.
+  final bool redemarrageNecessaire;
+
+  bool get configure => id.isNotEmpty;
+}
+
+final clientWebProvider = NotifierProvider<ClientWebNotifier, EtatClientWeb>(ClientWebNotifier.new);
+
+class ClientWebNotifier extends Notifier<EtatClientWeb> {
+  @override
+  EtatClientWeb build() => _lire();
+
+  EtatClientWeb _lire() {
+    final CompteGoogle compte = ref.read(compteGoogleProvider);
+    return EtatClientWeb(
+      id: compte.clientWeb,
+      surLeTelephone: compte.clientWebEnregistre,
+      redemarrageNecessaire: compte.redemarrageNecessaire,
+    );
+  }
+
+  /// Enregistre l'ID collé. Retourne `null` si c'est fait, sinon le message à montrer.
+  Future<String?> enregistrer(String saisie) async {
+    try {
+      await ref.read(compteGoogleProvider).enregistrerClientWeb(saisie);
+    } on ErreurDrive catch (erreur) {
+      return erreur.message;
+    } catch (erreur) {
+      return 'Enregistrement impossible : $erreur';
+    }
+    state = _lire();
+    return null;
+  }
+
+  /// Oublie l'ID enregistré sur le téléphone. Retourne `null` si c'est fait, sinon le message à montrer.
+  Future<String?> oublier() async {
+    try {
+      await ref.read(compteGoogleProvider).oublierClientWeb();
+    } catch (erreur) {
+      return 'Impossible d’oublier l’ID : $erreur';
+    }
+    state = _lire();
+    return null;
+  }
+}
+
 /// Le bilan du dernier envoi (`null` : aucun envoi pour l'instant).
 final dernierBilanDriveProvider = FutureProvider.autoDispose<RapportEnvoi?>(
   (ref) => ref.watch(serviceDriveProvider).dernierBilan(),

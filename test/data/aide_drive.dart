@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:crochet_creations/data/drive/client_drive.dart';
 import 'package:crochet_creations/data/drive/compte_google.dart';
 import 'package:crochet_creations/domain/drive_envoi.dart';
+import 'package:crochet_creations/domain/id_client_google.dart';
 
 /// Fausse connexion à Google, pour les tests : aucun réseau, aucune fenêtre.
 class FauxCompteGoogle implements CompteGoogle {
@@ -10,6 +11,42 @@ class FauxCompteGoogle implements CompteGoogle {
 
   @override
   bool configure;
+
+  /// L'ID client Web saisi dans l'application (`null` : aucun), et ce qu'on avait avant de le saisir.
+  String? idEnregistre;
+  bool? _configureAvant;
+
+  /// Vrai pour simuler un ID qu'il faut fermer complètement l'application pour prendre en compte.
+  @override
+  bool redemarrageNecessaire = false;
+
+  /// Si défini, `enregistrerClientWeb` échoue avec cette erreur.
+  ErreurDrive? erreurDEnregistrement;
+
+  @override
+  String get clientWeb => configure ? (idEnregistre ?? 'fourni-123456$suffixeIdClientGoogle') : '';
+
+  @override
+  bool get clientWebEnregistre => idEnregistre != null;
+
+  @override
+  Future<void> enregistrerClientWeb(String saisie) async {
+    final ErreurDrive? erreur = erreurDEnregistrement;
+    if (erreur != null) throw erreur;
+    final String id = nettoyerIdClientWeb(saisie);
+    final String? probleme = erreurIdClientWeb(id);
+    if (probleme != null) throw ErreurDrive(probleme);
+    _configureAvant ??= configure;
+    idEnregistre = id;
+    configure = true;
+  }
+
+  @override
+  Future<void> oublierClientWeb() async {
+    idEnregistre = null;
+    configure = _configureAvant ?? configure;
+    _configureAvant = null;
+  }
 
   /// Le compte que `restaurer` retrouve au lancement (`null` : personne n'est connecté).
   ProfilGoogle? dejaConnecte;

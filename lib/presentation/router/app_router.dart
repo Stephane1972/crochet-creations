@@ -14,6 +14,7 @@ import '../devis/devis_conversion_screen.dart';
 import '../devis/devis_detail_screen.dart';
 import '../devis/devis_form_screen.dart';
 import '../devis/devis_screen.dart';
+import '../drive/drive_restauration_screen.dart';
 import '../drive/drive_screen.dart';
 import '../entreprise/mon_entreprise_screen.dart';
 import '../factures/facture_detail_screen.dart';
@@ -54,6 +55,8 @@ abstract final class AppRouter {
         return _page(settings, const SauvegardeScreen());
       case AppRoutes.drive:
         return _page(settings, const DriveScreen());
+      case AppRoutes.driveRestauration:
+        return _page(settings, const DriveRestaurationScreen());
       case AppRoutes.categories:
         return _page(settings, const CategoriesScreen());
       case AppRoutes.lieuxVente:

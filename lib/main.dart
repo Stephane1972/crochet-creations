@@ -12,6 +12,7 @@ import 'data/database/app_database.dart';
 import 'data/drive/client_drive.dart';
 import 'data/drive/compte_google.dart';
 import 'data/drive/service_drive.dart';
+import 'data/drive/service_sauvegarde_drive.dart';
 import 'data/providers.dart';
 import 'data/repositories/parametres_repository.dart';
 import 'data/sauvegarde/espace_libre.dart';
@@ -22,6 +23,7 @@ import 'data/stockage/stockage_photos.dart';
 import 'data/stockage/stockage_pieces_jointes.dart';
 import 'domain/drive_envoi.dart';
 import 'presentation/common/photo_retrouvee.dart';
+import 'presentation/drive/drive_providers.dart';
 import 'presentation/startup/erreur_demarrage_app.dart';
 
 Future<void> main() async {
@@ -79,42 +81,58 @@ Future<void> main() async {
       fichierBilan: File('${documents.path}${Platform.pathSeparator}drive${Platform.pathSeparator}dernier_envoi.json'),
     );
 
+    // Google Drive (étape 7) : sauvegardes des données sur Drive et restauration. Le réglage « envoi automatique » et le dernier
+    // bilan sont, eux aussi, de petits fichiers à part ; les téléchargements de travail passent par un dossier provisoire.
+    final String dossierDrive = '${documents.path}${Platform.pathSeparator}drive';
+    final ServiceSauvegardeDrive sauvegardeDrive = ServiceSauvegardeDrive(
+      client: ClientDriveGoogle(compteGoogle),
+      envoi: drive,
+      sauvegarde: sauvegarde,
+      dossierTravail: Directory('$dossierDrive${Platform.pathSeparator}travail'),
+      fichierEtat: File('$dossierDrive${Platform.pathSeparator}sauvegardes_drive.json'),
+    );
+
     // Photo prise juste avant qu'Android ferme l'application (rare) : retrouvée une seule fois, ici, puis proposée
     // dans la feuille de choix de photo.
     final String? photoRetrouvee = await SelecteurPhotoSysteme().retrouverPhotoPerdue();
 
-    runApp(
-      ProviderScope(
-        overrides: [
-          photoRetrouveeInitialeProvider.overrideWithValue(photoRetrouvee),
-          appDatabaseProvider.overrideWithValue(base),
-          stockagePhotosProvider.overrideWithValue(photos),
-          stockageFacturesProvider.overrideWithValue(factures),
-          stockageDevisProvider.overrideWithValue(devis),
-          stockagePiecesJointesProvider.overrideWithValue(piecesJointes),
-          serviceSauvegardeProvider.overrideWithValue(sauvegarde),
-          compteGoogleProvider.overrideWithValue(compteGoogle),
-          serviceDriveProvider.overrideWithValue(drive),
-          modeThemeInitialProvider.overrideWithValue(modeInitial),
-          modeThemeStoreProvider.overrideWithValue(parametres),
-        ],
-        child: const CrochetApp(),
-      ),
+    final ProviderContainer conteneur = ProviderContainer(
+      overrides: [
+        photoRetrouveeInitialeProvider.overrideWithValue(photoRetrouvee),
+        appDatabaseProvider.overrideWithValue(base),
+        stockagePhotosProvider.overrideWithValue(photos),
+        stockageFacturesProvider.overrideWithValue(factures),
+        stockageDevisProvider.overrideWithValue(devis),
+        stockagePiecesJointesProvider.overrideWithValue(piecesJointes),
+        serviceSauvegardeProvider.overrideWithValue(sauvegarde),
+        compteGoogleProvider.overrideWithValue(compteGoogle),
+        serviceDriveProvider.overrideWithValue(drive),
+        serviceSauvegardeDriveProvider.overrideWithValue(sauvegardeDrive),
+        modeThemeInitialProvider.overrideWithValue(modeInitial),
+        modeThemeStoreProvider.overrideWithValue(parametres),
+      ],
     );
+    runApp(UncontrolledProviderScope(container: conteneur, child: const CrochetApp()));
 
     // Sauvegarde automatique : si la dernière date d'un jour ou plus. En arrière-plan, après l'affichage du
-    // premier écran : elle ne retarde pas le démarrage, et un échec ne gêne jamais l'utilisation.
-    unawaited(_sauvegardeAutomatique(sauvegarde));
+    // premier écran : elle ne retarde pas le démarrage, et un échec ne gêne jamais l'utilisation. Ensuite, l'envoi
+    // automatique vers Drive (désactivé au départ) : au plus une fois par jour, seulement si Google est connecté.
+    unawaited(_sauvegardesAutomatiques(sauvegarde, conteneur));
   } catch (erreur, pile) {
     debugPrint('Ouverture de la base impossible : $erreur\n$pile');
     runApp(ErreurDemarrageApp(erreur: erreur));
   }
 }
 
-Future<void> _sauvegardeAutomatique(ServiceSauvegarde sauvegarde) async {
+Future<void> _sauvegardesAutomatiques(ServiceSauvegarde sauvegarde, ProviderContainer conteneur) async {
   try {
     await sauvegarde.sauvegarderAutomatiquementSiBesoin();
   } catch (erreur, pile) {
     debugPrint('Sauvegarde automatique impossible : $erreur\n$pile');
+  }
+  try {
+    await conteneur.read(sauvegardeDriveProvider.notifier).lancerSiBesoin();
+  } catch (erreur, pile) {
+    debugPrint('Envoi automatique vers Drive impossible : $erreur\n$pile');
   }
 }

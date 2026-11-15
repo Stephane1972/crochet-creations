@@ -193,10 +193,17 @@ Les noms ci-dessous sont ceux de la console Google Cloud (en français ou en ang
    → **Créer**.
 8. **Créer l'accès « Application Web »** : **Clients** → **Créer un client** → type **Application Web** → nom « Web » → **Créer**.
    Copier l'**ID client** affiché (il se termine par `.apps.googleusercontent.com`). Ignorer le « code secret » : il ne sert pas ici.
-9. **Donner l'ID client Web à l'application** : il est écrit dans `lib/core/constants/google_config.dart` (constante
-   `_clientWebParDefaut`) ; envoyez-le-moi et je le fais, ou, pour une construction locale, ajoutez
-   `--dart-define=GOOGLE_WEB_CLIENT_ID=VOTRE_ID` à `flutter run` / `flutter build`. Ce n'est **pas un secret** : il est visible dans toute
-   application Android qui utilise Google. Ne publiez en revanche jamais un « code secret » ni un fichier de clé.
+9. **Donner l'ID client Web à l'application** : le plus simple est de le **coller dans l'application**, sans nouvelle version :
+   *Réglages → Google Drive → carte « ID client Web Google »* → coller l'ID → **Enregistrer l'ID**, puis *Se connecter à Google*.
+   L'application nettoie ce qui est collé (espaces, retours à la ligne, guillemets), vérifie qu'il a la forme d'un ID client
+   (`…apps.googleusercontent.com`) et **refuse un « code secret »** (`GOCSPX-…`). L'ID est gardé sur le téléphone (un petit fichier, hors de la
+   base et des sauvegardes : après un changement de téléphone, il est à coller de nouveau). *Oublier l'ID enregistré* revient à celui fourni
+   avec l'application, s'il y en a un. Si l'on corrige un ID **après** avoir essayé de se connecter, Google ne se laisse configurer qu'une fois
+   par lancement : l'application demande alors de la fermer complètement (la retirer des applications récentes), puis de la rouvrir.
+   Autres façons de le donner : l'écrire dans `lib/core/constants/google_config.dart` (constante `_clientWebParDefaut`) ou, pour une
+   construction locale, ajouter `--dart-define=GOOGLE_WEB_CLIENT_ID=VOTRE_ID` à `flutter run` / `flutter build`. L'ID saisi dans l'application
+   passe avant celui fourni avec elle. Ce n'est **pas un secret** : il est visible dans toute application Android qui utilise Google. Ne
+   publiez en revanche jamais un « code secret » ni un fichier de clé.
 
 **Si la connexion échoue** : l'écran *Google Drive* affiche la raison. Les causes habituelles sont (a) le **nom du package** ou
 l'**empreinte SHA-1** de l'accès Android qui ne correspondent pas à l'APK installé (recopier la SHA-1 des notes de la pré-version,

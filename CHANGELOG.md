@@ -28,6 +28,12 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
   retour à l'accueil. Pas de réseau : **rien n'est modifié**, on recommence. Fichier absent de Drive, de taille différente ou abîmé : il
   n'est pas remis en place et la fin de la restauration le signale (un PDF qui peut être refait n'est pas signalé).
 - **Tout est gardé sur Drive** : l'application n'efface aucune sauvegarde (toujours aucune suppression ni aucun partage sur Drive).
+- **L'ID client Web de Google se colle dans l'application** (*Réglages → Google Drive → carte « ID client Web Google »*) : plus besoin de
+  reconstruire l'application pour le lui donner. Il est nettoyé (espaces, retours à la ligne, guillemets), vérifié (forme d'un ID client
+  `…apps.googleusercontent.com`), **un « code secret » (`GOCSPX-…`) est refusé**, et il est gardé dans un petit fichier du téléphone
+  (`drive/client_web.txt`, hors de la base et des sauvegardes). Il passe avant celui fourni avec l'application ; *Oublier l'ID enregistré*
+  revient à ce dernier. Corriger un ID après un essai de connexion demande de relancer l'application (Google ne se configure qu'une fois par
+  lancement) : l'écran le dit.
 - Le **téléchargement** d'un fichier Drive (écrit dans un fichier provisoire, taille vérifiée, puis renommé) rejoint le client Drive.
 
 ### Modifié
@@ -35,7 +41,7 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
   Restaurer depuis Drive*. Les sauvegardes locales (archives complètes) ne changent pas.
 - Le service de sauvegarde sépare la lecture / l'écriture des données seules et réutilise, pour la restauration, le même remplacement
   transactionnel (copie de sécurité, base, fichiers) que la restauration locale.
-- Le numéro de version passe à 0.21.0 (build 24). La mention « en attente de validation » est retirée du titre de la version 0.20.0
+- Le numéro de version passe à 0.21.0 (build 25). La mention « en attente de validation » est retirée du titre de la version 0.20.0
   (étape 6 validée et fusionnée).
 
 ### Inchangé volontairement

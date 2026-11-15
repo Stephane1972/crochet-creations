@@ -114,6 +114,7 @@ crochet-creations/
 │   │   ├── partage/service_documents.dart    partage (share_plus) et impression (printing), remplaçables en test
 │   │   ├── drive/
 │   │   │   ├── compte_google.dart            connexion au compte Google (interface CompteGoogle + google_sign_in), erreurs lisibles (ErreurDrive)
+│   │   │   ├── stockage_client_web.dart      l'ID client Web saisi dans l'application, gardé dans un petit fichier (drive/client_web.txt)
 │   │   │   ├── client_drive.dart             opérations Drive : trouver / créer un dossier, lister, envoyer en flux (interface ClientDrive + API Drive v3)
 │   │   │   ├── service_drive.dart            vérifier et envoyer à la demande, arrêt, bilan du dernier envoi gardé dans un petit fichier
 │   │   │   └── service_sauvegarde_drive.dart sauvegarder les données sur Drive (données seules + liste des fichiers), envoi automatique, restaurer depuis Drive
@@ -1065,8 +1066,11 @@ supprimer ni partager** ; **Drive est la mémoire** (aucun registre de « ce qui
 - `domain/drive_envoi.dart` (sans réseau ni fichier) : `DossierDrive` (les quatre dossiers : nom sur le téléphone — celui de l'archive de
   sauvegarde —, nom sur Drive, et si on compare le contenu), `planifierEnvoi` (compare les fichiers du téléphone à ceux de Drive),
   `RapportEnvoi` / `ErreurEnvoi` (le bilan, en JSON), `porteeDrive` (`drive.file`), `nomDossierRacineDrive`.
-- `data/drive/compte_google.dart` : `CompteGoogle` (`configure`, `restaurer`, `seConnecter`, `seDeconnecter`, `jetonAcces`,
-  `invaliderJeton`) et `CompteGoogleReel` (`google_sign_in` 7 : `initialize(serverClientId)`, `authenticate()`, puis
+- `domain/id_client_google.dart` : `nettoyerIdClientWeb` (espaces, retours à la ligne, guillemets) et `erreurIdClientWeb` (forme d'un ID
+  client `…apps.googleusercontent.com` ; refuse un « code secret » `GOCSPX-…`). `data/drive/stockage_client_web.dart` : `StockageClientWeb`
+  (lire / écrire en passant par un fichier provisoire / effacer ; un contenu qui n'a pas la forme d'un ID est ignoré).
+- `data/drive/compte_google.dart` : `CompteGoogle` (`configure`, `clientWeb`, `clientWebEnregistre`, `redemarrageNecessaire`,
+  `enregistrerClientWeb`, `oublierClientWeb`, `restaurer`, `seConnecter`, `seDeconnecter`, `jetonAcces`, `invaliderJeton`) et `CompteGoogleReel` (`google_sign_in` 7 : `initialize(serverClientId)`, `authenticate()`, puis
   `authorizeScopes([drive.file])` ; le jeton d'accès est gardé 30 minutes). `ErreurDrive` porte un **message lisible tel quel**, avec deux
   drapeaux : `autorisationAExpire` (inutile de réessayer : se reconnecter) et `annulee` (la personne a fermé la fenêtre : pas une panne).
 - `data/drive/client_drive.dart` : `ClientDrive` (`trouverDossier`, `creerDossier`, `lister`, `envoyer`) — **aucune méthode de
@@ -1107,8 +1111,12 @@ progression n'est rafraîchie qu'au plus toutes les 150 ms. Les éléments porte
 
 `main.dart` construit `CompteGoogleReel`, `ClientDriveGoogle` et `ServiceDrive` (les quatre dossiers de fichiers, le fichier du bilan) et
 les fournit par `compteGoogleProvider` et `serviceDriveProvider`, que les tests remplacent par un faux compte et un faux Drive en mémoire.
-`core/constants/google_config.dart` porte l'**ID client Web** (`--dart-define=GOOGLE_WEB_CLIENT_ID` ou la constante du fichier) : tant qu'il
-est vide, `CompteGoogle.configure` est faux et l'écran explique que Google n'est pas configuré, sans rien casser. `tool/setup_android.sh`
+`core/constants/google_config.dart` porte l'**ID client Web** fourni avec l'application (`--dart-define=GOOGLE_WEB_CLIENT_ID` ou la constante
+du fichier) ; celui que la personne **colle dans l'écran Google Drive** passe avant (`StockageClientWeb`, relu par `main.dart` à chaque
+lancement et donné à `CompteGoogleReel`). `google_sign_in.initialize` n'est appelé qu'une fois par lancement : si l'ID change après cet
+appel, `redemarrageNecessaire` est vrai et `seConnecter` demande de relancer l'application. Tant qu'il n'y a aucun ID,
+`CompteGoogle.configure` est faux et l'écran explique que Google n'est pas configuré, sans rien casser (`clientWebProvider` rafraîchit
+l'écran quand l'ID est enregistré). `tool/setup_android.sh`
 ajoute la permission `INTERNET` au manifeste (`flutter create` ne la déclare que pour le débogage). La configuration Google Cloud (projet,
 API Drive, écran de consentement avec le seul droit `drive.file`, accès Android et Web) est décrite dans le README.
 

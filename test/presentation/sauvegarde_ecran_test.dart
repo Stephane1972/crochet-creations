@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -386,6 +387,29 @@ void main() {
     final Uint8List octets = await env.travailler(tester, () => File(chemin).readAsBytes());
     final Archive archive = ZipDecoder().decodeBytes(octets);
     expect(archive.files.map((f) => f.name).toList(), ExportCsv.fichiers);
+
+    await env.fermer(tester);
+  });
+
+  testWidgets('exporter le catalogue partage un .zip avec les produits, sans coûts ni stocks', (WidgetTester tester) async {
+    final EnvironnementTest env = await EnvironnementTest.creer(tester);
+    await env.creerProduit(tester);
+    await ouvrirEcran(tester, env);
+
+    expect(find.byKey(const Key('exporter-catalogue')), findsOneWidget);
+    await toucher(tester, dansEcran(find.text('Exporter le catalogue (produits et photos)')));
+    await attendreJusqua(tester, () => env.partageFichiers.partages.isNotEmpty, essais: 400);
+
+    expect(env.partageFichiers.partages, <String>[
+      'crochet-creations-catalogue-2026-10-31.zip | application/zip | Catalogue – Un p’tit crochet dans les stocks',
+    ]);
+    final String chemin = env.partageFichiers.cheminsPartages.single;
+    final Uint8List octets = await env.travailler(tester, () => File(chemin).readAsBytes());
+    final Archive archive = ZipDecoder().decodeBytes(octets);
+    expect(archive.files.map((f) => f.name).toSet(), <String>{'LISEZMOI.txt', 'catalogue.csv', 'catalogue.json'});
+    final String csv = utf8.decode(archive.find('catalogue.csv')!.content);
+    expect(csv, contains('Doudou lapin'));
+    expect(csv.split('\r\n').first, isNot(contains('Stock')));
 
     await env.fermer(tester);
   });

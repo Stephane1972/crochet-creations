@@ -12,13 +12,15 @@ import '../../domain/drive_sauvegardes.dart';
 import '../../domain/id_client_google.dart';
 import '../../domain/pieces_jointes.dart';
 import 'drive_providers.dart';
+import 'drive_widgets.dart';
 
 /// Réglages › Google Drive : se connecter à Google (étape 6), vérifier ce qui est déjà sur Drive, envoyer à la demande les
 /// photos des produits, les factures, les devis et les pièces jointes des notes, et voir le bilan du dernier envoi ; sauvegarder
 /// les données sur Drive, à la demande ou automatiquement une fois par jour, et les restaurer (étape 7).
 ///
-/// L'envoi ne fait que **copier** : l'application ne supprime ni ne partage rien sur Drive. Rien ne part tout seul, sauf si
-/// l'envoi automatique des sauvegardes est activé (il est désactivé au départ).
+/// L'envoi ne fait que **copier** : l'application ne supprime rien sur Drive et ne partage rien d'elle-même. Rien ne part tout
+/// seul, sauf si l'envoi automatique des sauvegardes est activé (il est désactivé au départ). Le partage (étape 8) se fait
+/// dans l'écran « Partages », fichier par fichier, à la demande de la personne.
 class DriveScreen extends ConsumerWidget {
   const DriveScreen({super.key});
 
@@ -37,6 +39,8 @@ class DriveScreen extends ConsumerWidget {
             const _CarteEnvoi(),
             const SizedBox(height: 12),
             const _CarteSauvegardes(),
+            const SizedBox(height: 12),
+            const _CartePartages(),
           ],
           const SizedBox(height: 12),
           const _CarteDernierEnvoi(),
@@ -47,44 +51,6 @@ class DriveScreen extends ConsumerWidget {
 }
 
 String _pluriel(int n, String singulier, [String? pluriel]) => '$n ${n > 1 ? (pluriel ?? '${singulier}s') : singulier}';
-
-class _Carte extends StatelessWidget {
-  const _Carte({required this.titre, required this.enfants});
-
-  final String titre;
-  final List<Widget> enfants;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(titre, style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            ...enfants,
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-Text _texteDiscret(BuildContext context, String texte, {Key? key}) {
-  final ThemeData theme = Theme.of(context);
-  return Text(
-    texte,
-    key: key,
-    style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-  );
-}
-
-Text _texteErreur(BuildContext context, String texte, {Key? key}) {
-  final ThemeData theme = Theme.of(context);
-  return Text(texte, key: key, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.error));
-}
 
 // -----------------------------------------------------------------------------
 // Connexion
@@ -115,7 +81,7 @@ class _CarteConnexionState extends ConsumerState<_CarteConnexion> {
     final bool occupe = ref.watch(envoiDriveProvider).occupe || ref.watch(sauvegardeDriveProvider).occupe;
 
     if (!configure) {
-      return _Carte(
+      return CarteDrive(
         titre: 'Connexion à Google',
         enfants: <Widget>[
           Text(
@@ -124,7 +90,7 @@ class _CarteConnexionState extends ConsumerState<_CarteConnexion> {
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           const SizedBox(height: 8),
-          _texteDiscret(
+          texteDiscretDrive(
             context,
             'Il s’agit d’une configuration unique et gratuite sur Google Cloud (environ 15 minutes) : elle est expliquée '
             'pas à pas dans le guide « Google Drive » du fichier README du projet. L’application fonctionne normalement '
@@ -136,7 +102,7 @@ class _CarteConnexionState extends ConsumerState<_CarteConnexion> {
 
     final ProfilGoogle? connecte = profil.valueOrNull;
     if (profil.isLoading) {
-      return const _Carte(
+      return const CarteDrive(
         titre: 'Connexion à Google',
         enfants: <Widget>[
           Row(
@@ -152,19 +118,19 @@ class _CarteConnexionState extends ConsumerState<_CarteConnexion> {
     }
 
     if (connecte == null) {
-      return _Carte(
+      return CarteDrive(
         titre: 'Connexion à Google',
         enfants: <Widget>[
           const Text('Aucun compte Google n’est connecté.', key: Key('drive-non-connecte')),
           const SizedBox(height: 8),
-          _texteDiscret(
+          texteDiscretDrive(
             context,
             'Votre Drive reste privé : l’application ne demande que le droit de voir et de gérer les fichiers qu’elle '
-            'crée elle-même, jamais le reste de votre Drive. Elle ne supprime rien et ne partage rien.',
+            'crée elle-même, jamais le reste de votre Drive. Elle ne supprime rien et ne partage rien sans votre accord.',
           ),
           if (_erreur != null) ...<Widget>[
             const SizedBox(height: 8),
-            _texteErreur(context, _erreur!, key: const Key('drive-erreur-connexion')),
+            texteErreurDrive(context, _erreur!, key: const Key('drive-erreur-connexion')),
           ],
           const SizedBox(height: 12),
           FilledButton.icon(
@@ -177,7 +143,7 @@ class _CarteConnexionState extends ConsumerState<_CarteConnexion> {
       );
     }
 
-    return _Carte(
+    return CarteDrive(
       titre: 'Connexion à Google',
       enfants: <Widget>[
         Row(
@@ -194,7 +160,7 @@ class _CarteConnexionState extends ConsumerState<_CarteConnexion> {
           ],
         ),
         const SizedBox(height: 4),
-        _texteDiscret(context, 'Connecté. Les fichiers déjà envoyés restent sur Drive, même après une déconnexion.'),
+        texteDiscretDrive(context, 'Connecté. Les fichiers déjà envoyés restent sur Drive, même après une déconnexion.'),
         const SizedBox(height: 8),
         TextButton(
           key: const Key('drive-deconnecter'),
@@ -269,7 +235,7 @@ class _CarteClientWebState extends ConsumerState<_CarteClientWeb> {
     final EtatClientWeb etat = ref.watch(clientWebProvider);
     final ThemeData theme = Theme.of(context);
 
-    return _Carte(
+    return CarteDrive(
       titre: 'ID client Web Google',
       enfants: <Widget>[
         Text(
@@ -284,7 +250,7 @@ class _CarteClientWebState extends ConsumerState<_CarteClientWeb> {
           Text(etat.id, key: const Key('drive-client-web-id'), style: theme.textTheme.bodySmall),
         ],
         const SizedBox(height: 8),
-        _texteDiscret(
+        texteDiscretDrive(
           context,
           'Dans la console Google Cloud : API et services → Identifiants → l’accès de type « Application Web » → copiez '
           'l’« ID client » (il se termine par $suffixeIdClientGoogle) et collez-le ici. Ce n’est pas un secret ; ne collez '
@@ -307,7 +273,7 @@ class _CarteClientWebState extends ConsumerState<_CarteClientWeb> {
         ),
         if (_erreur != null) ...<Widget>[
           const SizedBox(height: 8),
-          _texteErreur(context, _erreur!, key: const Key('drive-client-web-erreur')),
+          texteErreurDrive(context, _erreur!, key: const Key('drive-client-web-erreur')),
         ],
         if (_enregistre) ...<Widget>[
           const SizedBox(height: 8),
@@ -321,7 +287,7 @@ class _CarteClientWebState extends ConsumerState<_CarteClientWeb> {
           ),
         ] else if (etat.redemarrageNecessaire) ...<Widget>[
           const SizedBox(height: 8),
-          _texteErreur(
+          texteErreurDrive(
             context,
             'Fermez complètement l’application (retirez-la des applications récentes), puis rouvrez-la : le nouvel ID '
             'sera alors pris en compte.',
@@ -402,7 +368,7 @@ class _CarteEnvoi extends ConsumerWidget {
         contenu.addAll(<Widget>[
           const LinearProgressIndicator(key: Key('drive-verification-en-cours')),
           const SizedBox(height: 8),
-          _texteDiscret(context, 'Comparaison du téléphone et de Drive…'),
+          texteDiscretDrive(context, 'Comparaison du téléphone et de Drive…'),
         ]);
       case PhaseEnvoi.verifie:
         contenu.addAll(<Widget>[_ResumeVerification(verification: etat.verification!), const SizedBox(height: 12), boutons]);
@@ -423,24 +389,24 @@ class _CarteEnvoi extends ConsumerWidget {
           ),
           if (arret != null) ...<Widget>[
             const SizedBox(height: 4),
-            _texteErreur(context, arret.message, key: const Key('drive-arret')),
+            texteErreurDrive(context, arret.message, key: const Key('drive-arret')),
           ],
           const SizedBox(height: 12),
           boutons,
         ]);
       case PhaseEnvoi.erreur:
         contenu.addAll(<Widget>[
-          _texteErreur(context, etat.erreur ?? 'Une erreur est survenue.', key: const Key('drive-erreur')),
+          texteErreurDrive(context, etat.erreur ?? 'Une erreur est survenue.', key: const Key('drive-erreur')),
           if (etat.autorisationAExpire) ...<Widget>[
             const SizedBox(height: 4),
-            _texteDiscret(context, 'Reconnectez-vous à Google (carte « Connexion à Google »), puis réessayez.'),
+            texteDiscretDrive(context, 'Reconnectez-vous à Google (carte « Connexion à Google »), puis réessayez.'),
           ],
           const SizedBox(height: 12),
           boutons,
         ]);
     }
 
-    return _Carte(titre: 'Envoyer sur Drive', enfants: contenu);
+    return CarteDrive(titre: 'Envoyer sur Drive', enfants: contenu);
   }
 }
 
@@ -514,10 +480,10 @@ class _Progression extends StatelessWidget {
             style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
           ),
         const SizedBox(height: 8),
-        _texteDiscret(context, 'Gardez l’application ouverte et l’écran allumé jusqu’à la fin.'),
+        texteDiscretDrive(context, 'Gardez l’application ouverte et l’écran allumé jusqu’à la fin.'),
         const SizedBox(height: 8),
         if (etat.arretDemande)
-          _texteDiscret(context, 'Arrêt demandé : l’envoi s’arrête à la fin du fichier en cours…', key: const Key('drive-arret-demande'))
+          texteDiscretDrive(context, 'Arrêt demandé : l’envoi s’arrête à la fin du fichier en cours…', key: const Key('drive-arret-demande'))
         else
           OutlinedButton.icon(
             key: const Key('drive-arreter'),
@@ -533,6 +499,31 @@ class _Progression extends StatelessWidget {
 // -----------------------------------------------------------------------------
 // Sauvegarde des données
 // -----------------------------------------------------------------------------
+
+/// Entrée vers l'écran « Partages » (étape 8).
+class _CartePartages extends StatelessWidget {
+  const _CartePartages();
+
+  @override
+  Widget build(BuildContext context) {
+    return CarteDrive(
+      titre: 'Partager des fichiers',
+      enfants: <Widget>[
+        const Text(
+          'Partagez une facture, un devis ou le catalogue des produits avec une personne précise, ou par un lien. '
+          'Rien n’est partagé sans votre accord, et vous pouvez arrêter un partage à tout moment.',
+        ),
+        const SizedBox(height: 12),
+        FilledButton.tonalIcon(
+          key: const Key('drive-partages'),
+          onPressed: () => Navigator.of(context).pushNamed(AppRoutes.drivePartages),
+          icon: const Icon(Icons.share_outlined),
+          label: const Text('Partager des fichiers…'),
+        ),
+      ],
+    );
+  }
+}
 
 class _CarteSauvegardes extends ConsumerWidget {
   const _CarteSauvegardes();
@@ -601,7 +592,7 @@ class _CarteSauvegardes extends ConsumerWidget {
     final BilanSauvegardeDrive? derniere = reglages?.derniere;
     if (derniere == null) {
       contenu.add(
-        _texteDiscret(
+        texteDiscretDrive(
           context,
           reglages == null && memoire.isLoading ? 'Lecture du réglage…' : 'Aucune sauvegarde sur Drive pour l’instant.',
           key: const Key('drive-aucune-sauvegarde'),
@@ -626,7 +617,7 @@ class _CarteSauvegardes extends ConsumerWidget {
       final DateTime? verification = reglages?.derniereVerification;
       if (verification != null && verification.isAfter(derniere.date)) {
         contenu.add(
-          _texteDiscret(
+          texteDiscretDrive(
             context,
             'Vérifiée le ${formatDateLongue(verification)} à ${formatHeure(verification)} : rien de neuf depuis.',
             key: const Key('drive-derniere-verification'),
@@ -640,7 +631,7 @@ class _CarteSauvegardes extends ConsumerWidget {
     if (nonEnvoyes.isNotEmpty) {
       contenu.addAll(<Widget>[
         const SizedBox(height: 6),
-        _texteErreur(
+        texteErreurDrive(
           context,
           '${_pluriel(nonEnvoyes.length, 'fichier n’a pas pu partir', 'fichiers n’ont pas pu partir')} sur Drive et '
           '${nonEnvoyes.length > 1 ? 'ne sont pas listés' : 'n’est pas listé'} dans la dernière sauvegarde '
@@ -674,28 +665,28 @@ class _CarteSauvegardes extends ConsumerWidget {
           ),
           if (arret != null) ...<Widget>[
             const SizedBox(height: 4),
-            _texteErreur(context, arret.message, key: const Key('drive-sauvegarde-arret')),
+            texteErreurDrive(context, arret.message, key: const Key('drive-sauvegarde-arret')),
           ],
           const SizedBox(height: 12),
           boutons,
         ]);
       case PhaseSauvegardeDrive.erreur:
         contenu.addAll(<Widget>[
-          _texteErreur(
+          texteErreurDrive(
             context,
             '${etat.automatique ? 'La sauvegarde automatique a échoué : ' : ''}${etat.erreur ?? 'Une erreur est survenue.'}',
             key: const Key('drive-sauvegarde-erreur'),
           ),
           if (etat.autorisationAExpire) ...<Widget>[
             const SizedBox(height: 4),
-            _texteDiscret(context, 'Reconnectez-vous à Google (carte « Connexion à Google »), puis réessayez.'),
+            texteDiscretDrive(context, 'Reconnectez-vous à Google (carte « Connexion à Google »), puis réessayez.'),
           ],
           const SizedBox(height: 12),
           boutons,
         ]);
     }
 
-    return _Carte(titre: 'Sauvegarder mes données sur Drive', enfants: contenu);
+    return CarteDrive(titre: 'Sauvegarder mes données sur Drive', enfants: contenu);
   }
 }
 
@@ -744,11 +735,11 @@ class _ProgressionSauvegarde extends StatelessWidget {
             style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
           ),
         const SizedBox(height: 8),
-        _texteDiscret(context, 'Gardez l’application ouverte et l’écran allumé jusqu’à la fin.'),
+        texteDiscretDrive(context, 'Gardez l’application ouverte et l’écran allumé jusqu’à la fin.'),
         if (progression.etape == EtapeSauvegardeDrive.fichiers) ...<Widget>[
           const SizedBox(height: 8),
           if (etat.arretDemande)
-            _texteDiscret(
+            texteDiscretDrive(
               context,
               'Arrêt demandé : l’envoi s’arrête à la fin du fichier en cours, et les données ne seront pas sauvegardées…',
               key: const Key('drive-sauvegarde-arret-demande'),
@@ -783,10 +774,10 @@ class _CarteDernierEnvoi extends ConsumerWidget {
 
     final RapportEnvoi? rapport = bilan.valueOrNull;
     if (rapport == null) {
-      return _Carte(
+      return CarteDrive(
         titre: 'Dernier envoi',
         enfants: <Widget>[
-          _texteDiscret(
+          texteDiscretDrive(
             context,
             bilan.isLoading ? 'Lecture du bilan…' : 'Aucun envoi pour l’instant.',
             key: const Key('drive-aucun-bilan'),
@@ -795,7 +786,7 @@ class _CarteDernierEnvoi extends ConsumerWidget {
       );
     }
 
-    return _Carte(
+    return CarteDrive(
       titre: 'Dernier envoi',
       enfants: <Widget>[
         Text(
@@ -820,7 +811,7 @@ class _CarteDernierEnvoi extends ConsumerWidget {
             ],
           )
         else
-          _texteErreur(
+          texteErreurDrive(
             context,
             rapport.interrompu
                 ? 'Envoi incomplet : il s’est arrêté avant la fin. Relancez « Envoyer maintenant » : seul ce qui manque repart.'

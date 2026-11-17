@@ -157,8 +157,9 @@ Le développement se fait en 12 étapes validées une par une (détail dans [ROA
 - **Un fichier qui échoue n'empêche pas les autres** ; l'envoi s'arrête seulement si la connexion à Google est perdue ou après trois
   échecs de suite. Le **bilan du dernier envoi** (date, fichiers envoyés, déjà sur Drive, échecs détaillés) reste affiché ; relancer
   l'envoi ne renvoie que ce qui manque. **Arrêter** interrompt l'envoi à la fin du fichier en cours.
-- **Jamais de suppression, jamais de partage** : l'application ne sait ni supprimer ni partager un fichier sur Drive. Elle ne demande à
-  Google que le droit de voir et de gérer **les fichiers qu'elle a elle-même créés** (`drive.file`), jamais le reste de votre Drive.
+- **Jamais de suppression, jamais de partage tout seul** : l'application ne supprime aucun fichier sur Drive et ne partage rien d'elle-même
+  (le partage, à la demande, vient avec l'étape 8). Elle ne demande à Google que le droit de voir et de gérer **les fichiers qu'elle a
+  elle-même créés** (`drive.file`), jamais le reste de votre Drive.
 - Gardez l'application ouverte et l'écran allumé pendant un gros envoi (les vidéos peuvent être lourdes). Se déconnecter n'efface rien sur Drive.
 - Aucun changement de la base (schéma 6) ni de la sauvegarde. Nouvelles dépendances gratuites : `google_sign_in`, `googleapis`, `http`. La
   permission Internet est ajoutée à l'application (elle ne sert qu'à cet envoi).
@@ -241,7 +242,40 @@ minutes à se propager.
   beaucoup de photos.
 - Une sauvegarde « données seules » de Drive ne se restaure **que** par ce chemin : si on la choisit dans *Sauvegarde et export*, un message
   l'explique et renvoie vers *Google Drive → Restaurer depuis Drive*. Les sauvegardes locales (archives complètes avec photos) ne changent pas.
-- **Jamais de suppression, jamais de partage** (comme en partie 1) : droit `drive.file` seulement. Aucun changement de la base (schéma 6).
+- **Jamais de suppression, jamais de partage tout seul** (comme en partie 1) : droit `drive.file` seulement. Aucun changement de la base (schéma 6).
+
+### Google Drive, partie 3 (étape 8 de l'évolution)
+
+Deux choses : **donner le catalogue** à quelqu'un, et **partager un fichier de votre Drive** avec une personne précise (ou par un lien).
+
+- **Exporter le catalogue** (*Réglages → Sauvegarde et export → Exporter le catalogue (produits et photos)*) : un fichier `.zip` avec le
+  **tableau des produits** (`catalogue.csv`, à ouvrir avec Excel, LibreOffice ou Numbers : prix de vente en euros), les **mêmes informations en
+  JSON** (`catalogue.json`), les **photos** (`photos/PRD-0001_1.jpg`…) et un petit mode d'emploi (`LISEZMOI.txt`). Il se partage par la feuille
+  de partage d'Android (e-mail, messagerie, Drive…). **Il ne contient jamais** les coûts des matières, les stocks, les clients, les ventes ni
+  les factures : c'est fait pour être donné. Les produits archivés n'y sont pas ; une photo introuvable sur le téléphone est **signalée** (un
+  message, et le `LISEZMOI.txt`), jamais inventée. Ce n'est **pas une sauvegarde** : il ne se restaure pas.
+- **Partager des fichiers** (*Réglages → Google Drive → Partager des fichiers…*, après connexion à Google) : l'écran **Partages** liste vos
+  **factures**, vos **devis** et vos **exports** déjà sur Drive, avec « Partagé » ou « Privé ». Les fichiers doivent d'abord être envoyés sur
+  Drive (écran *Google Drive*, « Envoyer sur Drive »). **Vos sauvegardes ne sont jamais proposées**, ni les photos des produits ni les pièces
+  jointes des notes.
+- **Envoyer le catalogue sur Drive** (écran Partages) : prépare le même `.zip` et l'envoie dans le dossier **« Exports »** de votre Drive. Le
+  renvoyer le même jour met à jour le même fichier (ceux qui y ont accès voient la nouvelle version ; Drive garde l'ancienne dans
+  l'historique du fichier). Il apparaît ensuite dans la rubrique **Exports**, prêt à être partagé.
+- **Un fichier, un écran** (toucher un fichier de la liste) :
+  - **Qui a accès** : vous (propriétaire), les personnes avec qui il est partagé, le lien public s'il est activé. Un accès créé en dehors de
+    l'application (un groupe, ou le droit de modifier donné à la main dans Drive) est **montré, jamais modifié** : à gérer dans Drive.
+  - **Partager avec une personne** : saisissez son adresse e-mail. Elle peut **lire** le fichier, **sans pouvoir le modifier**, et Google la
+    prévient par e-mail. L'adresse est vérifiée avant tout (vide, mal écrite, la vôtre, déjà partagée). Si Google la refuse (par exemple une
+    adresse sans compte Google, selon les réglages de votre Drive), le message le dit et rien n'est partagé.
+  - **Retirer l'accès** d'une personne : confirmation, puis elle ne peut plus ouvrir le fichier. **Le fichier reste sur votre Drive.**
+  - **Lien** : **Copier le lien** donne l'adresse du fichier (seules les personnes ayant accès peuvent l'ouvrir). **Activer le lien public…**
+    permet à **toute personne qui a le lien** de lire le fichier, même sans compte Google (sans pouvoir le modifier, et sans qu'il apparaisse
+    dans une recherche) : une **confirmation** l'explique d'abord, et rappelle qu'une facture ou un devis contient le nom et l'adresse du
+    client. **Arrêter le lien public…** (avec confirmation) le retire ; les personnes avec qui le fichier est partagé gardent leur accès.
+- **Rien n'est partagé sans votre geste** : ni à l'envoi, ni à la sauvegarde, ni à la connexion. **Un partage ne donne que le droit de lire.**
+  **L'application ne supprime jamais un fichier sur Drive** : arrêter un partage retire un accès, pas le fichier. Droit demandé à Google inchangé :
+  `drive.file` (seuls les fichiers créés par l'application ; le reste de votre Drive reste invisible pour elle).
+- Aucun changement de la base (schéma 6) ni de la sauvegarde ; aucune nouvelle dépendance.
 
 ### Ce que contient l'étape 11 : sauvegarde et export
 

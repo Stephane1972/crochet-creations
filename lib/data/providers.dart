@@ -5,6 +5,7 @@ import '../domain/document_facture.dart';
 import 'database/app_database.dart';
 import 'drive/compte_google.dart';
 import 'drive/service_drive.dart';
+import 'drive/service_partages_drive.dart';
 import 'drive/service_sauvegarde_drive.dart';
 import 'partage/service_documents.dart';
 import 'partage/service_partage_fichiers.dart';
@@ -25,6 +26,7 @@ import 'repositories/parametres_repository.dart';
 import 'repositories/produit_repository.dart';
 import 'repositories/statistiques_repository.dart';
 import 'repositories/vente_repository.dart';
+import 'sauvegarde/export_catalogue.dart';
 import 'sauvegarde/export_csv.dart';
 import 'sauvegarde/selecteur_fichier.dart';
 import 'sauvegarde/service_sauvegarde.dart';
@@ -223,6 +225,23 @@ final serviceSauvegardeDriveProvider = Provider<ServiceSauvegardeDrive>((ref) {
 /// Export des données en CSV (un .zip, un fichier par type de données).
 final exportCsvProvider = Provider<ExportCsv>(
   (ref) => ExportCsv(ref.watch(appDatabaseProvider), horloge: ref.watch(horlogeProvider)),
+);
+
+/// Partage de fichiers de Drive (étape 8), fourni au démarrage (voir `lib/main.dart`). Les tests le remplacent par un service
+/// qui parle à un faux Drive.
+final servicePartagesDriveProvider = Provider<ServicePartagesDrive>((ref) {
+  throw UnimplementedError(
+    'servicePartagesDriveProvider doit être fourni au démarrage (overrides du ProviderScope).',
+  );
+});
+
+/// Export du catalogue (un .zip : tableau des produits, JSON et photos ; sans coûts ni stocks).
+final exportCatalogueProvider = Provider<ExportCatalogue>(
+  (ref) => ExportCatalogue(
+    ref.watch(appDatabaseProvider),
+    ref.watch(stockagePhotosProvider),
+    horloge: ref.watch(horlogeProvider),
+  ),
 );
 
 /// Sélecteur de fichiers d'Android, pour restaurer une sauvegarde. Les tests le remplacent par un faux sélecteur.

@@ -11,6 +11,7 @@ import '../../core/theme/theme_mode_provider.dart';
 import '../../core/utils/date_fr.dart';
 import '../../core/widgets/dialogues.dart';
 import '../../data/providers.dart';
+import '../../data/sauvegarde/export_catalogue.dart';
 import '../../data/sauvegarde/export_csv.dart';
 import '../../data/sauvegarde/format_sauvegarde.dart';
 import '../../data/sauvegarde/service_sauvegarde.dart';
@@ -237,6 +238,27 @@ class _SauvegardeScreenState extends ConsumerState<SauvegardeScreen> {
     });
   }
 
+  Future<void> _exporterCatalogue() {
+    return _executer(() async {
+      final ServiceSauvegarde service = ref.read(serviceSauvegardeProvider);
+      final ResultatCatalogue resultat = await ref.read(exportCatalogueProvider).ecrireArchive(service.dossierExports);
+      await ref.read(servicePartageFichiersProvider).partager(
+        cheminFichier: resultat.fichier.path,
+        nomFichier: resultat.fichier.uri.pathSegments.last,
+        typeMime: 'application/zip',
+        sujet: 'Catalogue – ${AppConstants.nomApplication}',
+      );
+      if (!mounted || resultat.photosManquantes.isEmpty) return;
+      final int n = resultat.photosManquantes.length;
+      afficherMessage(
+        context,
+        n == 1
+            ? 'Une photo est introuvable sur le téléphone : elle n’est pas dans le catalogue (voir LISEZMOI.txt).'
+            : '$n photos sont introuvables sur le téléphone : elles ne sont pas dans le catalogue (voir LISEZMOI.txt).',
+      );
+    });
+  }
+
   Future<void> _exporterJson() {
     return _executer(() async {
       final File fichier = await ref.read(serviceSauvegardeProvider).ecrireJson();
@@ -400,6 +422,20 @@ class _SauvegardeScreenState extends ConsumerState<SauvegardeScreen> {
                   ),
                   enabled: !_occupe,
                   onTap: _exporterCsv,
+                ),
+                const Divider(indent: 56),
+                ListTile(
+                  key: const Key('exporter-catalogue'),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  leading: Icon(Icons.collections_bookmark_outlined, color: scheme.primary),
+                  title: Text('Exporter le catalogue (produits et photos)', style: theme.textTheme.titleSmall),
+                  subtitle: Text(
+                    'Un fichier .zip à donner à quelqu’un : le tableau des produits avec leurs prix de vente, et leurs photos. '
+                    'Sans les coûts, les stocks ni les clients. Vous pouvez aussi l’envoyer sur Google Drive (Réglages › Google Drive › Partages).',
+                    style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+                  ),
+                  enabled: !_occupe,
+                  onTap: _exporterCatalogue,
                 ),
                 const Divider(indent: 56),
                 ListTile(

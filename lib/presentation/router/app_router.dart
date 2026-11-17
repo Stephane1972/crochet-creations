@@ -14,6 +14,8 @@ import '../devis/devis_conversion_screen.dart';
 import '../devis/devis_detail_screen.dart';
 import '../devis/devis_form_screen.dart';
 import '../devis/devis_screen.dart';
+import '../drive/drive_partage_fichier_screen.dart';
+import '../drive/drive_partages_screen.dart';
 import '../drive/drive_restauration_screen.dart';
 import '../drive/drive_screen.dart';
 import '../entreprise/mon_entreprise_screen.dart';
@@ -57,6 +59,13 @@ abstract final class AppRouter {
         return _page(settings, const DriveScreen());
       case AppRoutes.driveRestauration:
         return _page(settings, const DriveRestaurationScreen());
+      case AppRoutes.drivePartages:
+        return _page(settings, const DrivePartagesScreen());
+      case AppRoutes.drivePartageFichier:
+        final Object? argumentsPartage = settings.arguments;
+        return argumentsPartage is ArgumentsPartageFichier
+            ? _page(settings, DrivePartageFichierScreen(fichier: argumentsPartage))
+            : _page(settings, const _PageIntrouvable());
       case AppRoutes.categories:
         return _page(settings, const CategoriesScreen());
       case AppRoutes.lieuxVente:

@@ -69,6 +69,8 @@ crochet-creations/
 │   │   ├── document_devis.dart               DocumentDevis : tout ce qui s'imprime sur un devis (réutilise les lignes et parties de la facture)
 │   │   ├── drive_envoi.dart                  envoi vers Drive, sans réseau : dossiers, comparaison téléphone / Drive (planifierEnvoi), bilan d'un envoi
 │   │   ├── drive_sauvegardes.dart            sauvegardes sur Drive, sans réseau : noms datés, liste, état gardé (envoi automatique, dernière sauvegarde), envoiAutomatiqueDu
+│   │   ├── drive_partage.dart                partage sur Drive, sans réseau : rubriques partageables, accès d'un fichier, règles de l'adresse e-mail
+│   │   ├── catalogue_export.dart             archive « catalogue » sans réseau : produits sans coûts ni stocks, CSV, JSON, chemins des photos, LISEZMOI
 │   │   └── calculs/
 │   │       ├── totaux.dart                   sous-total, remise, frais de port, total
 │   │       ├── statut_paiement.dart          payée / partielle / impayée / remboursée
@@ -117,12 +119,14 @@ crochet-creations/
 │   │   │   ├── stockage_client_web.dart      l'ID client Web saisi dans l'application, gardé dans un petit fichier (drive/client_web.txt)
 │   │   │   ├── client_drive.dart             opérations Drive : trouver / créer un dossier, lister, envoyer en flux (interface ClientDrive + API Drive v3)
 │   │   │   ├── service_drive.dart            vérifier et envoyer à la demande, arrêt, bilan du dernier envoi gardé dans un petit fichier
-│   │   │   └── service_sauvegarde_drive.dart sauvegarder les données sur Drive (données seules + liste des fichiers), envoi automatique, restaurer depuis Drive
+│   │   │   ├── service_sauvegarde_drive.dart sauvegarder les données sur Drive (données seules + liste des fichiers), envoi automatique, restaurer depuis Drive
+│   │   │   └── service_partages_drive.dart   partager en lecture (personne, lien public), retirer un accès, envoyer le catalogue dans « Exports »
 │   │   ├── sauvegarde/
 │   │   │   ├── format_sauvegarde.dart        contenu d'une archive (format 2), tables dans l'ordre, colonnes qui citent des fichiers, modèles de progression
 │   │   │   ├── service_sauvegarde.dart       sauvegarder (en flux, avec empreintes), lister, sauvegarde automatique, restaurer (avec contrôle), export JSON
 │   │   │   ├── espace_libre.dart             place libre du téléphone (interface + mesure Android par disk_space_plus)
 │   │   │   ├── export_csv.dart               export CSV : un .zip, un fichier par type de données
+│   │   │   ├── export_catalogue.dart         export du catalogue : un .zip (CSV, JSON, photos, LISEZMOI), photos rangées une par une
 │   │   │   └── selecteur_fichier.dart        choix du fichier à restaurer : copie de travail en flux (interface + sélecteur Android)
 │   │   ├── partage/
 │   │   │   └── service_partage_fichiers.dart partage d'un fichier quelconque (sauvegarde, export) par la feuille de partage
@@ -153,6 +157,9 @@ crochet-creations/
 │       ├── drive/                            Google Drive (voir « Google Drive »)
 │       │   ├── drive_screen.dart             écran Réglages › Google Drive : connexion, vérifier / envoyer, sauvegarder mes données, bilan du dernier envoi
 │       │   ├── drive_restauration_screen.dart écran Restaurer depuis Drive : liste, confirmation, progression, compte rendu
+│       │   ├── drive_partages_screen.dart    écran Partages : catalogue sur Drive, factures / devis / exports avec « Partagé » ou « Privé »
+│       │   ├── drive_partage_fichier_screen.dart écran d'un fichier : qui a accès, partager avec une personne, lien public (confirmations)
+│       │   ├── drive_widgets.dart            carte et textes communs aux écrans Google Drive
 │       │   └── drive_providers.dart          compte connecté, état de la vérification, de l'envoi et de la sauvegarde, dernier bilan
 │       ├── sauvegarde/                       sauvegarde et export (voir « Sauvegarde et export »)
 │       │   ├── sauvegarde_screen.dart        écran Sauvegarde et export : sauvegarder, restaurer, exporter (écran 23)
@@ -287,8 +294,8 @@ les produits : `domain/produits/`, `data/produits/`, `presentation/produits/`.
 - `filtresClientsProvider` : recherche, type (particulier / professionnel), « Archivés ». Le filtrage et le tri
   se font côté écran (`filtrerClients`), sur la liste complète : un client archivé apparaît ou disparaît sans relecture ;
 - sauvegarde (étape 11) : `serviceSauvegardeProvider` (fourni par `main()`, lève une erreur explicite sinon),
-  `exportCsvProvider`, `selecteurFichierSauvegardeProvider` et `servicePartageFichiersProvider` (les tests remplacent
-  les deux derniers par des faux), `sauvegardesLocalesProvider` (liste des sauvegardes du téléphone, relue par
+  `exportCsvProvider`, `exportCatalogueProvider` (étape 8), `selecteurFichierSauvegardeProvider` et `servicePartageFichiersProvider`
+  (les tests remplacent les deux derniers par des faux), `sauvegardesLocalesProvider` (liste des sauvegardes du téléphone, relue par
   `ref.invalidate` après chaque sauvegarde, suppression ou restauration).
 
 Les flux « en direct » sont des `StreamProvider.autoDispose` : l'écran se met à jour tout seul après chaque
@@ -1058,7 +1065,7 @@ dans le dossier temporaire : le sélecteur 13 ne donne plus de chemin) que l'éc
 ## Google Drive (étapes 6 et 7 de l'évolution)
 
 Envoi **à la demande** des photos, factures, devis et pièces jointes vers le Drive de la personne. Trois principes : **copier, jamais
-supprimer ni partager** ; **Drive est la mémoire** (aucun registre de « ce qui est déjà parti » sur le téléphone) ; **un fichier qui
+supprimer ni partager tout seul** (le partage, à la demande, est la partie 3) ; **Drive est la mémoire** (aucun registre de « ce qui est déjà parti » sur le téléphone) ; **un fichier qui
 échoue n'empêche pas les autres**.
 
 ### Les couches
@@ -1073,8 +1080,8 @@ supprimer ni partager** ; **Drive est la mémoire** (aucun registre de « ce qui
   `enregistrerClientWeb`, `oublierClientWeb`, `restaurer`, `seConnecter`, `seDeconnecter`, `jetonAcces`, `invaliderJeton`) et `CompteGoogleReel` (`google_sign_in` 7 : `initialize(serverClientId)`, `authenticate()`, puis
   `authorizeScopes([drive.file])` ; le jeton d'accès est gardé 30 minutes). `ErreurDrive` porte un **message lisible tel quel**, avec deux
   drapeaux : `autorisationAExpire` (inutile de réessayer : se reconnecter) et `annulee` (la personne a fermé la fenêtre : pas une panne).
-- `data/drive/client_drive.dart` : `ClientDrive` (`trouverDossier`, `creerDossier`, `lister`, `envoyer`) — **aucune méthode de
-  suppression ni de partage** — et `ClientDriveGoogle` (API Drive v3 du paquet `googleapis`, requêtes authentifiées par le jeton du
+- `data/drive/client_drive.dart` : `ClientDrive` (`trouverDossier`, `creerDossier`, `lister`, `envoyer`, puis `telecharger` et, en partie 3, les
+  méthodes de partage) — **aucune méthode de suppression de fichier** — et `ClientDriveGoogle` (API Drive v3 du paquet `googleapis`, requêtes authentifiées par le jeton du
   compte). Un refus 401 est retenté une fois avec un jeton neuf ; toute erreur sort en `ErreurDrive` (429 / 403 de débit, quota plein, API non
   activée, 404, 5xx, pas d'Internet, délai dépassé, fichier illisible). L'envoi est **« reprenable » et en flux** (`ResumableUploadOptions`,
   `File.openRead`) : un fichier n'est jamais entièrement en mémoire et un fichier à moitié envoyé n'est jamais créé.
@@ -1173,6 +1180,47 @@ envoyés, progression en trois étapes, Arrêter, résultat) ; `DriveRestauratio
 et la vente en cours sont relus après la restauration). `sauvegardeDriveProvider` (`Notifier`, `PhaseSauvegardeDrive`) continue si l'on quitte
 l'écran ; progression rafraîchie au plus toutes les 150 ms. Les éléments portent des `Key` (`drive-sauvegarder`, `drive-restaurer`,
 `drive-auto-interrupteur`, `drive-sauvegarde-fin`, `drive-sauvegarde-$i`, `drive-restauration-erreur`…) pour les tests.
+
+### Partie 3 (étape 8) : export du catalogue et partage
+
+Mêmes principes, et deux de plus : **rien n'est partagé sans un geste de la personne** (aucun service ne partage tout seul : seul l'écran
+« Partages » appelle `ServicePartagesDrive`) ; **un partage ne donne que le droit de lire**, et arrêter un partage **retire un accès, jamais le
+fichier**. Droit Google inchangé : `drive.file`. Aucun changement de la base (schéma 6) ni de la sauvegarde.
+
+**Archive du catalogue** (`domain/catalogue_export.dart`, `data/sauvegarde/export_catalogue.dart`) : `ExportCatalogue.ecrireArchive(dossier)` lit les
+produits non archivés **d'un seul tenant** (`transaction`) et écrit `crochet-creations-catalogue-AAAA-MM-JJ.zip` : `LISEZMOI.txt`, `catalogue.csv`
+(BOM UTF-8, `;`, prix en euros), `catalogue.json` (`prixVenteCentimes` et `prixVenteEuros`) et `photos/<REF>_<rang>.<ext>`. `ProduitCatalogue` ne porte **ni
+coût, ni stock, ni client, ni vente** : ce sont des champs qui n'existent pas, pas des champs filtrés. Les photos (la principale d'abord, puis
+l'ordre des positions, sans doublon) sont ajoutées **une par une** à un `ZipFileEncoder` (`addFile` en mode stocké : jamais toutes en mémoire) ;
+l'archive est écrite dans un fichier provisoire renommé à la fin (jamais à moitié écrite). Une photo annoncée par la base mais absente du
+téléphone est **listée dans `ResultatCatalogue.photosManquantes`** (« REF : nom du fichier ») et dans le `LISEZMOI.txt`, jamais inventée. Le nom
+de fichier d'une photo passe par `nomSurPourFichier` (lettres, chiffres, `.`, `-`, `_`). `SauvegardeScreen` n'ajoute que la tuile
+`exporter-catalogue` : écrire l'archive dans `ServiceSauvegarde.dossierExports`, puis la feuille de partage.
+
+**Règles du partage** (`domain/drive_partage.dart`, sans réseau) : `RubriquePartage` (`factures`, `devis`, `exports` — **les sauvegardes, les photos et
+les pièces jointes n'en font pas partie**, un test le vérifie), `nomDossierExportsDrive`, `TypeAcces` (propriétaire, personne, lien public, autre) d'après le
+« type » et le « rôle » d'un droit Drive (`typeAccesDrive`), `AccesDrive` (id du droit, adresse, nom, `peutModifier`), `AccesFichier` (`personnes`,
+`lienPublic`, `autres`, `estPrive`, `resume`), `erreurCourrielPartage` (vide, forme, **la sienne**, **déjà partagée**) et `normaliserCourriel`.
+`FichierDistant` gagne `partage` (champ `shared` de Drive) et `lien` (`webViewLink`).
+
+**Client Drive** : `listerAcces` (`permissions.list`), `partagerAvec` (`permissions.create`, `type: user`, `role: reader`,
+`sendNotificationEmail: true`), `activerLienPublic` (`type: anyone`, `role: reader`, `allowFileDiscovery: false`), `retirerAcces`
+(`permissions.delete` : **un droit, pas un fichier**) et `lienDuFichier` (`files.get`, champ `webViewLink`). Messages dédiés : adresse refusée
+(400), droits insuffisants pour changer un partage (403).
+
+**`ServicePartagesDrive`** (`data/drive/service_partages_drive.dart`) : `lister()` (les trois rubriques, **sans rien créer** sur Drive ; une rubrique sans dossier
+est vide ; les plus récemment nommés d'abord), `acces`, `lien`, `partagerAvec` (**vérifie l'adresse avant d'appeler Google**, puis rend les accès à jour),
+`activerLien` (sans effet si le lien est déjà actif), `retirer` (le propriétaire ne se retire pas) et `envoyerExport(archive)` (dossiers principal et « Exports »
+créés au besoin ; un fichier du même nom est **mis à jour** : ses accès restent). Fourni par `servicePartagesDriveProvider` (construit dans `main()` ;
+les tests le branchent sur le faux Drive).
+
+**Écrans** : `DrivePartagesScreen` (route `AppRoutes.drivePartages`, carte « Partager des fichiers » de `DriveScreen`) : catalogue (préparer + envoyer,
+résultat ou erreur, photos introuvables signalées), puis une carte par rubrique alimentée par `fichiersPartageablesProvider` (relu au retour d'un fichier).
+`DrivePartageFichierScreen` (route `AppRoutes.drivePartageFichier`, reçoit `ArgumentsPartageFichier`) : qui a accès, partager avec une personne, lien. **Trois
+confirmations** (`confirmer`) : activer le lien public (le texte explique ce qu'il permet, et ajoute un rappel pour une facture ou un devis), arrêter le lien,
+retirer un accès. Une autorisation expirée remet le compte à « non connecté » (`connexionPerdue`). Les éléments portent des `Key` (`drive-partages`,
+`partages-envoyer-catalogue`, `partages-catalogue-resultat`, `partages-fichier-<nom>`, `partages-etat-<nom>`, `partage-courriel`, `partage-partager`,
+`partage-retirer-$i`, `partage-activer-lien`, `partage-arreter-lien`, `partage-copier-lien`, `partage-resume`, `partage-info`, `partage-erreur`…) pour les tests.
 
 ## Dossier `android/`
 
@@ -1332,6 +1380,15 @@ PDF refait, photo non partie, coupure du réseau sans rien toucher, `.zip` illis
 carte et l'écran de restauration : sauvegarder, rien de neuf, interrupteur, panne, fichier refusé, arrêt, blocage mutuel, envoi automatique ;
 liste, erreur et « Réessayer », restaurer, renoncer, coupure du réseau, retour bloqué pendant l'opération) et `drive_sauvegarde_auto_test`
 (l'ouverture de l'application : activé, désactivé, non connecté, une fois par jour, échec retenté).
+
+Google Drive, partie 3 (étape 8) : `catalogue_export_test` (photos du produit, noms de fichiers sûrs, chemins dans l'archive, CSV, JSON, LISEZMOI :
+aucune colonne de coût ni de stock), `export_catalogue_test` (archive complète avec photos renommées, jamais de coût ni de client, photo introuvable
+signalée, produit archivé écarté, archive du jour remplacée sans fichier provisoire), `drive_partage_test` (rubriques sans les sauvegardes, type d'accès,
+résumé, règles de l'adresse e-mail), `service_partages_drive_test` (lecture sans rien créer, rubriques, partage avec adresse nettoyée, refus avant tout
+appel, retrait d'un accès sans toucher au fichier, lien public une seule fois, envoi du catalogue et remplacement le même jour), `client_drive_test`
+(requêtes de partage : lecture seule, lien sans recherche, retrait d'un droit, **aucun DELETE de fichier**, erreurs en clair),
+`sauvegarde_ecran_test` (la tuile d'export du catalogue) et `drive_partages_test` (l'écran Partages et l'écran d'un fichier : partager, adresse refusée,
+retirer et lien public avec leurs confirmations, copie du lien, accès créés hors de l'application, pannes).
 
 Sauvegarde et export (étape 11) : `csv_test` (protection des cellules, montants), `service_sauvegarde_test` (liste des tables
 = celles de la base et dans l'ordre des clés étrangères, contenu de l'archive, nommage, **aller-retour complet** sur un autre

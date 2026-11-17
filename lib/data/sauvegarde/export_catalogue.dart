@@ -139,7 +139,7 @@ class ExportCatalogue {
     final List<int> lisezmoi = utf8.encode(
       construireLisezmoiCatalogue(
         application: AppConstants.nomApplication,
-        dateTexte: formatDateLongue(maintenant),
+        dateTexte: '${formatDateLongue(maintenant)} ${maintenant.year}', // « lundi 16 novembre 2026 »
         produits: produits.length,
         photos: aRanger.length,
         photosManquantes: manquantes,

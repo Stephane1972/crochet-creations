@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:crochet_creations/data/drive/client_drive.dart';
 import 'package:crochet_creations/data/drive/compte_google.dart';
 import 'package:crochet_creations/domain/drive_envoi.dart';
+import 'package:crochet_creations/domain/drive_partage.dart';
 import 'package:crochet_creations/domain/id_client_google.dart';
 
 /// Fausse connexion à Google, pour les tests : aucun réseau, aucune fenêtre.
@@ -117,9 +118,13 @@ class FichierDriveFaux {
 
   /// Nombre de fois où le contenu a été envoyé (1 = jamais remplacé).
   int versions = 1;
+
+  /// Les accès donnés par l'application ou posés à la main dans un test (le propriétaire n'y figure pas : le faux Drive
+  /// l'ajoute toujours en premier).
+  final List<AccesDrive> acces = <AccesDrive>[];
 }
 
-/// Faux Drive en mémoire : les mêmes opérations que [ClientDrive], et rien d'autre (pas de suppression, pas de partage).
+/// Faux Drive en mémoire : les mêmes opérations que [ClientDrive], et rien d'autre (pas de suppression de fichier).
 class FauxClientDrive implements ClientDrive {
   final Map<String, DossierDriveFaux> dossiers = <String, DossierDriveFaux>{};
   final Map<String, FichierDriveFaux> fichiers = <String, FichierDriveFaux>{};
@@ -149,6 +154,27 @@ class FauxClientDrive implements ClientDrive {
   Future<void> Function(String nom)? pauseTelechargement;
 
   int dossiersCrees = 0;
+
+  /// Adresses que Google refuserait (une adresse inventée, par exemple) : le partage échoue avec un message lisible.
+  final Set<String> adressesRefusees = <String>{};
+
+  /// Si défini, la lecture ou la modification des accès du fichier [id] échoue avec cette erreur (retourne `null` : elle réussit).
+  ErreurDrive? Function(String id)? echecAcces;
+
+  /// Chaque partage demandé, sous la forme « nom du fichier | adresse ».
+  final List<String> partagesDemandes = <String>[];
+
+  /// Chaque lien activé (nom du fichier), et chaque accès retiré (« nom du fichier | libellé »).
+  final List<String> liensActives = <String>[];
+  final List<String> accesRetires = <String>[];
+
+  /// Le propriétaire de tous les fichiers du faux Drive.
+  static const AccesDrive proprietaire = AccesDrive(
+    id: 'perm-proprietaire',
+    type: TypeAcces.proprietaire,
+    email: 'stef@exemple.fr',
+    nom: 'Stéphane',
+  );
 
   /// Noms des fichiers envoyés (créés ou mis à jour), dans l'ordre.
   final List<String> envoyes = <String>[];
@@ -184,7 +210,15 @@ class FauxClientDrive implements ClientDrive {
     _verifierPanne();
     return <FichierDistant>[
       for (final FichierDriveFaux f in fichiers.values)
-        if (f.dossierId == dossierId) FichierDistant(id: f.id, nom: f.nom, octets: f.contenu.length, empreinte: f.empreinte),
+        if (f.dossierId == dossierId)
+          FichierDistant(
+            id: f.id,
+            nom: f.nom,
+            octets: f.contenu.length,
+            empreinte: f.empreinte,
+            partage: f.acces.isNotEmpty,
+            lien: 'https://drive.exemple.fr/fichier/${f.id}',
+          ),
     ];
   }
 
@@ -236,6 +270,56 @@ class FauxClientDrive implements ClientDrive {
     await destination.writeAsBytes(fichier.contenu);
     progression?.call(fichier.contenu.length);
     telecharges.add(fichier.nom);
+  }
+
+  // --- Partage -------------------------------------------------------------------
+
+  FichierDriveFaux _fichierPartage(String id) {
+    _verifierPanne();
+    final FichierDriveFaux? fichier = fichiers[id];
+    if (fichier == null) throw const ErreurDrive('Le fichier ou le dossier est introuvable sur Drive.');
+    final ErreurDrive? erreur = echecAcces?.call(id);
+    if (erreur != null) throw erreur;
+    return fichier;
+  }
+
+  @override
+  Future<List<AccesDrive>> listerAcces(String fichierId) async {
+    final FichierDriveFaux fichier = _fichierPartage(fichierId);
+    return <AccesDrive>[proprietaire, ...fichier.acces];
+  }
+
+  @override
+  Future<void> partagerAvec({required String fichierId, required String email}) async {
+    final FichierDriveFaux fichier = _fichierPartage(fichierId);
+    if (adressesRefusees.contains(email)) {
+      throw const ErreurDrive('Google n’a pas accepté de partager avec cette adresse. Vérifiez qu’elle est exacte.');
+    }
+    fichier.acces.add(AccesDrive(id: 'perm-${++_suite}', type: TypeAcces.personne, email: email, nom: null));
+    partagesDemandes.add('${fichier.nom} | $email');
+  }
+
+  @override
+  Future<void> activerLienPublic(String fichierId) async {
+    final FichierDriveFaux fichier = _fichierPartage(fichierId);
+    fichier.acces.add(AccesDrive(id: 'perm-${++_suite}', type: TypeAcces.lienPublic));
+    liensActives.add(fichier.nom);
+  }
+
+  @override
+  Future<void> retirerAcces({required String fichierId, required String accesId}) async {
+    final FichierDriveFaux fichier = _fichierPartage(fichierId);
+    if (accesId == proprietaire.id) throw const ErreurDrive('Le propriétaire du fichier ne peut pas être retiré.');
+    final int rang = fichier.acces.indexWhere((AccesDrive a) => a.id == accesId);
+    if (rang < 0) throw const ErreurDrive('Le fichier ou le dossier est introuvable sur Drive.');
+    final AccesDrive retire = fichier.acces.removeAt(rang);
+    accesRetires.add('${fichier.nom} | ${retire.libelle}');
+  }
+
+  @override
+  Future<String?> lienDuFichier(String fichierId) async {
+    _fichierPartage(fichierId);
+    return 'https://drive.exemple.fr/fichier/$fichierId';
   }
 
   // --- Pour vérifier -----------------------------------------------------------

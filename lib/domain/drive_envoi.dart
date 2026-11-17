@@ -48,7 +48,14 @@ class FichierLocal {
 
 /// Un fichier déjà présent dans le dossier Drive.
 class FichierDistant {
-  const FichierDistant({required this.id, required this.nom, this.octets, this.empreinte});
+  const FichierDistant({
+    required this.id,
+    required this.nom,
+    this.octets,
+    this.empreinte,
+    this.partage = false,
+    this.lien,
+  });
 
   final String id;
   final String nom;
@@ -58,6 +65,13 @@ class FichierDistant {
 
   /// SHA-256 notée à l'envoi (absente si le fichier n'a pas été envoyé par l'application).
   final String? empreinte;
+
+  /// Vrai si Drive indique que le fichier est partagé (avec quelqu'un, ou par un lien). Un indice pour la liste des partages ;
+  /// le détail des accès se lit fichier par fichier (voir `drive_partage.dart`).
+  final bool partage;
+
+  /// L'adresse du fichier dans Drive (`null` : inconnue).
+  final String? lien;
 }
 
 enum ActionEnvoi {

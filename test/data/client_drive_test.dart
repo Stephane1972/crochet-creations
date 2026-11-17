@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:crochet_creations/data/drive/client_drive.dart';
 import 'package:crochet_creations/data/drive/compte_google.dart';
 import 'package:crochet_creations/domain/drive_envoi.dart';
+import 'package:crochet_creations/domain/drive_partage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -435,6 +436,157 @@ void main() {
 
         expect(destination.existsSync(), isFalse);
         expect(File('${destination.path}.tmp').existsSync(), isFalse);
+      });
+    });
+
+    group('partage', () {
+      test('listerAcces : le propriétaire, les personnes, le lien public et les autres accès', () async {
+        final ClientDriveGoogle client = creer(
+          (_) async => _json(
+            '{"permissions":['
+            '{"id":"p0","type":"user","role":"owner","emailAddress":"stef@exemple.fr","displayName":"Stéphane"},'
+            '{"id":"p1","type":"user","role":"reader","emailAddress":"marie@exemple.fr"},'
+            '{"id":"p2","type":"anyone","role":"reader"},'
+            '{"id":"p3","type":"user","role":"writer","emailAddress":"paul@exemple.fr"},'
+            '{"id":"p4","type":"group","role":"reader","emailAddress":"equipe@exemple.fr"},'
+            '{"type":"user","role":"reader"}'
+            ']}',
+          ),
+        );
+
+        final List<AccesDrive> acces = await client.listerAcces('f1');
+
+        expect(acces.map((AccesDrive a) => a.id), <String>['p0', 'p1', 'p2', 'p3', 'p4']); // sans identifiant : ignoré
+        expect(acces.map((AccesDrive a) => a.type), <TypeAcces>[
+          TypeAcces.proprietaire,
+          TypeAcces.personne,
+          TypeAcces.lienPublic,
+          TypeAcces.personne,
+          TypeAcces.autre,
+        ]);
+        expect(acces[0].nom, 'Stéphane');
+        expect(acces[1].email, 'marie@exemple.fr');
+        expect(acces.map((AccesDrive a) => a.peutModifier), <bool>[false, false, false, true, false]);
+
+        final http.Request requete = appels.single;
+        expect(requete.method, 'GET');
+        expect(requete.url.path, endsWith('/files/f1/permissions'));
+        expect(requete.url.queryParameters['fields'], 'permissions(id,type,role,emailAddress,displayName)');
+        expect(requete.headers['authorization'], 'Bearer jeton-de-test');
+      });
+
+      test('listerAcces : aucun accès si Google ne répond rien', () async {
+        final ClientDriveGoogle client = creer((_) async => _json('{}'));
+        expect(await client.listerAcces('f1'), isEmpty);
+      });
+
+      test('partagerAvec : une personne, en lecture seule, prévenue par e-mail', () async {
+        final ClientDriveGoogle client = creer((_) async => _json('{"id":"p9"}'));
+        await client.partagerAvec(fichierId: 'f1', email: 'marie@exemple.fr');
+
+        final http.Request requete = appels.single;
+        expect(requete.method, 'POST');
+        expect(requete.url.path, endsWith('/files/f1/permissions'));
+        expect(requete.url.queryParameters['sendNotificationEmail'], 'true');
+        final Map<String, dynamic> corps = jsonDecode(requete.body) as Map<String, dynamic>;
+        expect(corps['type'], 'user');
+        expect(corps['role'], 'reader');
+        expect(corps['emailAddress'], 'marie@exemple.fr');
+      });
+
+      test('activerLienPublic : toute personne ayant le lien, en lecture seule, sans apparaître dans les recherches', () async {
+        final ClientDriveGoogle client = creer((_) async => _json('{"id":"p9"}'));
+        await client.activerLienPublic('f1');
+
+        final http.Request requete = appels.single;
+        expect(requete.method, 'POST');
+        expect(requete.url.path, endsWith('/files/f1/permissions'));
+        final Map<String, dynamic> corps = jsonDecode(requete.body) as Map<String, dynamic>;
+        expect(corps['type'], 'anyone');
+        expect(corps['role'], 'reader');
+        expect(corps['allowFileDiscovery'], false);
+        expect(corps.containsKey('emailAddress'), isFalse);
+      });
+
+      test('retirerAcces : retire seulement le droit, jamais le fichier', () async {
+        final ClientDriveGoogle client = creer((_) async => http.Response('', 204));
+        await client.retirerAcces(fichierId: 'f1', accesId: 'p1');
+
+        final http.Request requete = appels.single;
+        expect(requete.method, 'DELETE');
+        expect(requete.url.path, endsWith('/files/f1/permissions/p1'));
+      });
+
+      test('aucun appel de l’application ne supprime un fichier : tout DELETE vise un droit', () async {
+        final ClientDriveGoogle client = creer((_) async => _json('{"id":"p9"}'));
+        await client.partagerAvec(fichierId: 'f1', email: 'marie@exemple.fr');
+        await client.activerLienPublic('f1');
+        await client.listerAcces('f1');
+        expect(appels.where((http.Request r) => r.method == 'DELETE'), isEmpty);
+      });
+
+      test('lienDuFichier : l’adresse du fichier dans Drive', () async {
+        final ClientDriveGoogle client = creer(
+          (_) async => _json('{"webViewLink":"https://drive.google.com/file/d/f1/view"}'),
+        );
+        expect(await client.lienDuFichier('f1'), 'https://drive.google.com/file/d/f1/view');
+
+        final http.Request requete = appels.single;
+        expect(requete.method, 'GET');
+        expect(requete.url.path, endsWith('/files/f1'));
+        expect(requete.url.queryParameters['fields'], 'webViewLink');
+      });
+
+      test('lienDuFichier : null si Google ne donne pas d’adresse', () async {
+        final ClientDriveGoogle client = creer((_) async => _json('{"id":"f1"}'));
+        expect(await client.lienDuFichier('f1'), isNull);
+      });
+
+      test('lister demande aussi si le fichier est partagé, et son adresse', () async {
+        final ClientDriveGoogle client = creer(
+          (_) async => _json(
+            '{"files":['
+            '{"id":"a","name":"a.pdf","size":"3","shared":true,"webViewLink":"https://drive.google.com/file/d/a/view"},'
+            '{"id":"b","name":"b.pdf","size":"4"}'
+            ']}',
+          ),
+        );
+        final List<FichierDistant> fichiers = await client.lister('d1');
+
+        expect(appels.single.url.queryParameters['fields'], contains('shared'));
+        expect(appels.single.url.queryParameters['fields'], contains('webViewLink'));
+        expect(fichiers[0].partage, isTrue);
+        expect(fichiers[0].lien, 'https://drive.google.com/file/d/a/view');
+        expect(fichiers[1].partage, isFalse);
+        expect(fichiers[1].lien, isNull);
+      });
+
+      test('une adresse que Google refuse (400) : message qui parle de l’adresse', () async {
+        final ClientDriveGoogle client = creer((_) async => _json(_erreurJson(400, 'Invalid sharing request.'), 400));
+        await expectLater(
+          client.partagerAvec(fichierId: 'f1', email: 'inconnue@exemple.fr'),
+          throwsA(isA<ErreurDrive>().having((ErreurDrive e) => e.message, 'message', contains('n’a pas accepté de partager'))),
+        );
+      });
+
+      test('droits insuffisants (403) : message qui parle du partage, pas de l’API', () async {
+        final ClientDriveGoogle client = creer(
+          (_) async => _json(_erreurJson(403, 'The user does not have sufficient permissions for this file.'), 403),
+        );
+        await expectLater(
+          client.activerLienPublic('f1'),
+          throwsA(
+            isA<ErreurDrive>().having((ErreurDrive e) => e.message, 'message', allOf(contains('changer le partage'), isNot(contains('API')))),
+          ),
+        );
+      });
+
+      test('connexion expirée (401) pendant un partage : la connexion est à refaire', () async {
+        final ClientDriveGoogle client = creer((_) async => _json(_erreurJson(401, 'Invalid Credentials'), 401));
+        await expectLater(
+          client.listerAcces('f1'),
+          throwsA(isA<ErreurDrive>().having((ErreurDrive e) => e.autorisationAExpire, 'autorisationAExpire', isTrue)),
+        );
       });
     });
   });

@@ -5,10 +5,12 @@ import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:http/http.dart' as http;
 
 import '../../domain/drive_envoi.dart';
+import '../../domain/drive_partage.dart';
 import 'compte_google.dart';
 
 /// Les opérations sur Drive dont l'application a besoin : retrouver ou créer un dossier, lister ses fichiers, envoyer un
-/// fichier, télécharger un fichier. Rien d'autre : **aucune suppression, aucun partage**.
+/// fichier, télécharger un fichier, et (étape 8) partager un fichier en lecture. **Aucune suppression de fichier** : la seule
+/// chose qui se retire est un accès, quand la personne arrête un partage.
 abstract class ClientDrive {
   /// Identifiant du dossier [nom] (dans [parentId], ou à la racine de « Mon Drive »), `null` s'il n'existe pas.
   Future<String?> trouverDossier(String nom, {String? parentId});
@@ -41,6 +43,22 @@ abstract class ClientDrive {
     required File destination,
     void Function(int octetsRecus)? progression,
   });
+
+  /// Les accès au fichier [fichierId] : le propriétaire, les personnes, le lien public s'il est activé.
+  Future<List<AccesDrive>> listerAcces(String fichierId);
+
+  /// Donne à [email] le droit de **lire** le fichier. Google prévient la personne par e-mail ; si l'adresse n'a pas de compte
+  /// Google, elle reçoit un lien d'accès par e-mail. Lève une [ErreurDrive] si Google refuse l'adresse.
+  Future<void> partagerAvec({required String fichierId, required String email});
+
+  /// Active le lien : toute personne qui l'a peut **lire** le fichier (sans pouvoir le modifier ni le trouver par une recherche).
+  Future<void> activerLienPublic(String fichierId);
+
+  /// Retire l'accès [accesId] du fichier (une personne, ou le lien public). Le fichier reste sur Drive.
+  Future<void> retirerAcces({required String fichierId, required String accesId});
+
+  /// L'adresse du fichier dans Drive (`null` : Google n'en donne pas).
+  Future<String?> lienDuFichier(String fichierId);
 }
 
 /// Type de contenu d'un fichier d'après son extension (pour que Drive l'affiche correctement).
@@ -159,9 +177,20 @@ class ClientDriveGoogle implements ClientDrive {
       if (message.contains('quota')) {
         return const ErreurDrive('Votre Drive est plein : libérez de la place puis réessayez.');
       }
+      if (message.contains('sufficient permission')) {
+        return const ErreurDrive(
+          'Google refuse de changer le partage de ce fichier : seule la personne qui l’a créé dans Drive peut le faire.',
+        );
+      }
       return ErreurDrive(
         'Google Drive a refusé l’accès (${erreur.message ?? 'accès refusé'}). '
         'Vérifiez que l’API Google Drive est activée dans le projet Google Cloud.',
+      );
+    }
+    if (statut == 400 && (message.contains('sharing') || message.contains('invalid') && message.contains('email'))) {
+      return const ErreurDrive(
+        'Google n’a pas accepté de partager avec cette adresse. Vérifiez qu’elle est exacte (une adresse sans compte Google '
+        'peut être refusée selon les réglages de votre Drive).',
       );
     }
     if (statut == 404) return const ErreurDrive('Le fichier ou le dossier est introuvable sur Drive.');
@@ -206,7 +235,7 @@ class ClientDriveGoogle implements ClientDrive {
         spaces: 'drive',
         pageSize: 1000,
         pageToken: page,
-        $fields: 'nextPageToken, files(id,name,size,appProperties)',
+        $fields: 'nextPageToken, files(id,name,size,appProperties,shared,webViewLink)',
       );
       for (final drive.File f in liste.files ?? const <drive.File>[]) {
         final String? id = f.id;
@@ -218,6 +247,8 @@ class ClientDriveGoogle implements ClientDrive {
             nom: nom,
             octets: int.tryParse(f.size ?? ''),
             empreinte: f.appProperties?[proprieteEmpreinteDrive],
+            partage: f.shared ?? false,
+            lien: f.webViewLink,
           ),
         );
       }
@@ -313,5 +344,54 @@ class ClientDriveGoogle implements ClientDrive {
       await nettoyer();
       rethrow;
     }
+  });
+
+  @override
+  Future<List<AccesDrive>> listerAcces(String fichierId) => _executer(() async {
+    final drive.PermissionList liste = await _api.permissions.list(
+      fichierId,
+      $fields: 'permissions(id,type,role,emailAddress,displayName)',
+    );
+    return <AccesDrive>[
+      for (final drive.Permission p in liste.permissions ?? const <drive.Permission>[])
+        if (p.id != null)
+          AccesDrive(
+            id: p.id!,
+            type: typeAccesDrive(type: p.type, role: p.role),
+            email: p.emailAddress,
+            nom: p.displayName,
+            peutModifier: p.role != null && p.role != 'reader' && p.role != 'commenter' && p.role != 'owner',
+          ),
+    ];
+  });
+
+  @override
+  Future<void> partagerAvec({required String fichierId, required String email}) => _executer(() async {
+    await _api.permissions.create(
+      drive.Permission(type: 'user', role: 'reader', emailAddress: email),
+      fichierId,
+      sendNotificationEmail: true,
+      $fields: 'id',
+    );
+  });
+
+  @override
+  Future<void> activerLienPublic(String fichierId) => _executer(() async {
+    await _api.permissions.create(
+      drive.Permission(type: 'anyone', role: 'reader', allowFileDiscovery: false),
+      fichierId,
+      $fields: 'id',
+    );
+  });
+
+  @override
+  Future<void> retirerAcces({required String fichierId, required String accesId}) => _executer(() async {
+    await _api.permissions.delete(fichierId, accesId);
+  });
+
+  @override
+  Future<String?> lienDuFichier(String fichierId) => _executer(() async {
+    final Object reponse = await _api.files.get(fichierId, $fields: 'webViewLink');
+    return reponse is drive.File ? reponse.webViewLink : null;
   });
 }

@@ -2,8 +2,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/drive/compte_google.dart';
 import '../../data/drive/service_drive.dart';
+import '../../data/drive/service_sauvegarde_drive.dart';
 import '../../data/providers.dart';
 import '../../domain/drive_envoi.dart';
+import '../../domain/drive_sauvegardes.dart';
+import '../../domain/erreurs.dart';
 
 /// Le compte Google connecté (`null` : personne n'est connecté). Au premier affichage de l'écran Google Drive, retrouve le
 /// compte déjà connecté, sans rien demander.
@@ -35,10 +38,68 @@ class ProfilGoogleNotifier extends AsyncNotifier<ProfilGoogle?> {
     await ref.read(compteGoogleProvider).seDeconnecter();
     state = const AsyncData<ProfilGoogle?>(null);
     ref.read(envoiDriveProvider.notifier).reinitialiser();
+    ref.read(sauvegardeDriveProvider.notifier).reinitialiser();
   }
 
   /// La connexion est perdue (droit retiré, jeton refusé) : l'écran repasse à « Non connecté ».
   void connexionPerdue() => state = const AsyncData<ProfilGoogle?>(null);
+}
+
+/// L'ID client Web de Google Cloud utilisé par l'application (voir `google_config.dart`) : ce que la personne a saisi dans
+/// l'écran Google Drive, sinon celui qui a été fourni avec l'application.
+class EtatClientWeb {
+  const EtatClientWeb({required this.id, required this.surLeTelephone, required this.redemarrageNecessaire});
+
+  /// L'ID utilisé (vide : aucun, la connexion à Google est alors impossible).
+  final String id;
+
+  /// Vrai si cet ID a été saisi dans l'application.
+  final bool surLeTelephone;
+
+  /// Vrai si l'application doit être fermée complètement, puis rouverte, pour prendre en compte le nouvel ID.
+  final bool redemarrageNecessaire;
+
+  bool get configure => id.isNotEmpty;
+}
+
+final clientWebProvider = NotifierProvider<ClientWebNotifier, EtatClientWeb>(ClientWebNotifier.new);
+
+class ClientWebNotifier extends Notifier<EtatClientWeb> {
+  @override
+  EtatClientWeb build() => _lire();
+
+  EtatClientWeb _lire() {
+    final CompteGoogle compte = ref.read(compteGoogleProvider);
+    return EtatClientWeb(
+      id: compte.clientWeb,
+      surLeTelephone: compte.clientWebEnregistre,
+      redemarrageNecessaire: compte.redemarrageNecessaire,
+    );
+  }
+
+  /// Enregistre l'ID collé. Retourne `null` si c'est fait, sinon le message à montrer.
+  Future<String?> enregistrer(String saisie) async {
+    try {
+      await ref.read(compteGoogleProvider).enregistrerClientWeb(saisie);
+    } on ErreurDrive catch (erreur) {
+      return erreur.message;
+    } catch (erreur) {
+      return 'Enregistrement impossible : $erreur';
+    }
+    state = _lire();
+    return null;
+  }
+
+  /// Oublie l'ID enregistré sur le téléphone. Retourne `null` si c'est fait, sinon le message à montrer.
+  Future<String?> oublier() async {
+    try {
+      await ref.read(compteGoogleProvider).oublierClientWeb();
+    } catch (erreur) {
+      return 'Impossible d’oublier l’ID : $erreur';
+    }
+    state = _lire();
+    return null;
+  }
 }
 
 /// Le bilan du dernier envoi (`null` : aucun envoi pour l'instant).
@@ -119,7 +180,7 @@ class EnvoiDriveNotifier extends Notifier<EtatEnvoi> {
 
   /// Compare le téléphone et Drive, sans rien envoyer.
   Future<void> verifier() async {
-    if (state.occupe) return;
+    if (state.occupe || ref.read(sauvegardeDriveProvider).occupe) return;
     state = const EtatEnvoi.enVerification();
     try {
       state = EtatEnvoi.verifie(await ref.read(serviceDriveProvider).verifier());
@@ -132,7 +193,7 @@ class EnvoiDriveNotifier extends Notifier<EtatEnvoi> {
 
   /// Envoie ce qui n'est pas encore sur Drive.
   Future<void> envoyer() async {
-    if (state.occupe) return;
+    if (state.occupe || ref.read(sauvegardeDriveProvider).occupe) return;
     final AnnulationEnvoi annulation = AnnulationEnvoi();
     _annulation = annulation;
     state = const EtatEnvoi.enEnvoi(ProgressionEnvoi.preparation());
@@ -190,5 +251,167 @@ class EnvoiDriveNotifier extends Notifier<EtatEnvoi> {
   void _echec(ErreurDrive erreur) {
     state = EtatEnvoi.enErreur(erreur.message, autorisationAExpire: erreur.autorisationAExpire);
     if (erreur.autorisationAExpire) ref.read(profilGoogleProvider.notifier).connexionPerdue();
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Sauvegarde des données sur Drive (étape 7)
+// -----------------------------------------------------------------------------
+
+/// Le réglage « envoi automatique » et le dernier bilan des sauvegardes Drive (gardés sur le téléphone).
+final etatSauvegardesDriveProvider = FutureProvider.autoDispose<EtatSauvegardesDrive>(
+  (ref) => ref.watch(serviceSauvegardeDriveProvider).lireEtat(),
+);
+
+/// Les sauvegardes qui sont sur Drive, de la plus récente à la plus ancienne (pour les restaurer).
+final sauvegardesDriveProvider = FutureProvider.autoDispose<List<SauvegardeDrive>>(
+  (ref) => ref.watch(serviceSauvegardeDriveProvider).listerSauvegardes(),
+);
+
+/// Où en est la sauvegarde sur Drive.
+enum PhaseSauvegardeDrive {
+  /// Rien en cours.
+  repos,
+
+  /// Sauvegarde en cours.
+  enCours,
+
+  /// Terminée (ou arrêtée) : le résultat est dans [SuiviSauvegardeDrive.resultat].
+  termine,
+
+  /// Échec (Google injoignable, connexion perdue, données illisibles).
+  erreur,
+}
+
+class SuiviSauvegardeDrive {
+  const SuiviSauvegardeDrive._(
+    this.phase, {
+    this.progression,
+    this.resultat,
+    this.erreur,
+    this.autorisationAExpire = false,
+    this.arretDemande = false,
+    this.automatique = false,
+  });
+
+  const SuiviSauvegardeDrive.repos() : this._(PhaseSauvegardeDrive.repos);
+
+  const SuiviSauvegardeDrive.enCours(ProgressionSauvegardeDrive progression, {bool arretDemande = false, bool automatique = false})
+    : this._(PhaseSauvegardeDrive.enCours, progression: progression, arretDemande: arretDemande, automatique: automatique);
+
+  const SuiviSauvegardeDrive.termine(ResultatSauvegardeDrive resultat, {bool automatique = false})
+    : this._(PhaseSauvegardeDrive.termine, resultat: resultat, automatique: automatique);
+
+  const SuiviSauvegardeDrive.enErreur(String message, {bool autorisationAExpire = false, bool automatique = false})
+    : this._(PhaseSauvegardeDrive.erreur, erreur: message, autorisationAExpire: autorisationAExpire, automatique: automatique);
+
+  final PhaseSauvegardeDrive phase;
+  final ProgressionSauvegardeDrive? progression;
+  final ResultatSauvegardeDrive? resultat;
+  final String? erreur;
+
+  /// Vrai si la connexion à Google doit être refaite.
+  final bool autorisationAExpire;
+
+  /// Vrai si la personne a demandé l'arrêt : il a lieu à la fin du fichier en cours.
+  final bool arretDemande;
+
+  /// Vrai si cette sauvegarde est celle de l'envoi automatique (lancée à l'ouverture de l'application).
+  final bool automatique;
+
+  bool get occupe => phase == PhaseSauvegardeDrive.enCours;
+}
+
+/// La sauvegarde des données sur Drive. Elle continue si l'on quitte l'écran (tant que l'application reste ouverte), et c'est
+/// elle que l'envoi automatique lance à l'ouverture de l'application.
+final sauvegardeDriveProvider = NotifierProvider<SauvegardeDriveNotifier, SuiviSauvegardeDrive>(SauvegardeDriveNotifier.new);
+
+class SauvegardeDriveNotifier extends Notifier<SuiviSauvegardeDrive> {
+  AnnulationEnvoi? _annulation;
+
+  @override
+  SuiviSauvegardeDrive build() => const SuiviSauvegardeDrive.repos();
+
+  /// « Sauvegarder maintenant sur Drive ».
+  Future<void> sauvegarder() => _lancer(automatique: false);
+
+  /// À l'ouverture de l'application : sauvegarde si l'envoi automatique est activé, que Google est connecté et que rien n'est
+  /// passé depuis un jour. Ne fait rien (et ne dit rien) sinon : un échec s'affiche sur l'écran Google Drive, jamais ailleurs.
+  Future<void> lancerSiBesoin() async {
+    if (state.occupe || ref.read(envoiDriveProvider).occupe) return;
+    try {
+      if (!await ref.read(serviceSauvegardeDriveProvider).automatiqueEstDu()) return;
+      if (await ref.read(compteGoogleProvider).restaurer() == null) return;
+    } catch (_) {
+      return;
+    }
+    await _lancer(automatique: true);
+  }
+
+  Future<void> _lancer({required bool automatique}) async {
+    if (state.occupe || ref.read(envoiDriveProvider).occupe) return;
+    final AnnulationEnvoi annulation = AnnulationEnvoi();
+    _annulation = annulation;
+    state = SuiviSauvegardeDrive.enCours(const ProgressionSauvegardeDrive.preparation(), automatique: automatique);
+
+    // La progression arrive à chaque morceau envoyé : on ne rafraîchit l'écran que s'il y a du nouveau (autre étape, autre
+    // fichier, autre nombre de fichiers) ou au plus tous les 150 ms.
+    ProgressionSauvegardeDrive? derniere;
+    DateTime? dernierRafraichissement;
+    void suivre(ProgressionSauvegardeDrive progression) {
+      final DateTime maintenant = DateTime.now();
+      final ProgressionSauvegardeDrive? avant = derniere;
+      final bool nouveau =
+          avant == null ||
+          avant.etape != progression.etape ||
+          avant.fichiers?.fichierEnCours != progression.fichiers?.fichierEnCours ||
+          avant.fichiers?.fichiersFaits != progression.fichiers?.fichiersFaits ||
+          dernierRafraichissement == null ||
+          maintenant.difference(dernierRafraichissement!) >= const Duration(milliseconds: 150);
+      if (!nouveau) return;
+      derniere = progression;
+      dernierRafraichissement = maintenant;
+      state = SuiviSauvegardeDrive.enCours(progression, arretDemande: annulation.demandee, automatique: automatique);
+    }
+
+    try {
+      final ResultatSauvegardeDrive resultat = await ref
+          .read(serviceSauvegardeDriveProvider)
+          .sauvegarder(progression: suivre, annulation: annulation);
+      state = SuiviSauvegardeDrive.termine(resultat, automatique: automatique);
+      ref.invalidate(etatSauvegardesDriveProvider);
+      ref.invalidate(dernierBilanDriveProvider);
+      ref.invalidate(sauvegardesDriveProvider);
+      if (resultat.arret?.autorisationAExpire ?? false) ref.read(profilGoogleProvider.notifier).connexionPerdue();
+    } on ErreurDrive catch (erreur) {
+      state = SuiviSauvegardeDrive.enErreur(
+        erreur.message,
+        autorisationAExpire: erreur.autorisationAExpire,
+        automatique: automatique,
+      );
+      if (erreur.autorisationAExpire) ref.read(profilGoogleProvider.notifier).connexionPerdue();
+    } on ErreurMetier catch (erreur) {
+      state = SuiviSauvegardeDrive.enErreur(erreur.message, automatique: automatique);
+    } catch (erreur) {
+      state = SuiviSauvegardeDrive.enErreur('Sauvegarde impossible : $erreur', automatique: automatique);
+    } finally {
+      _annulation = null;
+    }
+  }
+
+  /// Demande l'arrêt de l'envoi des fichiers : il s'arrête à la fin du fichier en cours, et les données ne sont alors pas
+  /// sauvegardées.
+  void arreter() {
+    final AnnulationEnvoi? annulation = _annulation;
+    final ProgressionSauvegardeDrive? progression = state.progression;
+    if (annulation == null || !state.occupe || progression == null) return;
+    if (progression.etape != EtapeSauvegardeDrive.fichiers) return;
+    annulation.demander();
+    state = SuiviSauvegardeDrive.enCours(progression, arretDemande: true, automatique: state.automatique);
+  }
+
+  /// Revient à « rien en cours » (après une déconnexion, par exemple). Sans effet pendant une sauvegarde.
+  void reinitialiser() {
+    if (!state.occupe) state = const SuiviSauvegardeDrive.repos();
   }
 }

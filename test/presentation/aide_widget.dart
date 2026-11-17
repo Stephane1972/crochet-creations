@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'package:crochet_creations/app.dart';
 import 'package:crochet_creations/data/database/app_database.dart';
 import 'package:crochet_creations/data/drive/service_drive.dart';
+import 'package:crochet_creations/data/drive/service_sauvegarde_drive.dart';
 import 'package:crochet_creations/data/providers.dart';
 import 'package:crochet_creations/data/repositories/categorie_note_repository.dart';
 import 'package:crochet_creations/data/repositories/categorie_repository.dart';
@@ -244,6 +245,14 @@ class EnvironnementTest {
     fichierBilan: File('${dossier.path}/drive/dernier_envoi.json'),
     horloge: () => maintenant ?? DateTime.now(),
   );
+  late final ServiceSauvegardeDrive serviceSauvegardeDrive = ServiceSauvegardeDrive(
+    client: clientDrive,
+    envoi: serviceDrive,
+    sauvegarde: sauvegarde,
+    dossierTravail: Directory('${dossier.path}/drive/travail'),
+    fichierEtat: File('${dossier.path}/drive/sauvegardes_drive.json'),
+    horloge: () => maintenant ?? DateTime.now(),
+  );
   late final ServiceSauvegarde sauvegarde = ServiceSauvegarde(
     base: db,
     dossierSauvegardes: Directory('${dossier.path}/sauvegardes'),
@@ -306,6 +315,7 @@ class EnvironnementTest {
     servicePartageFichiersProvider.overrideWithValue(partageFichiers),
     compteGoogleProvider.overrideWithValue(compteGoogle),
     serviceDriveProvider.overrideWithValue(serviceDrive),
+    serviceSauvegardeDriveProvider.overrideWithValue(serviceSauvegardeDrive),
     selecteurFichierSauvegardeProvider.overrideWithValue(selecteurFichier),
     horlogeProvider.overrideWithValue(() => maintenant ?? DateTime.now()),
     // L'aperçu réel rasterise le PDF avec le moteur d'impression d'Android : ici, on en affiche le texte.

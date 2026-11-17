@@ -352,6 +352,91 @@ void main() {
         expect(appels, isEmpty);
       });
     });
+
+    group('telecharger', () {
+      /// Le contenu d'un fichier, comme Drive le renvoie (type et longueur annoncés).
+      Future<http.Response> contenu(String corps) async => http.Response(
+        corps,
+        200,
+        headers: <String, String>{'content-type': 'application/octet-stream', 'content-length': '${utf8.encode(corps).length}'},
+      );
+
+      test('écrit le contenu dans le fichier demandé, avec le jeton du compte, et suit la progression', () async {
+        final ClientDriveGoogle client = creer((_) => contenu('contenu du fichier'));
+        final File destination = File('${temp.path}/sous-dossier/photo_1.jpg');
+        final List<int> progres = <int>[];
+
+        await client.telecharger(id: 'fichier-1', destination: destination, progression: progres.add);
+
+        expect(destination.readAsStringSync(), 'contenu du fichier');
+        expect(File('${destination.path}.tmp').existsSync(), isFalse);
+        final http.Request requete = appels.single;
+        expect(requete.method, 'GET');
+        expect(requete.url.path, contains('fichier-1'));
+        expect(requete.url.queryParameters['alt'], 'media'); // le contenu, pas les informations du fichier
+        expect(requete.headers['authorization'], 'Bearer jeton-de-test');
+        expect(progres, isNotEmpty);
+        expect(progres.last, 'contenu du fichier'.length);
+      });
+
+      test('un fichier déjà là est remplacé', () async {
+        final ClientDriveGoogle client = creer((_) => contenu('version de Drive'));
+        final File destination = File('${temp.path}/FACT-2026-0001.pdf')..writeAsStringSync('ancienne version');
+
+        await client.telecharger(id: 'fichier-1', destination: destination);
+
+        expect(destination.readAsStringSync(), 'version de Drive');
+        expect(File('${destination.path}.tmp').existsSync(), isFalse);
+      });
+
+      test('un téléchargement coupé : message clair, le fichier d’avant est gardé, rien ne reste', () async {
+        final ClientDriveGoogle client = ClientDriveGoogle(
+          compte,
+          base: MockClient.streaming(
+            (http.BaseRequest requete, http.ByteStream corps) async => http.StreamedResponse(
+              Stream<List<int>>.value(utf8.encode('0123456789')),
+              200,
+              headers: <String, String>{'content-type': 'application/octet-stream', 'content-length': '100'},
+            ),
+          ),
+        );
+        final File destination = File('${temp.path}/photo_1.jpg')..writeAsStringSync('ancienne version');
+
+        await expectLater(
+          client.telecharger(id: 'fichier-1', destination: destination),
+          throwsA(isA<ErreurDrive>().having((ErreurDrive e) => e.message, 'message', contains('s’est arrêté avant la fin'))),
+        );
+
+        expect(destination.readAsStringSync(), 'ancienne version');
+        expect(File('${destination.path}.tmp').existsSync(), isFalse);
+      });
+
+      test('fichier introuvable sur Drive : message clair, rien n’est écrit', () async {
+        final ClientDriveGoogle client = creer((_) async => _json(_erreurJson(404, 'File not found'), 404));
+        final File destination = File('${temp.path}/absent.jpg');
+
+        await expectLater(
+          client.telecharger(id: 'fichier-1', destination: destination),
+          throwsA(isA<ErreurDrive>().having((ErreurDrive e) => e.message, 'message', contains('introuvable'))),
+        );
+
+        expect(destination.existsSync(), isFalse);
+        expect(File('${destination.path}.tmp').existsSync(), isFalse);
+      });
+
+      test('pas d’Internet : message clair, rien n’est écrit', () async {
+        final ClientDriveGoogle client = creer((_) async => throw const SocketException('injoignable'));
+        final File destination = File('${temp.path}/photo_1.jpg');
+
+        await expectLater(
+          client.telecharger(id: 'fichier-1', destination: destination),
+          throwsA(isA<ErreurDrive>().having((ErreurDrive e) => e.message, 'message', contains('Pas de connexion à Internet'))),
+        );
+
+        expect(destination.existsSync(), isFalse);
+        expect(File('${destination.path}.tmp').existsSync(), isFalse);
+      });
+    });
   });
 
   group('CompteGoogleReel sans ID client Web', () {

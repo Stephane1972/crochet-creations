@@ -94,6 +94,9 @@ class ServiceSauvegarde {
   static const String _messageIncompatible =
       'Cette sauvegarde est abîmée ou incompatible : rien n’a été modifié.';
   static const String _messageIntrouvable = 'Ce fichier est introuvable sur le téléphone.';
+  static const String _messageDonneesSeules =
+      'Cette sauvegarde ne contient que les données : ses photos et ses documents sont sur Google Drive. '
+      'Elle se restaure depuis Réglages › Google Drive › Restaurer depuis Drive.';
 
   // Une seule sauvegarde ou restauration à la fois : sinon l'une effacerait les fichiers provisoires de l'autre.
   Future<void> _derniere = Future<void>.value();
@@ -170,12 +173,7 @@ class ServiceSauvegarde {
       nombreFichiers: empreintes.length,
       fichiersAbsents: absents,
     );
-    final List<int> jsonListe = utf8.encode(
-      const JsonEncoder.withIndent('  ').convert(<String, Object?>{
-        'format': FormatSauvegarde.version,
-        'fichiers': empreintes.map((EmpreinteFichier e) => e.versJson()).toList(),
-      }),
-    );
+    final List<int> jsonListe = _jsonListe(empreintes);
 
     final int octetsFichiers = empreintes.fold<int>(0, (int somme, EmpreinteFichier e) => somme + e.octets);
     await _verifierPlace(octetsFichiers + jsonDonnees.length + jsonListe.length, 'faire la sauvegarde');
@@ -334,6 +332,7 @@ class ServiceSauvegarde {
     required DateTime date,
     required int nombreFichiers,
     List<String>? fichiersAbsents,
+    bool donneesSeules = false,
   }) {
     final Map<String, Object?> document = <String, Object?>{
       'manifeste': <String, Object?>{
@@ -348,11 +347,21 @@ class ServiceSauvegarde {
         },
         if (fichiersAbsents != null) 'complete': fichiersAbsents.isEmpty,
         if (fichiersAbsents != null) 'fichiersAbsents': fichiersAbsents,
+        // Sauvegarde Drive : les fichiers ne sont pas dans l'archive (ils sont déjà dans leurs dossiers Drive).
+        if (donneesSeules) 'donneesSeules': true,
       },
       'tables': donnees.tables,
     };
     return utf8.encode(const JsonEncoder.withIndent('  ').convert(document));
   }
+
+  /// `fichiers.json` : la liste des fichiers de l'archive, avec la taille et l'empreinte de chacun.
+  List<int> _jsonListe(List<EmpreinteFichier> empreintes) => utf8.encode(
+    const JsonEncoder.withIndent('  ').convert(<String, Object?>{
+      'format': FormatSauvegarde.version,
+      'fichiers': empreintes.map((EmpreinteFichier e) => e.versJson()).toList(),
+    }),
+  );
 
   /// Les photos et PDF présents sur le téléphone (les fichiers provisoires `.tmp` sont ignorés), dossier par dossier.
   Future<List<_FichierLocal>> _fichiersPresents() async {
@@ -491,43 +500,9 @@ class ServiceSauvegarde {
         throw const DonneeInvalide(_messageIncompatible);
       }
 
-      // 2. La copie de sécurité de ce qui existe (l'archive n'est plus utile : tout est lu, rien n'en dépend).
-      try {
-        await _creer(TypeSauvegarde.avantRestauration, (ProgressionSauvegarde p) {
-          // L'avancement de la copie de sécurité est ramené à une seule étape de la restauration.
-          final double global = ((p.numeroEtape - 1) + (p.fraction ?? 0)) / p.nombreEtapes;
-          surProgression?.call(ProgressionSauvegarde(EtapeSauvegarde.copieDeSecurite, (global * 1000).round(), 1000));
-        });
-      } catch (_) {
-        await _abandonnerPreparation();
-        rethrow;
-      }
-
-      // 3. La base, puis les fichiers.
-      surProgression?.call(const ProgressionSauvegarde(EtapeSauvegarde.remplacement, 0, 1));
-      try {
-        await _remplacerDonnees(contenu);
-      } on ErreurMetier {
-        await _abandonnerPreparation();
-        rethrow;
-      } catch (erreur, pile) {
-        debugPrint('Restauration impossible : $erreur\n$pile');
-        await _abandonnerPreparation();
-        throw const DonneeInvalide(_messageIncompatible);
-      }
-
-      // Les écrans ouverts relisent la base : Drift n'a pas vu passer ces écritures, on le prévient.
-      _base.markTablesUpdated(_base.allTables);
-
-      await _installerFichiers();
-      surProgression?.call(const ProgressionSauvegarde(EtapeSauvegarde.remplacement, 1, 1));
-
-      int lignes = 0;
-      for (final List<Map<String, Object?>> t in contenu.tables.values) {
-        lignes += t.length;
-      }
-      return ResultatRestauration(
-        lignes: lignes,
+      return await _appliquer(
+        contenu,
+        surProgression,
         fichiers: contenu.fichiers.length,
         fichiersAbsents: contenu.manifeste.fichiersAbsents,
       );
@@ -536,8 +511,204 @@ class ServiceSauvegarde {
     }
   }
 
+  /// Les étapes qui suivent la mise de côté des fichiers (dans les dossiers provisoires) : copie de sécurité des données
+  /// actuelles, remplacement de la base en une seule transaction, mise en place des fichiers. Commune à la restauration d'une
+  /// archive complète et à celle d'une sauvegarde « données seules » de Drive.
+  Future<ResultatRestauration> _appliquer(
+    _Contenu contenu,
+    SurProgression? surProgression, {
+    required int fichiers,
+    required List<String> fichiersAbsents,
+  }) async {
+    // 2. La copie de sécurité de ce qui existe (l'archive n'est plus utile : tout est lu, rien n'en dépend).
+    try {
+      await _creer(TypeSauvegarde.avantRestauration, (ProgressionSauvegarde p) {
+        // L'avancement de la copie de sécurité est ramené à une seule étape de la restauration.
+        final double global = ((p.numeroEtape - 1) + (p.fraction ?? 0)) / p.nombreEtapes;
+        surProgression?.call(ProgressionSauvegarde(EtapeSauvegarde.copieDeSecurite, (global * 1000).round(), 1000));
+      });
+    } catch (_) {
+      await _abandonnerPreparation();
+      rethrow;
+    }
+
+    // 3. La base, puis les fichiers.
+    surProgression?.call(const ProgressionSauvegarde(EtapeSauvegarde.remplacement, 0, 1));
+    try {
+      await _remplacerDonnees(contenu);
+    } on ErreurMetier {
+      await _abandonnerPreparation();
+      rethrow;
+    } catch (erreur, pile) {
+      debugPrint('Restauration impossible : $erreur\n$pile');
+      await _abandonnerPreparation();
+      throw const DonneeInvalide(_messageIncompatible);
+    }
+
+    // Les écrans ouverts relisent la base : Drift n'a pas vu passer ces écritures, on le prévient.
+    _base.markTablesUpdated(_base.allTables);
+
+    await _installerFichiers();
+    surProgression?.call(const ProgressionSauvegarde(EtapeSauvegarde.remplacement, 1, 1));
+
+    int lignes = 0;
+    for (final List<Map<String, Object?>> t in contenu.tables.values) {
+      lignes += t.length;
+    }
+    return ResultatRestauration(lignes: lignes, fichiers: fichiers, fichiersAbsents: fichiersAbsents);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Sauvegarde « données seules » (Google Drive, étape 7)
+  // ---------------------------------------------------------------------------
+
+  /// Prend un instantané des données et de la liste des fichiers **confirmés sur Drive** ([fichiersConfirmes], sous la forme
+  /// `dossier/nom`), sans écrire ni calculer d'empreinte de fichier : c'est rapide, et [DonneesSeules.empreinte] dit si quelque
+  /// chose a changé depuis la dernière sauvegarde Drive.
+  Future<DonneesSeules> lireDonneesSeules({required Set<String> fichiersConfirmes}) async {
+    final _InstantaneBase base = await _lireBase();
+    final List<_FichierMesure> fichiers = <_FichierMesure>[];
+    for (final _FichierLocal f in await _fichiersPresents()) {
+      if (!fichiersConfirmes.contains(f.chemin) || _lireChemin(f.chemin) == null) continue;
+      try {
+        fichiers.add(_FichierMesure(f, await f.fichier.length()));
+      } on FileSystemException catch (erreur) {
+        debugPrint('Fichier illisible, il ne sera pas listé : ${f.chemin} ($erreur)');
+      }
+    }
+    final Set<String> listes = fichiers.map((_FichierMesure f) => f.local.chemin).toSet();
+    final List<String> absents = FormatSauvegarde.fichiersIrremplacablesCites(base.tables).difference(listes).toList()..sort();
+    // L'empreinte porte sur les données et sur la liste des fichiers (nom et taille), pas sur la date : deux sauvegardes
+    // de la même situation ont la même empreinte.
+    final String empreinte = sha256
+        .convert(
+          utf8.encode(
+            jsonEncode(<String, Object?>{
+              'tables': base.tables,
+              'fichiers': <Object?>[for (final _FichierMesure f in fichiers) <Object?>[f.local.chemin, f.octets]],
+            }),
+          ),
+        )
+        .toString();
+    return DonneesSeules._(base, fichiers, empreinte, absents);
+  }
+
+  /// Écrit dans [destination] l'archive « données seules » de [donnees] : `donnees.json` et `fichiers.json` (la liste des
+  /// fichiers avec leur empreinte SHA-256, calculée ici), **sans les fichiers eux-mêmes**. L'archive est écrite dans un fichier
+  /// provisoire, relue, puis prend son nom ; au moindre problème, rien n'est laissé.
+  Future<File> ecrireDonneesSeules(DonneesSeules donnees, File destination) {
+    return _enSerie(() => _ecrireDonneesSeules(donnees, destination));
+  }
+
+  Future<File> _ecrireDonneesSeules(DonneesSeules donnees, File destination) async {
+    final List<EmpreinteFichier> empreintes = <EmpreinteFichier>[];
+    for (final _FichierMesure f in donnees._fichiers) {
+      try {
+        final ({int octets, String sha256}) lu = await _empreinte(f.local.fichier);
+        empreintes.add(EmpreinteFichier(chemin: f.local.chemin, octets: lu.octets, sha256: lu.sha256));
+      } on FileSystemException catch (erreur) {
+        debugPrint('Fichier illisible, il ne sera pas listé : ${f.local.chemin} ($erreur)');
+      }
+    }
+    final Set<String> listes = empreintes.map((EmpreinteFichier e) => e.chemin).toSet();
+    final List<String> absents =
+        FormatSauvegarde.fichiersIrremplacablesCites(donnees._base.tables).difference(listes).toList()..sort();
+    final List<int> jsonDonnees = _jsonDonnees(
+      donnees._base,
+      date: _horloge(),
+      nombreFichiers: empreintes.length,
+      fichiersAbsents: absents,
+      donneesSeules: true,
+    );
+    final List<int> jsonListe = _jsonListe(empreintes);
+    await _verifierPlace(jsonDonnees.length + jsonListe.length, 'préparer la sauvegarde Drive');
+
+    await destination.parent.create(recursive: true);
+    final File provisoire = File('${destination.path}.tmp');
+    try {
+      final ZipFileEncoder encodeur = ZipFileEncoder()..create(provisoire.path);
+      try {
+        encodeur.addArchiveFile(ArchiveFile.bytes(FormatSauvegarde.fichierDonnees, jsonDonnees));
+        encodeur.addArchiveFile(ArchiveFile.bytes(FormatSauvegarde.fichierListe, jsonListe));
+      } finally {
+        await encodeur.close();
+      }
+      await _verifierArchiveEcrite(provisoire, const <EmpreinteFichier>[]);
+      if (await destination.exists()) await destination.delete();
+      await provisoire.rename(destination.path);
+    } catch (erreur, pile) {
+      await _effacer(provisoire);
+      if (erreur is ErreurMetier) rethrow;
+      debugPrint('Sauvegarde Drive impossible : $erreur\n$pile');
+      if (_disqueRempli(erreur)) {
+        throw const DonneeInvalide(
+          'Le téléphone est plein : la sauvegarde Drive n’a pas pu être préparée. Libérez de la place, puis recommencez.',
+        );
+      }
+      rethrow;
+    }
+    return destination;
+  }
+
+  /// Vérifie que [archive] est une sauvegarde « données seules » de cette application et lit ce qu'elle dit, sans rien modifier.
+  Future<ExamenDonneesSeules> examinerDonneesSeules(File archive) async {
+    final _Contenu contenu = await _lireArchive(archive, donneesSeules: true);
+    try {
+      return ExamenDonneesSeules(manifeste: contenu.manifeste, fichiers: contenu.annonces);
+    } finally {
+      await contenu.fermer();
+    }
+  }
+
+  /// Remplace **toutes** les données par celles de la sauvegarde « données seules » [archive], après avoir fait venir les
+  /// fichiers qu'elle liste.
+  ///
+  /// Dans l'ordre : lecture de l'archive → [recuperer] écrit les fichiers dans des dossiers provisoires, en les contrôlant
+  /// (rien n'est touché tant que ce n'est pas fini) → copie de sécurité des données actuelles → remplacement de la base en
+  /// une seule transaction → mise en place des fichiers. Si [recuperer] échoue, tout est abandonné et rien n'a été modifié.
+  Future<ResultatRestauration> restaurerDonneesSeules(
+    File archive, {
+    required RecuperateurFichiers recuperer,
+    SurProgression? surProgression,
+  }) {
+    return _enSerie(() => _restaurerDonneesSeules(archive, recuperer, surProgression));
+  }
+
+  Future<ResultatRestauration> _restaurerDonneesSeules(
+    File archive,
+    RecuperateurFichiers recuperer,
+    SurProgression? surProgression,
+  ) async {
+    final _Contenu contenu = await _lireArchive(archive, donneesSeules: true);
+    try {
+      final int octets = contenu.annonces.fold<int>(0, (int somme, EmpreinteFichier f) => somme + f.octets);
+      await _verifierPlace(octets, 'restaurer cette sauvegarde');
+      final Set<String> installes;
+      try {
+        await _preparerProvisoires();
+        installes = await recuperer(contenu.annonces, (String dossier) => _provisoire(_dossiers[dossier]!));
+      } catch (erreur, pile) {
+        await _abandonnerPreparation();
+        if (erreur is ErreurMetier || erreur is! FileSystemException) rethrow;
+        debugPrint('Restauration Drive impossible : $erreur\n$pile');
+        if (_disqueRempli(erreur)) {
+          throw const DonneeInvalide(
+            'Le téléphone est plein : la restauration a été abandonnée, rien n’a été modifié. '
+            'Libérez de la place, puis recommencez.',
+          );
+        }
+        throw const DonneeInvalide(_messageIncompatible);
+      }
+      final List<String> absents =
+          FormatSauvegarde.fichiersIrremplacablesCites(contenu.tables).difference(installes).toList()..sort();
+      return await _appliquer(contenu, surProgression, fichiers: installes.length, fichiersAbsents: absents);
+    } finally {
+      await contenu.fermer();
+    }
+  }
+
   /// Ouvre l'archive et vérifie tout ce qu'on peut vérifier sans toucher à la base ni extraire un fichier.
-  Future<_Contenu> _lireArchive(File fichier) async {
+  Future<_Contenu> _lireArchive(File fichier, {bool donneesSeules = false}) async {
     final InputFileStream flux;
     final Archive archive;
     if (!await fichier.exists()) throw const DonneeInvalide(_messageIntrouvable);
@@ -554,14 +725,14 @@ class ServiceSauvegarde {
     }
 
     try {
-      return _lireContenu(archive, flux);
+      return _lireContenu(archive, flux, donneesSeules: donneesSeules);
     } catch (_) {
       await flux.close();
       rethrow;
     }
   }
 
-  _Contenu _lireContenu(Archive archive, InputFileStream flux) {
+  _Contenu _lireContenu(Archive archive, InputFileStream flux, {required bool donneesSeules}) {
     final ArchiveFile? entreeDonnees = archive.find(FormatSauvegarde.fichierDonnees);
     if (entreeDonnees == null) throw const DonneeInvalide(_messageNonReconnu);
 
@@ -602,24 +773,31 @@ class ServiceSauvegarde {
 
     final List<_FichierArchive> fichiers = <_FichierArchive>[];
     final Set<String> chemins = <String>{};
-    for (final ArchiveFile entree in archive) {
-      if (!entree.isFile || entree.name == FormatSauvegarde.fichierDonnees) continue;
-      if (!entree.name.startsWith(FormatSauvegarde.prefixeFichiers)) continue;
-      // fichiers/<dossier>/<nom> : rien d'autre. Un nom qui remonte dans l'arborescence est refusé.
-      final String chemin = entree.name.substring(FormatSauvegarde.prefixeFichiers.length);
-      final ({String dossier, String nom})? lu = _lireChemin(chemin);
-      if (lu == null || !chemins.add(chemin)) throw const DonneeInvalide(_messageIncompatible);
-      final EmpreinteFichier? annonce = annonces?[chemin];
-      if (annonces != null && (annonce == null || annonce.octets != entree.size)) {
-        throw const DonneeInvalide(_messageIncompatible);
+    if (donneesSeules) {
+      // Sauvegarde Drive : la liste annonce des fichiers qui ne sont pas dans l'archive (ils sont dans leurs dossiers Drive).
+      if (annonces == null || manifeste['donneesSeules'] != true) throw const DonneeInvalide(_messageIncompatible);
+      chemins.addAll(annonces.keys);
+    } else {
+      for (final ArchiveFile entree in archive) {
+        if (!entree.isFile || entree.name == FormatSauvegarde.fichierDonnees) continue;
+        if (!entree.name.startsWith(FormatSauvegarde.prefixeFichiers)) continue;
+        // fichiers/<dossier>/<nom> : rien d'autre. Un nom qui remonte dans l'arborescence est refusé.
+        final String chemin = entree.name.substring(FormatSauvegarde.prefixeFichiers.length);
+        final ({String dossier, String nom})? lu = _lireChemin(chemin);
+        if (lu == null || !chemins.add(chemin)) throw const DonneeInvalide(_messageIncompatible);
+        final EmpreinteFichier? annonce = annonces?[chemin];
+        if (annonces != null && (annonce == null || annonce.octets != entree.size)) {
+          throw const DonneeInvalide(_messageIncompatible);
+        }
+        fichiers.add(
+          _FichierArchive(dossier: lu.dossier, nom: lu.nom, entree: entree, octets: entree.size, empreinte: annonce?.sha256),
+        );
       }
-      fichiers.add(
-        _FichierArchive(dossier: lu.dossier, nom: lu.nom, entree: entree, octets: entree.size, empreinte: annonce?.sha256),
-      );
-    }
-    // Tout ce que la liste annonce doit être dans l'archive.
-    if (annonces != null && annonces.keys.any((String chemin) => !chemins.contains(chemin))) {
-      throw const DonneeInvalide(_messageIncompatible);
+      // Tout ce que la liste annonce doit être dans l'archive. Une sauvegarde Drive choisie ici, comme une archive : on dit
+      // où elle se restaure.
+      if (annonces != null && annonces.keys.any((String chemin) => !chemins.contains(chemin))) {
+        throw DonneeInvalide(manifeste['donneesSeules'] == true ? _messageDonneesSeules : _messageIncompatible);
+      }
     }
 
     // Les photos citées par les données mais absentes de l'archive : vrai pour toute archive, même ancienne.
@@ -632,13 +810,14 @@ class ServiceSauvegarde {
       manifeste: ManifesteSauvegarde(
         creeLe: creeLe is String ? DateTime.tryParse(creeLe) : null,
         versionApplication: version is String ? version : '?',
-        nombreFichiers: fichiers.length,
+        nombreFichiers: donneesSeules ? chemins.length : fichiers.length,
         lignes: comptes,
         format: format,
         fichiersAbsents: absents,
       ),
       tables: tables,
       fichiers: fichiers,
+      annonces: donneesSeules ? annonces!.values.toList() : const <EmpreinteFichier>[],
       flux: flux,
       // Une sauvegarde du schéma 1 ou 2 n'a pas de catégories : les produits y portent les clés des cinq de départ.
       sansCategories: tablesBrutes['categories_produit'] == null,
@@ -770,11 +949,7 @@ class ServiceSauvegarde {
   /// Écrit chaque fichier de l'archive dans le dossier provisoire, puis relit ce qui a été écrit : la taille
   /// (et, pour une archive du format 2, l'empreinte SHA-256) doit être celle annoncée, sinon l'archive est abîmée.
   Future<void> _extraireFichiers(_Contenu contenu, SurProgression? surProgression) async {
-    for (final MapEntry<String, Directory> dossier in _dossiers.entries) {
-      final Directory provisoire = _provisoire(dossier.value);
-      if (await provisoire.exists()) await provisoire.delete(recursive: true);
-      await provisoire.create(recursive: true);
-    }
+    await _preparerProvisoires();
     final int total = contenu.fichiers.length;
     surProgression?.call(ProgressionSauvegarde(EtapeSauvegarde.controleFichiers, 0, total));
     for (int i = 0; i < total; i++) {
@@ -794,6 +969,15 @@ class ServiceSauvegarde {
         );
       }
       surProgression?.call(ProgressionSauvegarde(EtapeSauvegarde.controleFichiers, i + 1, total));
+    }
+  }
+
+  /// Des dossiers provisoires vides, à côté des dossiers de fichiers : c'est là que sont mis de côté les fichiers à restaurer.
+  Future<void> _preparerProvisoires() async {
+    for (final Directory cible in _dossiers.values) {
+      final Directory provisoire = _provisoire(cible);
+      if (await provisoire.exists()) await provisoire.delete(recursive: true);
+      await provisoire.create(recursive: true);
     }
   }
 
@@ -908,6 +1092,43 @@ class ServiceSauvegarde {
   }
 }
 
+/// Va chercher les fichiers annoncés par une sauvegarde « données seules » et les écrit dans les dossiers provisoires :
+/// `destination('photos_produits')` donne le dossier provisoire de ce dossier de fichiers. Retourne les chemins
+/// (`dossier/nom`) réellement mis en place **et contrôlés** ; les autres sont dits absents. Une exception arrête tout.
+typedef RecuperateurFichiers =
+    Future<Set<String>> Function(List<EmpreinteFichier> annonces, Directory Function(String dossier) destination);
+
+/// Les données du moment et la liste des fichiers confirmés sur Drive, prêtes à être écrites dans une sauvegarde « données
+/// seules » (voir [ServiceSauvegarde.lireDonneesSeules]).
+class DonneesSeules {
+  const DonneesSeules._(this._base, this._fichiers, this.empreinte, this.fichiersAbsents);
+
+  final _InstantaneBase _base;
+  final List<_FichierMesure> _fichiers;
+
+  /// SHA-256 des données et de la liste des fichiers (nom et taille) : identique tant que rien n'a changé.
+  final String empreinte;
+
+  /// Photos citées par les données mais pas dans la liste (elles n'ont pas pu partir sur Drive).
+  final List<String> fichiersAbsents;
+
+  /// Nombre de fichiers que la sauvegarde liste.
+  int get nombreFichiers => _fichiers.length;
+}
+
+/// Ce que dit une sauvegarde « données seules », lu avant de la restaurer.
+class ExamenDonneesSeules {
+  const ExamenDonneesSeules({required this.manifeste, required this.fichiers});
+
+  /// `nombreFichiers` : fichiers listés ; `fichiersAbsents` : photos citées par les données mais pas listées.
+  final ManifesteSauvegarde manifeste;
+
+  /// Les fichiers à aller chercher sur Drive, avec leur taille et leur empreinte.
+  final List<EmpreinteFichier> fichiers;
+
+  int get octetsFichiers => fichiers.fold<int>(0, (int somme, EmpreinteFichier f) => somme + f.octets);
+}
+
 /// Toutes les lignes de toutes les tables, lues d'un seul tenant.
 class _InstantaneBase {
   const _InstantaneBase(this.tables);
@@ -927,12 +1148,21 @@ class _FichierLocal {
   String get chemin => '$dossier/$nom';
 }
 
+/// Un fichier du téléphone avec sa taille.
+class _FichierMesure {
+  const _FichierMesure(this.local, this.octets);
+
+  final _FichierLocal local;
+  final int octets;
+}
+
 /// Une archive lue et vérifiée, prête à être restaurée. Le fichier reste ouvert jusqu'à [fermer].
 class _Contenu {
   const _Contenu({
     required this.manifeste,
     required this.tables,
     required this.fichiers,
+    required this.annonces,
     required this.flux,
     required this.sansCategories,
     required this.sansLieux,
@@ -942,6 +1172,9 @@ class _Contenu {
   final ManifesteSauvegarde manifeste;
   final Map<String, List<Map<String, Object?>>> tables;
   final List<_FichierArchive> fichiers;
+
+  /// Sauvegarde « données seules » : les fichiers que la liste annonce, à aller chercher ailleurs (vide pour une archive complète).
+  final List<EmpreinteFichier> annonces;
   final InputFileStream flux;
 
   /// L'archive ne contient pas la table des catégories (sauvegarde d'un schéma antérieur au 3).

@@ -5,6 +5,7 @@ import '../domain/document_facture.dart';
 import 'database/app_database.dart';
 import 'drive/compte_google.dart';
 import 'drive/service_drive.dart';
+import 'drive/service_sauvegarde_drive.dart';
 import 'partage/service_documents.dart';
 import 'partage/service_partage_fichiers.dart';
 import 'pdf/devis_pdf.dart';
@@ -208,6 +209,14 @@ final compteGoogleProvider = Provider<CompteGoogle>((ref) {
 final serviceDriveProvider = Provider<ServiceDrive>((ref) {
   throw UnimplementedError(
     'serviceDriveProvider doit être fourni au démarrage (overrides du ProviderScope).',
+  );
+});
+
+/// Sauvegardes des données sur Google Drive et restauration depuis Drive (étape 7 de l'évolution), fournies au démarrage
+/// (voir `lib/main.dart`). Les tests les remplacent par un service qui parle à un faux Drive, dans un dossier temporaire.
+final serviceSauvegardeDriveProvider = Provider<ServiceSauvegardeDrive>((ref) {
+  throw UnimplementedError(
+    'serviceSauvegardeDriveProvider doit être fourni au démarrage (overrides du ProviderScope).',
   );
 });
 

@@ -5,6 +5,7 @@ import '../domain/document_facture.dart';
 import 'database/app_database.dart';
 import 'drive/compte_google.dart';
 import 'drive/service_drive.dart';
+import 'drive/service_partages_drive.dart';
 import 'drive/service_sauvegarde_drive.dart';
 import 'partage/service_documents.dart';
 import 'partage/service_partage_fichiers.dart';
@@ -225,6 +226,14 @@ final serviceSauvegardeDriveProvider = Provider<ServiceSauvegardeDrive>((ref) {
 final exportCsvProvider = Provider<ExportCsv>(
   (ref) => ExportCsv(ref.watch(appDatabaseProvider), horloge: ref.watch(horlogeProvider)),
 );
+
+/// Partage de fichiers de Drive (étape 8), fourni au démarrage (voir `lib/main.dart`). Les tests le remplacent par un service
+/// qui parle à un faux Drive.
+final servicePartagesDriveProvider = Provider<ServicePartagesDrive>((ref) {
+  throw UnimplementedError(
+    'servicePartagesDriveProvider doit être fourni au démarrage (overrides du ProviderScope).',
+  );
+});
 
 /// Export du catalogue (un .zip : tableau des produits, JSON et photos ; sans coûts ni stocks).
 final exportCatalogueProvider = Provider<ExportCatalogue>(

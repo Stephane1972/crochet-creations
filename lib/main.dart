@@ -12,6 +12,7 @@ import 'data/database/app_database.dart';
 import 'data/drive/client_drive.dart';
 import 'data/drive/compte_google.dart';
 import 'data/drive/service_drive.dart';
+import 'data/drive/service_partages_drive.dart';
 import 'data/drive/service_sauvegarde_drive.dart';
 import 'data/drive/stockage_client_web.dart';
 import 'data/providers.dart';
@@ -100,6 +101,9 @@ Future<void> main() async {
       fichierEtat: File('$dossierDrive${Platform.pathSeparator}sauvegardes_drive.json'),
     );
 
+    // Google Drive (étape 8) : partage en lecture de factures, devis et exports, à la demande de la personne uniquement.
+    final ServicePartagesDrive partagesDrive = ServicePartagesDrive(client: ClientDriveGoogle(compteGoogle));
+
     // Photo prise juste avant qu'Android ferme l'application (rare) : retrouvée une seule fois, ici, puis proposée
     // dans la feuille de choix de photo.
     final String? photoRetrouvee = await SelecteurPhotoSysteme().retrouverPhotoPerdue();
@@ -116,6 +120,7 @@ Future<void> main() async {
         compteGoogleProvider.overrideWithValue(compteGoogle),
         serviceDriveProvider.overrideWithValue(drive),
         serviceSauvegardeDriveProvider.overrideWithValue(sauvegardeDrive),
+        servicePartagesDriveProvider.overrideWithValue(partagesDrive),
         modeThemeInitialProvider.overrideWithValue(modeInitial),
         modeThemeStoreProvider.overrideWithValue(parametres),
       ],

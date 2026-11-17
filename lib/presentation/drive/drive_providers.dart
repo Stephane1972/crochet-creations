@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/drive/compte_google.dart';
 import '../../data/drive/service_drive.dart';
+import '../../data/drive/service_partages_drive.dart';
 import '../../data/drive/service_sauvegarde_drive.dart';
 import '../../data/providers.dart';
 import '../../domain/drive_envoi.dart';
@@ -101,6 +102,12 @@ class ClientWebNotifier extends Notifier<EtatClientWeb> {
     return null;
   }
 }
+
+/// Les fichiers de Drive que l'on peut partager (factures, devis, exports), par rubrique. Relus à chaque ouverture de l'écran
+/// « Partages ». Rien n'est créé sur Drive par cette lecture.
+final fichiersPartageablesProvider = FutureProvider.autoDispose<FichiersPartageables>(
+  (ref) => ref.watch(servicePartagesDriveProvider).lister(),
+);
 
 /// Le bilan du dernier envoi (`null` : aucun envoi pour l'instant).
 final dernierBilanDriveProvider = FutureProvider.autoDispose<RapportEnvoi?>(

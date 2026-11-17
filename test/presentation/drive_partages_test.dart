@@ -530,7 +530,8 @@ void main() {
       await toucher(tester, cle('partage-partager'));
       await attendre(tester, cle('partage-info'));
 
-      await tester.pageBack();
+      // `tester.pageBack()` cherche l'info-bulle anglaise « Back » (voir `retourArriere`) ; ici, sans pumpAndSettle.
+      await tester.tap(find.byType(BackButton));
       await tester.pump(const Duration(milliseconds: 500));
       await laisserFinir(tester);
 

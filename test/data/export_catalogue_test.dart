@@ -97,8 +97,10 @@ void main() {
       expect(_texte(archive, 'photos/PRD-0001_1.jpg'), 'photo un');
       expect(_texte(archive, 'photos/PRD-0001_2.jpg'), 'photo deux');
 
+      // La marque UTF-8 (BOM) est bien en tête du fichier (utf8.decode l'enlève : on regarde les octets).
+      expect(archive.find('catalogue.csv')!.content.take(3).toList(), <int>[0xEF, 0xBB, 0xBF]);
       final List<String> lignes = _texte(archive, 'catalogue.csv').split('\r\n');
-      expect(lignes[0], startsWith('﻿Référence;Nom;'));
+      expect(lignes[0], startsWith('Référence;Nom;'));
       expect(lignes[1], contains('PRD-0001;Doudou lapin « Noisette »;Doudou;'));
       expect(lignes[1], endsWith('Rose – taille M;photos/PRD-0001_1.jpg, photos/PRD-0001_2.jpg'));
 

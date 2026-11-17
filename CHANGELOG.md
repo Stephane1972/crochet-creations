@@ -6,6 +6,42 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
 
 ## [Non publié]
 
+## [0.22.0] — Google Drive, partie 3 : partage et export du catalogue (en attente de validation)
+
+### Ajouté
+- **« Exporter le catalogue (produits et photos) »** (*Réglages → Sauvegarde et export → Exporter*) : un fichier `.zip` **à donner à quelqu'un**
+  (une boutique, un marché, un site) avec le **tableau des produits** (`catalogue.csv`, ouvert par Excel avec les accents, prix de vente en
+  euros), les **mêmes informations en JSON** (`catalogue.json`), les **photos** (`photos/PRD-0001_1.jpg`…, la principale d'abord) et un petit
+  mode d'emploi (`LISEZMOI.txt`). **Jamais** les coûts des matières, les stocks, les clients, les ventes ni les factures. Les produits archivés
+  n'y sont pas ; une photo introuvable sur le téléphone est **signalée** (message et `LISEZMOI.txt`), jamais inventée. Les photos sont rangées
+  une par une dans l'archive, sans tout charger en mémoire. Partage par la feuille de partage d'Android.
+- **« Partager des fichiers… »** (*Réglages → Google Drive*) : un écran **Partages** qui liste les **factures**, les **devis** et les **exports**
+  déjà sur Drive (indication « Partagé » / « Privé »). **Les sauvegardes, les photos des produits et les pièces jointes des notes n'y sont jamais
+  proposées.**
+- **Partage d'un fichier** : **Qui a accès** (propriétaire, personnes, lien public), **partager avec une personne précise** par son adresse
+  e-mail (**lecture seule** ; Google prévient la personne), **retirer l'accès** d'une personne, **copier le lien du fichier**, **activer le lien
+  public** (toute personne ayant le lien peut lire, sans pouvoir modifier ni trouver le fichier par une recherche) et **l'arrêter**.
+  Adresse vérifiée avant tout appel à Google (vide, mal écrite, la sienne, déjà partagée) ; un refus de Google est expliqué en clair.
+- **« Envoyer le catalogue sur Drive »** (écran Partages) : prépare l'archive et l'envoie dans le dossier **« Exports »** de Drive ; le renvoyer le
+  même jour **met à jour le même fichier** (ses accès restent, Drive garde l'ancienne version dans l'historique). Il peut ensuite être partagé
+  comme une facture.
+
+### Sécurité (inchangé, et renforcé)
+- **Rien n'est partagé sans un geste de la personne** : l'application ne partage jamais d'elle-même, ni à l'envoi, ni à la sauvegarde.
+- **Le lien public demande une confirmation** qui explique ce qu'il permet (et, pour une facture ou un devis, rappelle qu'il contient le nom et
+  l'adresse du client) ; **retirer un accès** et **arrêter le lien** demandent aussi confirmation.
+- **Un partage ne donne que le droit de lire.** Arrêter un partage **retire un accès** : **le fichier lui-même n'est jamais supprimé**. Droit Google
+  inchangé : `drive.file` (seuls les fichiers créés par l'application).
+
+### Modifié
+- Les petits composants communs des écrans Google Drive (carte, textes) sont dans `drive_widgets.dart`.
+- `FichierDistant` porte deux informations de plus (fichier partagé, adresse du fichier) ; la liste de Drive les demande à Google.
+
+### Technique
+- `domain/catalogue_export.dart` et `domain/drive_partage.dart` (règles pures) ; `data/sauvegarde/export_catalogue.dart` ; `ClientDrive` gagne
+  `listerAcces`, `partagerAvec`, `activerLienPublic`, `retirerAcces`, `lienDuFichier` ; `data/drive/service_partages_drive.dart`.
+- Aucun changement de la base (schéma 6) ni de la sauvegarde ; aucune nouvelle dépendance. Version 0.22.0 (build 26).
+
 ## [0.21.0] — Google Drive, partie 2 : sauvegardes, restauration, changement de téléphone (en attente de validation)
 
 ### Ajouté

@@ -945,7 +945,7 @@ void main() {
       expect(dansFormulaire(find.text('Ajouter une pièce jointe')), findsOneWidget);
       expect(
         tester.widget<Text>(find.byKey(const Key('limites-pieces-jointes'))).data,
-        'Photos et documents : 25 Mo au plus chacun. Vidéos : 150 Mo au plus. 20 pièces jointes au plus par note.',
+        'Photos et documents : 100 Mo au plus chacun. Vidéos : 500 Mo au plus. 50 pièces jointes au plus par note.',
       );
 
       // La feuille de choix rappelle les limites aussi.
@@ -955,7 +955,7 @@ void main() {
       expect(dansFeuille(find.text('Filmer une vidéo')), findsOneWidget);
       expect(dansFeuille(find.text('Choisir une vidéo dans la galerie')), findsOneWidget);
       expect(dansFeuille(find.text('Choisir un document (PDF, Word, tableur…)')), findsOneWidget);
-      expect(dansFeuille(find.textContaining('150 Mo au plus')), findsOneWidget);
+      expect(dansFeuille(find.textContaining('500 Mo au plus')), findsOneWidget);
 
       await env.fermer(tester);
     });
@@ -972,7 +972,7 @@ void main() {
 
       expect(env.selecteurPieceJointe.sources, <SourcePieceJointe>[SourcePieceJointe.document]);
       expect(dansFormulaire(find.text('Document · 2 Ko')), findsOneWidget);
-      expect(dansFormulaire(find.text('Pièces jointes (1 sur 20)')), findsOneWidget);
+      expect(dansFormulaire(find.text('Pièces jointes (1 sur 50)')), findsOneWidget);
       expect(fichiersRanges(env), hasLength(1)); // déjà copié, pas encore dans la note
 
       await saisir(tester, 'Titre *', 'Poncho');
@@ -1009,7 +1009,7 @@ void main() {
       ]);
       expect(dansFormulaire(find.text('Photo · 100 o')), findsOneWidget);
       expect(dansFormulaire(find.text('Vidéo · 100 o')), findsOneWidget);
-      expect(dansFormulaire(find.text('Pièces jointes (2 sur 20)')), findsOneWidget);
+      expect(dansFormulaire(find.text('Pièces jointes (2 sur 50)')), findsOneWidget);
 
       await env.fermer(tester);
     });
@@ -1018,19 +1018,19 @@ void main() {
       final EnvironnementTest env = await EnvironnementTest.creer(tester);
       await ouvrirNouvelleNote(tester, env);
 
-      env.selecteurPieceJointe.preparer('Gros.jpg', TypePieceJointe.photo, octets: 26 * 1024 * 1024);
+      env.selecteurPieceJointe.preparer('Gros.jpg', TypePieceJointe.photo, octets: 101 * 1024 * 1024);
       await ajouterPiece(tester, 'Choisir une photo dans la galerie');
-      await attendreAffichage(tester, find.textContaining('la limite est de 25 Mo pour les photos'));
+      await attendreAffichage(tester, find.textContaining('la limite est de 100 Mo pour les photos'));
       expect(dansFormulaire(find.text('Gros.jpg')), findsNothing);
 
-      env.selecteurPieceJointe.preparer('Film.mp4', TypePieceJointe.video, octets: 151 * 1024 * 1024);
+      env.selecteurPieceJointe.preparer('Film.mp4', TypePieceJointe.video, octets: 501 * 1024 * 1024);
       await ajouterPiece(tester, 'Choisir une vidéo dans la galerie');
-      await attendreAffichage(tester, find.textContaining('la limite est de 150 Mo pour les vidéos'));
+      await attendreAffichage(tester, find.textContaining('la limite est de 500 Mo pour les vidéos'));
       expect(dansFormulaire(find.text('Film.mp4')), findsNothing);
 
-      env.selecteurPieceJointe.preparer('Gros.pdf', TypePieceJointe.document, octets: 26 * 1024 * 1024);
+      env.selecteurPieceJointe.preparer('Gros.pdf', TypePieceJointe.document, octets: 101 * 1024 * 1024);
       await ajouterPiece(tester, 'Choisir un document (PDF, Word, tableur…)');
-      await attendreAffichage(tester, find.textContaining('la limite est de 25 Mo pour les documents'));
+      await attendreAffichage(tester, find.textContaining('la limite est de 100 Mo pour les documents'));
 
       expect(dansFormulaire(find.text('Pièces jointes')), findsOneWidget); // toujours aucune
       expect(fichiersRanges(env), isEmpty);
@@ -1052,21 +1052,21 @@ void main() {
       await env.fermer(tester);
     });
 
-    testWidgets('20 pièces jointes au plus : un 21e ajout est refusé avant même de choisir un fichier', (
+    testWidgets('50 pièces jointes au plus : un 51e ajout est refusé avant même de choisir un fichier', (
       WidgetTester tester,
     ) async {
       final EnvironnementTest env = await EnvironnementTest.creer(tester);
-      final List<PieceRangee> vingt = <PieceRangee>[
-        for (int i = 0; i < 20; i++) await rangerPiece(tester, env, 'f$i.pdf', octets: 10),
+      final List<PieceRangee> cinquante = <PieceRangee>[
+        for (int i = 0; i < 50; i++) await rangerPiece(tester, env, 'f$i.pdf', octets: 10),
       ];
-      await creerNoteAvecPieces(tester, env, 'Pleine', vingt);
+      await creerNoteAvecPieces(tester, env, 'Pleine', cinquante);
       await ouvrirLaNote(tester, env, 'Pleine');
 
-      expect(dansFormulaire(find.text('Pièces jointes (20 sur 20)')), findsOneWidget);
+      expect(dansFormulaire(find.text('Pièces jointes (50 sur 50)')), findsOneWidget);
       await toucher(tester, boutonAjouterPiece());
 
       expect(find.byType(BottomSheet), findsNothing);
-      await attendreAffichage(tester, find.text('Une note peut avoir 20 pièces jointes au plus.'));
+      await attendreAffichage(tester, find.text('Une note peut avoir 50 pièces jointes au plus.'));
       expect(env.selecteurPieceJointe.sources, isEmpty);
 
       await env.fermer(tester);
@@ -1087,7 +1087,7 @@ void main() {
 
       expect(dansFormulaire(find.text('Patron.pdf')), findsNothing);
       expect(dansFormulaire(find.text('Modèle.jpg')), findsOneWidget);
-      expect(dansFormulaire(find.text('Pièces jointes (1 sur 20)')), findsOneWidget);
+      expect(dansFormulaire(find.text('Pièces jointes (1 sur 50)')), findsOneWidget);
       expect(fichiersRanges(env), hasLength(2)); // rien n'est encore effacé
 
       await toucher(tester, boutonEnregistrer());

@@ -7,7 +7,7 @@ import '../../domain/pieces_jointes.dart';
 
 /// Un fichier choisi par la personne (photo, vidéo, document), pas encore rangé dans l'application.
 ///
-/// Le contenu se lit **en flux** ([lire]) : une vidéo de 150 Mo ne passe jamais entièrement par la mémoire.
+/// Le contenu se lit **en flux** ([lire]) : une vidéo de 500 Mo ne passe jamais entièrement par la mémoire.
 class FichierChoisi {
   const FichierChoisi({required this.nom, required this.type, required this.lire, this.octets});
 

@@ -1063,6 +1063,9 @@ void main() {
       await ouvrirLaNote(tester, env, 'Pleine');
 
       expect(dansFormulaire(find.text('Pièces jointes (50 sur 50)')), findsOneWidget);
+      // Avec 50 pièces dans la liste, le bouton est sous l'écran : on fait défiler jusqu'à lui.
+      await tester.ensureVisible(boutonAjouterPiece());
+      await tester.pumpAndSettle();
       await toucher(tester, boutonAjouterPiece());
 
       expect(find.byType(BottomSheet), findsNothing);

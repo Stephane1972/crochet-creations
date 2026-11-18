@@ -601,8 +601,8 @@ différentes ne se confondent plus (test `test/data/flux_en_direct_test.dart`).
   `<documents>/notes_pieces_jointes`. Comme pour les photos, la base ne garde **que des noms** : `StockagePiecesJointes.fichier` ramène
   tout nom à son dernier morceau, rien ne peut faire sortir du dossier. L'index `idx_pieces_jointes_note_note_id` est créé avec la
   table, et en SQL dans la migration 5 → 6.
-- **Limites** (`domain/pieces_jointes.dart`, affichées dans le formulaire et dans la feuille d'ajout) : **25 Mo** par photo et par
-  document, **150 Mo** par vidéo, **20 pièces jointes** par note. Le type vient de la **source** pour les photos et les vidéos
+- **Limites** (`domain/pieces_jointes.dart`, affichées dans le formulaire et dans la feuille d'ajout) : **100 Mo** par photo et par
+  document, **500 Mo** par vidéo, **50 pièces jointes** par note. Le type vient de la **source** pour les photos et les vidéos
   (appareil ou galerie) ; pour « Choisir un document », il est déduit de l'extension (`typePieceJointeDepuisNom` : une image choisie comme
   document est reconnue comme photo, une vidéo comme vidéo, le reste est un document). Un fichier vide est refusé.
 - **Ranger sans passer par la mémoire.** `StockagePiecesJointes.enregistrer` copie le fichier choisi **en flux** (`FichierChoisi.lire`)
@@ -1095,7 +1095,7 @@ supprimer ni partager tout seul** (le partage, à la demande, est la partie 3) ;
   pour les factures et les devis (un PDF régénéré peut garder la même taille), de même **SHA-256**, noté à l'envoi dans les propriétés du
   fichier Drive (`appProperties['sha256']`). Même nom mais différent : le contenu du fichier Drive est **remplacé** (Drive garde l'ancienne
   version dans l'historique). Sinon : créé. Les photos et pièces jointes ne sont jamais modifiées après leur ajout : nom et taille
-  suffisent, ce qui évite de relire des vidéos de 150 Mo. Les fichiers de Drive absents du téléphone sont ignorés.
+  suffisent, ce qui évite de relire des vidéos de 500 Mo. Les fichiers de Drive absents du téléphone sont ignorés.
 - **Fichiers ignorés** : `.tmp`, fichiers cachés (nom commençant par un point) et sous-dossiers du téléphone (copies en cours).
 - **Boucle d'envoi** : un fichier après l'autre, dans l'ordre des dossiers puis des noms. Un échec est noté dans le bilan et l'envoi continue ;
   il s'arrête **tout de suite** si l'autorisation a expiré, et **après trois échecs de suite** (`echecsAvantArret`). La demande d'arrêt
@@ -1315,7 +1315,7 @@ Le cahier des charges ne tranchait pas ces points ; voici ce qui a été retenu 
   `service_sauvegarde_test` (aller-retour des catégories et des notes, archive d'avant le bloc-notes) et `notes_ecrans_test` (liste,
   filtres, nouvelle note, modification, suppression, écran Catégories de notes, déplacement des notes à la suppression d'une catégorie).
 - Pièces jointes des notes (étape 4 du plan d'évolution) : `pieces_jointes_notes_test` (limites par type, nom et extension, copie en flux,
-  refus avant et pendant la copie, fichier provisoire effacé, 20 pièces au plus, création / modification / suppression avec leurs
+  refus avant et pendant la copie, fichier provisoire effacé, 50 pièces au plus, création / modification / suppression avec leurs
   fichiers, flux en direct du décompte), `schema_test` et `migration_schema_test` (table, contraintes, cascade, version 6, migration 5 → 6),
   `service_sauvegarde_test` (4e dossier, empreintes, restauration sur un autre téléphone, pièce absente = incomplète, `.tmp` ignoré,
   archive du schéma 5) et `notes_ecrans_test` (limites affichées, ajout, refus, retrait, abandon, ouverture, nombre dans la liste).

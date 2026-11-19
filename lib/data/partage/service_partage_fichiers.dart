@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:share_plus/share_plus.dart';
@@ -45,11 +46,32 @@ class ServicePartageFichiersBureau implements ServicePartageFichiers {
   }) => enregistrerSous(cheminFichier: cheminFichier, nomFichier: nomFichier);
 }
 
-/// Ouvre « Enregistrer sous… » et y copie le fichier. Ne fait rien si la personne annule.
+/// Au-delà de cette taille, le fichier n'est pas chargé en mémoire pour la fenêtre « Enregistrer sous… » (une sauvegarde avec
+/// des vidéos peut peser plusieurs centaines de Mo) : il est copié ensuite.
+const int _tailleMaxEnMemoire = 32 * 1024 * 1024;
+
+/// Ouvre « Enregistrer sous… » et y range le fichier. Ne fait rien si la personne annule.
+///
+/// `file_picker` (version 12 et suivantes) exige les octets du fichier et les écrit lui-même à l'endroit choisi. Pour un fichier
+/// courant (PDF, export, petite sauvegarde), on les lui donne. Pour un gros fichier, on ne lui donne qu'un octet de remplissage,
+/// puis on copie le vrai fichier à l'endroit choisi. Dans les deux cas, on vérifie à la fin que le fichier rangé a la bonne taille.
 Future<void> enregistrerSous({required String cheminFichier, required String nomFichier}) async {
-  final Uri? choix = await FilePicker.saveFile(dialogTitle: 'Enregistrer « $nomFichier »', fileName: nomFichier);
+  final File source = File(cheminFichier);
+  final int taille = await source.length();
+  final bool petit = taille <= _tailleMaxEnMemoire;
+  final Uint8List octets = petit ? await source.readAsBytes() : Uint8List(1);
+
+  final Uri? choix = await FilePicker.saveFile(
+    dialogTitle: 'Enregistrer « $nomFichier »',
+    fileName: nomFichier,
+    bytes: octets,
+  );
   if (choix == null) return;
+
   final String destination = choix.scheme == 'file' ? choix.toFilePath() : choix.path;
   if (destination.isEmpty || destination == cheminFichier) return;
-  await File(cheminFichier).copy(destination);
+  final File cible = File(destination);
+  if (!await cible.exists() || await cible.length() != taille) {
+    await source.copy(destination);
+  }
 }

@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:crochet_creations/app.dart';
+import 'package:crochet_creations/core/plateforme.dart';
 import 'package:crochet_creations/data/database/app_database.dart';
 import 'package:crochet_creations/data/drive/service_drive.dart';
 import 'package:crochet_creations/data/drive/service_partages_drive.dart';
@@ -220,6 +221,10 @@ class EnvironnementTest {
   /// l'application.
   DateTime? maintenant;
 
+  /// Android (par défaut, comme tous les tests) ou Windows (`const Plateforme.windows()`). À régler **avant** d'ouvrir
+  /// l'application.
+  Plateforme plateforme = const Plateforme.android();
+
   /// Photo « retrouvée au démarrage » (Android avait fermé l'application pendant la prise de vue) ; `null` = aucune.
   /// À régler **avant** d'ouvrir l'application.
   String? photoRetrouvee;
@@ -305,6 +310,7 @@ class EnvironnementTest {
     stockagePhotosProvider.overrideWithValue(StockagePhotos(dossierPhotos)),
     selecteurPhotoProvider.overrideWithValue(selecteur),
     photoRetrouveeInitialeProvider.overrideWithValue(photoRetrouvee),
+    plateformeProvider.overrideWithValue(plateforme),
     stockageFacturesProvider.overrideWithValue(stockageFactures),
     stockageDevisProvider.overrideWithValue(stockageDevis),
     stockagePiecesJointesProvider.overrideWithValue(stockagePiecesJointes),

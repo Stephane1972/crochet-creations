@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/constants/app_constants.dart';
+import '../../core/plateforme.dart';
 import '../../core/router/app_routes.dart';
 import '../../core/theme/theme_mode_provider.dart';
 import '../../core/widgets/app_logo.dart';
@@ -108,12 +109,7 @@ class SettingsScreen extends ConsumerWidget {
                   route: AppRoutes.sauvegarde,
                 ),
                 Divider(indent: 56),
-                MenuTile(
-                  icone: Icons.cloud_upload_outlined,
-                  titre: 'Google Drive',
-                  description: 'Envoyer photos, factures, devis et pièces jointes sur votre Drive.',
-                  route: AppRoutes.drive,
-                ),
+                _TuileDrive(),
               ],
             ),
           ),
@@ -161,6 +157,25 @@ class _TitreSection extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10, left: 4),
       child: Text(texte, style: Theme.of(context).textTheme.titleMedium),
+    );
+  }
+}
+
+/// L'entrée « Google Drive » des Réglages. Sous Windows, elle dit que Drive n'est pas encore disponible (l'écran explique
+/// comment passer les données d'un appareil à l'autre).
+class _TuileDrive extends ConsumerWidget {
+  const _TuileDrive();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final bool disponible = ref.watch(plateformeProvider).googleDrive;
+    return MenuTile(
+      icone: Icons.cloud_upload_outlined,
+      titre: 'Google Drive',
+      description: disponible
+          ? 'Envoyer photos, factures, devis et pièces jointes sur votre Drive.'
+          : 'Pas encore disponible sous Windows : voir comment passer vos données d’un appareil à l’autre.',
+      route: AppRoutes.drive,
     );
   }
 }

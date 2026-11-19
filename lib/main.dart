@@ -7,10 +7,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'app.dart';
+import 'core/plateforme.dart';
 import 'core/theme/theme_mode_provider.dart';
 import 'data/database/app_database.dart';
 import 'data/drive/client_drive.dart';
 import 'data/drive/compte_google.dart';
+import 'data/drive/compte_google_indisponible.dart';
 import 'data/drive/service_drive.dart';
 import 'data/drive/service_partages_drive.dart';
 import 'data/drive/service_sauvegarde_drive.dart';
@@ -32,14 +34,20 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   try {
+    // Android (le téléphone) ou Windows (l'ordinateur) : voir `core/plateforme.dart`. Sous Android, rien ne change.
+    final Plateforme plateforme = Plateforme.courante();
+
     // Ouverture de la base avant le premier écran : création ou mise à jour du schéma,
     // puis lecture du mode jour / nuit mémorisé (pas de clignotement au démarrage).
-    final AppDatabase base = AppDatabase();
+    final AppDatabase base = plateforme.fenetreDeBureau ? AppDatabase.pourBureau() : AppDatabase();
     final ParametresRepository parametres = ParametresRepository(base);
     final ThemeMode modeInitial = await parametres.lireModeTheme();
 
-    // Photos des produits : dossier privé de l'application (créé à la première photo).
-    final Directory documents = await getApplicationDocumentsDirectory();
+    // Photos des produits : dossier privé de l'application (créé à la première photo). Sous Windows : le dossier
+    // « données d'application » de l'utilisateur (AppData), pas son dossier Documents.
+    final Directory documents = plateforme.fenetreDeBureau
+        ? await getApplicationSupportDirectory()
+        : await getApplicationDocumentsDirectory();
     final StockagePhotos photos = StockagePhotos(
       Directory('${documents.path}${Platform.pathSeparator}photos_produits'),
     );
@@ -73,13 +81,19 @@ Future<void> main() async {
     // petit fichier à part (hors de la base et de la sauvegarde).
     // L'ID client Web saisi dans l'écran Google Drive est un petit fichier du téléphone, relu à chaque lancement.
     final String dossierDrive = '${documents.path}${Platform.pathSeparator}drive';
-    final StockageClientWeb stockageClientWeb = StockageClientWeb(
-      File('$dossierDrive${Platform.pathSeparator}client_web.txt'),
-    );
-    final CompteGoogleReel compteGoogle = CompteGoogleReel(
-      stockage: stockageClientWeb,
-      clientWebEnregistre: await stockageClientWeb.lire(),
-    );
+    // Sous Windows, la connexion Google n'est pas disponible (pour l'instant) : un compte « indisponible » ne fait rien.
+    final CompteGoogle compteGoogle;
+    if (plateforme.googleDrive) {
+      final StockageClientWeb stockageClientWeb = StockageClientWeb(
+        File('$dossierDrive${Platform.pathSeparator}client_web.txt'),
+      );
+      compteGoogle = CompteGoogleReel(
+        stockage: stockageClientWeb,
+        clientWebEnregistre: await stockageClientWeb.lire(),
+      );
+    } else {
+      compteGoogle = const CompteGoogleIndisponible();
+    }
     final ServiceDrive drive = ServiceDrive(
       client: ClientDriveGoogle(compteGoogle),
       dossiers: <DossierDrive, Directory>{
@@ -106,7 +120,8 @@ Future<void> main() async {
 
     // Photo prise juste avant qu'Android ferme l'application (rare) : retrouvée une seule fois, ici, puis proposée
     // dans la feuille de choix de photo.
-    final String? photoRetrouvee = await SelecteurPhotoSysteme().retrouverPhotoPerdue();
+    // (Sans appareil photo, sous Windows, il n'y a rien à retrouver.)
+    final String? photoRetrouvee = plateforme.appareilPhoto ? await SelecteurPhotoSysteme().retrouverPhotoPerdue() : null;
 
     final ProviderContainer conteneur = ProviderContainer(
       overrides: [
@@ -123,6 +138,7 @@ Future<void> main() async {
         servicePartagesDriveProvider.overrideWithValue(partagesDrive),
         modeThemeInitialProvider.overrideWithValue(modeInitial),
         modeThemeStoreProvider.overrideWithValue(parametres),
+        plateformeProvider.overrideWithValue(plateforme),
       ],
     );
     runApp(UncontrolledProviderScope(container: conteneur, child: const CrochetApp()));

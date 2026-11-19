@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/plateforme.dart';
 import '../../core/widgets/dialogues.dart';
 import '../../data/database/app_database.dart';
 import '../../data/providers.dart';
@@ -225,7 +226,10 @@ class _NoteFormScreenState extends ConsumerState<NoteFormScreen> {
       afficherMessage(context, trop);
       return;
     }
-    final SourcePieceJointe? source = await demanderSourcePieceJointe(context);
+    final SourcePieceJointe? source = await demanderSourcePieceJointe(
+      context,
+      appareilPhoto: ref.read(plateformeProvider).appareilPhoto,
+    );
     if (source == null || !mounted) return;
 
     setState(() => _ajoutEnCours = true);

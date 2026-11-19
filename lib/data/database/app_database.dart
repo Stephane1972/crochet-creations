@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../domain/categories_produit.dart';
@@ -42,6 +43,17 @@ class AppDatabase extends _$AppDatabase {
   /// Les tests passent `NativeDatabase.memory()` pour une base temporaire en mémoire.
   AppDatabase([QueryExecutor? executor])
     : super(executor ?? driftDatabase(name: AppConstants.nomBaseDeDonnees));
+
+  /// Windows : le fichier de la base est rangé dans le dossier « données d'application » de l'utilisateur
+  /// (`AppData`), avec le reste des données de l'application, et non dans son dossier Documents (où drift le mettrait).
+  /// Android n'utilise jamais ce constructeur : il garde l'emplacement qu'il a toujours eu.
+  AppDatabase.pourBureau()
+    : super(
+        driftDatabase(
+          name: AppConstants.nomBaseDeDonnees,
+          native: DriftNativeOptions(databaseDirectory: getApplicationSupportDirectory),
+        ),
+      );
 
   /// Version du schéma. **À augmenter à chaque modification de `tables.dart`**,
   /// avec l'étape de migration correspondante dans [migration] (voir ARCHITECTURE.md).

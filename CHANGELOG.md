@@ -6,7 +6,21 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
 
 ## [Non publié]
 
-## [0.22.0] — Google Drive, partie 3 : partage et export du catalogue (en attente de validation)
+## [0.22.1] — Pièces jointes des notes : des limites plus larges
+
+### Modifié
+- **Les limites des pièces jointes d'une note sont relevées** (voir `domain/pieces_jointes.dart`) : **500 Mo** par vidéo (150 Mo avant),
+  **100 Mo** par photo et par document (25 Mo avant), **50 pièces jointes** par note (20 avant). Elles sont toujours annoncées avant l'ajout,
+  et un fichier trop gros est toujours refusé avec un message qui dit la limite, sans rien copier.
+- Rien d'autre ne change : la copie se fait toujours en flux (une vidéo de 500 Mo ne passe jamais entièrement par la mémoire), la
+  sauvegarde locale et l'envoi sur Drive lisent déjà les fichiers en flux, et la base de données reste en version 6. Les photos des
+  produits ne sont pas concernées (elles gardent leur réduction à 1 600 px).
+- À savoir : la sauvegarde locale garde 7 copies et contient les pièces jointes ; des vidéos plus grosses la rendent plus lourde (le contrôle
+  de l'espace libre avant la sauvegarde existe déjà).
+- Le numéro de version passe à 0.22.1 (build 27). Les mentions « en attente de validation » des versions 0.21.0 et 0.22.0 sont retirées
+  (étapes 7 et 8 validées et fusionnées) ; la feuille de route est mise à jour.
+
+## [0.22.0] — Google Drive, partie 3 : partage et export du catalogue
 
 ### Ajouté
 - **« Exporter le catalogue (produits et photos) »** (*Réglages → Sauvegarde et export → Exporter*) : un fichier `.zip` **à donner à quelqu'un**
@@ -42,7 +56,7 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
   `listerAcces`, `partagerAvec`, `activerLienPublic`, `retirerAcces`, `lienDuFichier` ; `data/drive/service_partages_drive.dart`.
 - Aucun changement de la base (schéma 6) ni de la sauvegarde ; aucune nouvelle dépendance. Version 0.22.0 (build 26).
 
-## [0.21.0] — Google Drive, partie 2 : sauvegardes, restauration, changement de téléphone (en attente de validation)
+## [0.21.0] — Google Drive, partie 2 : sauvegardes, restauration, changement de téléphone
 
 ### Ajouté
 - **« Sauvegarder mes données sur Drive »** (*Réglages → Google Drive*) : **Sauvegarder maintenant sur Drive** envoie, dans le dossier

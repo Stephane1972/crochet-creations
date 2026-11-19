@@ -1,9 +1,9 @@
 /// Pièces jointes d'une note : photos, vidéos et documents (PDF, Word, tableur...) rangés dans le téléphone.
 ///
 /// Règles (affichées à l'écran avant l'ajout, et rappelées dans le message de refus) :
-/// - une photo ou un document : **25 Mo** au plus ;
-/// - une vidéo : **150 Mo** au plus ;
-/// - **20 pièces jointes** au plus par note.
+/// - une photo ou un document : **100 Mo** au plus ;
+/// - une vidéo : **500 Mo** au plus ;
+/// - **50 pièces jointes** au plus par note.
 ///
 /// Rien n'est redimensionné ni compressé : le fichier est rangé tel quel, et refusé s'il dépasse la limite.
 library;
@@ -14,16 +14,16 @@ const int _octetsParKo = 1024;
 const int _octetsParMo = 1024 * 1024;
 
 /// Taille maximale d'une photo.
-const int limiteOctetsPhoto = 25 * _octetsParMo;
+const int limiteOctetsPhoto = 100 * _octetsParMo;
 
 /// Taille maximale d'une vidéo.
-const int limiteOctetsVideo = 150 * _octetsParMo;
+const int limiteOctetsVideo = 500 * _octetsParMo;
 
 /// Taille maximale d'un document.
-const int limiteOctetsDocument = 25 * _octetsParMo;
+const int limiteOctetsDocument = 100 * _octetsParMo;
 
 /// Nombre maximal de pièces jointes d'une note.
-const int nombreMaxPiecesJointes = 20;
+const int nombreMaxPiecesJointes = 50;
 
 /// Longueur maximale du nom affiché d'une pièce jointe.
 const int longueurMaxNomPieceJointe = 120;
@@ -42,7 +42,7 @@ String formaterTailleFichier(int octets) {
   return '${(octets / _octetsParMo).toStringAsFixed(1).replaceAll('.', ',')} Mo';
 }
 
-/// « 25 Mo », « 150 Mo ».
+/// « 100 Mo », « 500 Mo ».
 String libelleLimite(TypePieceJointe type) => '${limiteOctets(type) ~/ _octetsParMo} Mo';
 
 /// Les limites, en une phrase, à afficher près du bouton d'ajout.

@@ -31,7 +31,7 @@ enum DossierDrive {
 
   /// Vrai si un fichier de même nom et de même taille peut avoir changé (un PDF régénéré) : on compare alors l'empreinte.
   /// Les photos et les pièces jointes ne sont jamais modifiées après leur ajout (leur nom est unique) : nom et taille suffisent,
-  /// ce qui évite de relire des vidéos de 150 Mo à chaque vérification.
+  /// ce qui évite de relire des vidéos de 500 Mo à chaque vérification.
   final bool compareContenu;
 }
 

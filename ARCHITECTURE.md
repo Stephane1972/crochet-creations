@@ -1266,7 +1266,8 @@ la distribue ; les tests la remplacent (`aide_widget.dart` accepte un paramètre
   `getApplicationSupportDirectory()` ; le compte Google est `CompteGoogleIndisponible` (aucun appel au plugin `google_sign_in`, qui ne
   gère pas Windows) ; la récupération d'une photo perdue (spécifique à l'appareil photo d'Android) est ignorée.
 - **Partage de fichiers** (`ServicePartageFichiers`) : `ServicePartageFichiersBureau.enregistrerSous` ouvre « Enregistrer sous… »
-  (`FilePicker.saveFile`) puis copie le fichier ; `ServiceDocumentsBureau` fait de même pour les PDF (factures, devis) ;
+  (`FilePicker.saveFile`, qui exige les octets du fichier et les écrit lui-même : ils lui sont donnés jusqu'à 32 Mo, au-delà un octet de
+  remplissage suffit puis le vrai fichier est copié ; la taille du fichier rangé est vérifiée) ; `ServiceDocumentsBureau` fait de même pour les PDF (factures, devis) ;
   l'impression ouvre le dialogue d'impression de Windows. Les écrans ne le savent pas : ils appellent la même interface (`providers.dart` choisit l'implémentation).
 - **Écrans** : le choix photo/vidéo n'offre pas l'appareil photo (`demanderSourcePieceJointe(appareilPhoto: false)`) ; l'écran et la tuile
   *Google Drive* expliquent l'indisponibilité ; l'écran *Sauvegarde et export* adapte sa phrase sur Drive.

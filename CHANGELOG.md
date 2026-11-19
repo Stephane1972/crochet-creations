@@ -34,7 +34,8 @@ construction pour **Windows** (dossier `.zip` portable), demandée par Stéphane
 - Les photos ne sont **pas réduites** à l'ajout sous Windows (le sélecteur de fichiers de Windows ignore la taille demandée).
 - L'exécutable n'est **pas signé** par un éditeur : Windows peut afficher un avertissement au premier lancement.
 - La construction et le démarrage sont vérifiés par la CI GitHub (serveur Windows) ; l'application n'a pas encore été essayée sur un vrai PC :
-  Stéphane est invité à l'essayer et à signaler tout écart.
+  Stéphane est invité à l'essayer et à signaler tout écart. Le test de démarrage n'ouvre pas la fenêtre « Enregistrer sous… » : c'est le point
+  à essayer en premier (sauvegarde, facture PDF).
 
 ### Technique
 - `AppDatabase.pourBureau()` (SQLite dans le dossier de données de l'utilisateur) ; `CompteGoogleIndisponible` (aucun appel à `google_sign_in`) ;

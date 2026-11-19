@@ -125,7 +125,7 @@ Le développement se fait en 12 étapes validées une par une (détail dans [ROA
 
 - Dans l'écran d'une note, la section **Pièces jointes** : **Ajouter une pièce jointe** propose *Prendre une photo*, *Choisir une
   photo dans la galerie*, *Filmer une vidéo*, *Choisir une vidéo dans la galerie* et *Choisir un document (PDF, Word, tableur…)*.
-- **Limites, affichées avant l'ajout** : 25 Mo au plus par photo et par document, 150 Mo au plus par vidéo, 20 pièces jointes au plus
+- **Limites, affichées avant l'ajout** : 100 Mo au plus par photo et par document, 500 Mo au plus par vidéo, 50 pièces jointes au plus
   par note. Un fichier trop gros est refusé avec un message qui dit la limite ; rien n'est copié.
 - Le fichier est **copié dans l'application** (la galerie peut être vidée sans rien perdre). Une **photo** s'ouvre en plein écran dans
   l'application ; une **vidéo** ou un **document** s'ouvre dans l'application du téléphone qui sait le lire.

@@ -61,8 +61,8 @@ Plan validé par Stéphane, une pull request par étape (la facturation électro
 | 4 | Pièces jointes des notes : photos, vidéos, documents (limites affichées) | **faite** (PR #21 fusionnée, 0.18.0) |
 | 5 | Statistiques par mois, année, lieu de vente et catégorie (argent encaissé), graphique et tableau | **faite** (PR #22 fusionnée, 0.19.0) |
 | 6 | Google Drive, partie 1 : connexion, dossiers, envoi des fichiers, état | **faite** (PR #23 fusionnée, 0.20.0) |
-| 7 | Google Drive, partie 2 : sauvegardes versionnées, restauration, changement de téléphone | **écrite, en attente de validation** (PR #24, 0.21.0) |
-| 8 | Partage Drive (jamais public par défaut) et exports, dont le catalogue avec photos | **écrite, en attente de validation** (PR #25, 0.22.0 ; posée sur la PR #24) |
+| 7 | Google Drive, partie 2 : sauvegardes versionnées, restauration, changement de téléphone | **faite** (PR #24 fusionnée, 0.21.0) |
+| 8 | Partage Drive (jamais public par défaut) et exports, dont le catalogue avec photos | **faite** (PR #25 fusionnée, 0.22.0) |
 
 ### Version Windows demandée par Stéphane (novembre 2026)
 
@@ -70,7 +70,7 @@ Plan validé par Stéphane, une pull request par étape (la facturation électro
 pour l'instant** (les données passent par la sauvegarde `.zip`), **dossier `.zip` portable**, **même interface que le téléphone** dans une
 fenêtre redimensionnable.
 
-- [x] Version Windows de base : construction GitHub, test de démarrage, `.zip` portable (0.23.0, en attente de validation)
+- [x] Version Windows de base : construction GitHub, test de démarrage, `.zip` portable (PR #27, 0.23.0)
 - [ ] Plus tard, par étapes et seulement sur demande : mise en page pour grand écran, Google Drive sous Windows (client OAuth « bureau »),
   photos réduites à l'ajout, installateur ou signature du programme
 

@@ -58,14 +58,14 @@ void main() {
   }
 
   group('règles et limites', () {
-    test('les limites annoncées : 25 Mo les photos et les documents, 150 Mo les vidéos, 20 pièces par note', () {
-      expect(limiteOctets(TypePieceJointe.photo), 25 * 1024 * 1024);
-      expect(limiteOctets(TypePieceJointe.document), 25 * 1024 * 1024);
-      expect(limiteOctets(TypePieceJointe.video), 150 * 1024 * 1024);
-      expect(nombreMaxPiecesJointes, 20);
+    test('les limites annoncées : 100 Mo les photos et les documents, 500 Mo les vidéos, 50 pièces par note', () {
+      expect(limiteOctets(TypePieceJointe.photo), 100 * 1024 * 1024);
+      expect(limiteOctets(TypePieceJointe.document), 100 * 1024 * 1024);
+      expect(limiteOctets(TypePieceJointe.video), 500 * 1024 * 1024);
+      expect(nombreMaxPiecesJointes, 50);
       expect(
         libelleLimitesPiecesJointes(),
-        'Photos et documents : 25 Mo au plus chacun. Vidéos : 150 Mo au plus. 20 pièces jointes au plus par note.',
+        'Photos et documents : 100 Mo au plus chacun. Vidéos : 500 Mo au plus. 50 pièces jointes au plus par note.',
       );
     });
 
@@ -86,17 +86,17 @@ void main() {
     });
 
     test('un fichier trop gros ou vide est refusé avec un message qui dit la limite', () {
-      expect(erreurTaillePieceJointe(TypePieceJointe.photo, 25 * 1024 * 1024), isNull);
-      expect(erreurTaillePieceJointe(TypePieceJointe.photo, 25 * 1024 * 1024 + 1, nom: 'IMG.jpg'), contains('25 Mo'));
-      expect(erreurTaillePieceJointe(TypePieceJointe.photo, 25 * 1024 * 1024 + 1, nom: 'IMG.jpg'), contains('« IMG.jpg »'));
-      expect(erreurTaillePieceJointe(TypePieceJointe.video, 100 * 1024 * 1024), isNull);
-      expect(erreurTaillePieceJointe(TypePieceJointe.video, 150 * 1024 * 1024 + 1), contains('150 Mo'));
+      expect(erreurTaillePieceJointe(TypePieceJointe.photo, 100 * 1024 * 1024), isNull);
+      expect(erreurTaillePieceJointe(TypePieceJointe.photo, 100 * 1024 * 1024 + 1, nom: 'IMG.jpg'), contains('100 Mo'));
+      expect(erreurTaillePieceJointe(TypePieceJointe.photo, 100 * 1024 * 1024 + 1, nom: 'IMG.jpg'), contains('« IMG.jpg »'));
+      expect(erreurTaillePieceJointe(TypePieceJointe.video, 500 * 1024 * 1024), isNull);
+      expect(erreurTaillePieceJointe(TypePieceJointe.video, 500 * 1024 * 1024 + 1), contains('500 Mo'));
       expect(erreurTaillePieceJointe(TypePieceJointe.document, 0), contains('vide'));
     });
 
-    test('20 pièces jointes au plus par note', () {
-      expect(erreurNombrePiecesJointes(20), isNull);
-      expect(erreurNombrePiecesJointes(21), contains('20'));
+    test('50 pièces jointes au plus par note', () {
+      expect(erreurNombrePiecesJointes(50), isNull);
+      expect(erreurNombrePiecesJointes(51), contains('50'));
     });
 
     test('le nom affiché est nettoyé et raccourci, extension gardée', () {
@@ -138,14 +138,14 @@ void main() {
       expect(await noms(), hasLength(2));
     });
 
-    test('une vidéo de 30 Mo passe (limite 150 Mo), mais pas une photo de 30 Mo (limite 25 Mo)', () async {
-      final PieceRangee video = await stockage.enregistrer(_choisi('film.mp4', octets: 30 * 1024 * 1024));
+    test('une vidéo de 101 Mo passe (limite 500 Mo), mais pas une photo de 101 Mo (limite 100 Mo)', () async {
+      final PieceRangee video = await stockage.enregistrer(_choisi('film.mp4', octets: 101 * 1024 * 1024));
       expect(video.type, TypePieceJointe.video);
-      expect(await stockage.fichier(video.nomFichier).length(), 30 * 1024 * 1024);
+      expect(await stockage.fichier(video.nomFichier).length(), 101 * 1024 * 1024);
 
       await expectLater(
-        stockage.enregistrer(_choisi('grosse.jpg', octets: 30 * 1024 * 1024)),
-        _refus('limite est de 25 Mo pour les photos'),
+        stockage.enregistrer(_choisi('grosse.jpg', octets: 101 * 1024 * 1024)),
+        _refus('limite est de 100 Mo pour les photos'),
       );
       expect(await noms(), <String>[video.nomFichier]);
     });
@@ -153,7 +153,7 @@ void main() {
     test('un fichier trop gros annoncé par le sélecteur est refusé sans rien copier', () async {
       await expectLater(
         stockage.enregistrer(_choisi('gros.pdf', octets: limiteOctetsDocument + 1)),
-        _refus('25 Mo'),
+        _refus('100 Mo'),
       );
       expect(await stockage.dossier.exists(), isFalse);
     });
@@ -161,7 +161,7 @@ void main() {
     test('un fichier dont la taille n’est connue qu’en cours de copie est refusé dès qu’il dépasse, et rien ne reste', () async {
       await expectLater(
         stockage.enregistrer(_choisi('gros.pdf', octets: limiteOctetsDocument + 1, annoncer: false)),
-        _refus('dépasse la limite de 25 Mo'),
+        _refus('dépasse la limite de 100 Mo'),
       );
       expect(await noms(), isEmpty); // ni fichier, ni fichier provisoire
     });
@@ -231,14 +231,14 @@ void main() {
       expect(await notes.listerPiecesJointes(seule.id), isEmpty);
     });
 
-    test('plus de 20 pièces jointes : refusé, et rien n’est enregistré', () async {
-      final List<PieceRangee> trop = <PieceRangee>[for (int i = 0; i < 21; i++) await ranger('f$i.pdf')];
-      await expectLater(notes.creer(titre: 'Trop', piecesJointes: trop), _refus('20 pièces jointes'));
+    test('plus de 50 pièces jointes : refusé, et rien n’est enregistré', () async {
+      final List<PieceRangee> trop = <PieceRangee>[for (int i = 0; i < 51; i++) await ranger('f$i.pdf')];
+      await expectLater(notes.creer(titre: 'Trop', piecesJointes: trop), _refus('50 pièces jointes'));
       expect(await notes.lister(), isEmpty);
       expect(await db.select(db.piecesJointesNote).get(), isEmpty);
 
-      final Note vingt = await notes.creer(titre: 'Vingt', piecesJointes: trop.take(20).toList());
-      expect(await notes.listerPiecesJointes(vingt.id), hasLength(20));
+      final Note cinquante = await notes.creer(titre: 'Cinquante', piecesJointes: trop.take(50).toList());
+      expect(await notes.listerPiecesJointes(cinquante.id), hasLength(50));
     });
 
     test('une pièce jointe trop grosse pour son type est refusée : la note n’est pas créée', () async {
@@ -246,9 +246,9 @@ void main() {
         nomFichier: 'piece_x.jpg',
         nomAffiche: 'Enorme.jpg',
         type: TypePieceJointe.photo,
-        octets: 26 * 1024 * 1024,
+        octets: 101 * 1024 * 1024,
       );
-      await expectLater(notes.creer(titre: 'Trop lourde', piecesJointes: <PieceRangee>[enorme]), _refus('25 Mo'));
+      await expectLater(notes.creer(titre: 'Trop lourde', piecesJointes: <PieceRangee>[enorme]), _refus('100 Mo'));
       expect(await notes.lister(), isEmpty);
     });
 
@@ -296,22 +296,22 @@ void main() {
       expect(await noms(), hasLength(2));
     });
 
-    test('au-delà de 20 en comptant les ajouts et les retraits : refusé, et rien ne change', () async {
-      final List<PieceRangee> dixNeuf = <PieceRangee>[for (int i = 0; i < 19; i++) await ranger('f$i.pdf')];
-      final Note note = await notes.creer(titre: 'Presque pleine', piecesJointes: dixNeuf);
+    test('au-delà de 50 en comptant les ajouts et les retraits : refusé, et rien ne change', () async {
+      final List<PieceRangee> quaranteNeuf = <PieceRangee>[for (int i = 0; i < 49; i++) await ranger('f$i.pdf')];
+      final Note note = await notes.creer(titre: 'Presque pleine', piecesJointes: quaranteNeuf);
       final PieceRangee deux = await ranger('x.pdf');
       final PieceRangee trois = await ranger('y.pdf');
 
       await expectLater(
         notes.modifier(note.id, titre: 'Presque pleine', ajouts: <PieceRangee>[deux, trois]),
-        _refus('20 pièces jointes'),
+        _refus('50 pièces jointes'),
       );
-      expect(await notes.listerPiecesJointes(note.id), hasLength(19));
+      expect(await notes.listerPiecesJointes(note.id), hasLength(49));
 
       // En retirant une pièce, on a de la place pour deux ajouts.
       final int premier = (await notes.listerPiecesJointes(note.id)).first.id;
       await notes.modifier(note.id, titre: 'Presque pleine', ajouts: <PieceRangee>[deux, trois], retraits: <int>{premier});
-      expect(await notes.listerPiecesJointes(note.id), hasLength(20));
+      expect(await notes.listerPiecesJointes(note.id), hasLength(50));
     });
 
     test('supprimer une note supprime ses pièces jointes en base et leurs fichiers, pas ceux des autres notes', () async {

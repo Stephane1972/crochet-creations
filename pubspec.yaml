@@ -1,7 +1,7 @@
 name: crochet_creations
 description: "Un p’tit crochet dans les stocks : stock, ventes, factures, devis et cours pour une créatrice auto-entrepreneuse."
 publish_to: "none"
-version: 0.22.0+26
+version: 0.23.0+28
 
 environment:
   # Drift 2.35 demande Dart 3.10 (Flutter 3.38 ou plus récent, canal « stable »).
@@ -52,6 +52,9 @@ dependencies:
 
 dev_dependencies:
   flutter_test:
+    sdk: flutter
+  # Test de démarrage de la vraie application sous Windows (integration_test/, lancé par le workflow « Windows »).
+  integration_test:
     sdk: flutter
   flutter_lints: ^5.0.0
   flutter_launcher_icons: ^0.14.3

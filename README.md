@@ -9,6 +9,9 @@ les **devis**, les **cours et inscriptions**, les **dépenses**, des **statistiq
 et les **sauvegardes**. Elle fonctionne **entièrement hors ligne**, sans serveur ; l'envoi des fichiers vers **Google Drive**
 est une option, qui ne part que sur demande.
 
+Elle existe aussi en **version Windows** (un dossier `.zip` portable, la même interface dans une fenêtre) : voir « Version Windows » plus bas.
+La version Android reste la version de référence, inchangée.
+
 > Nom de l'application : « Un p’tit crochet dans les stocks » (elle s'appelait « Crochet & Créations » : le nom du dépôt GitHub
 > et le nom technique `crochet_creations` n'ont pas changé).
 
@@ -560,14 +563,49 @@ Flutter doit être récent (canal *stable*, Flutter 3.38 / Dart 3.10 au minimum)
 > Le dossier `android/` n'est volontairement **pas** versionné : il est généré par `tool/setup_android.sh`
 > (voir [ARCHITECTURE.md](ARCHITECTURE.md), section « Dossier android/ »).
 
+### Version Windows (dossier .zip portable)
+
+La même application, construite pour Windows 10/11 par GitHub, **sans rien installer** :
+
+1. Sur GitHub, dépôt › **Releases** (https://github.com/Stephane1972/crochet-creations/releases) › ouvrir la pré-version
+   **« Windows (dossier .zip portable) — … »** de la branche voulue et télécharger `crochet-creations-windows-XXXXXXX.zip`.
+2. Clic droit sur le .zip › **Extraire tout…**, puis ouvrir le dossier obtenu et double-cliquer sur **`crochet_creations.exe`**
+   (le fichier `LISEZMOI.txt` du dossier explique la suite). Windows peut afficher « Windows a protégé votre ordinateur » : le
+   programme n'est pas signé par un éditeur payant ; *Informations complémentaires › Exécuter quand même*.
+3. Les données restent sur l'ordinateur (dossier `%APPDATA%\fr.crochetcreations`), rien n'est envoyé sur Internet.
+
+**Ce qui est pareil** : tous les écrans, les calculs, les factures et devis en PDF, les statistiques, la sauvegarde et la restauration.
+La fenêtre se redimensionne ; le contenu garde la largeur d'un grand téléphone, centré.
+
+**Ce qui change** (et pourquoi) :
+
+| Sur Android | Sous Windows |
+|-------------|--------------|
+| Google Drive (connexion, envoi, partage) | **pas encore disponible** ; l'écran l'explique |
+| Appareil photo, caméra | on **choisit un fichier** déjà sur l'ordinateur |
+| Feuille de partage d'Android | **« Enregistrer sous… »** (fenêtre Windows de choix d'emplacement) |
+| Photos réduites à l'ajout | photos **gardées à leur taille d'origine** (le sélecteur Windows ne sait pas les réduire) |
+
+**Passer ses données du téléphone au PC (ou l'inverse)** : *Réglages › Sauvegarde et export › Sauvegarder maintenant*, enregistrer
+le `.zip` (Android : « Partager » ; Windows : « Enregistrer sous… »), le faire passer à l'autre appareil (e-mail, clé USB…),
+puis *Restaurer une sauvegarde* sur l'autre appareil.
+
+La construction est faite par le workflow `.github/workflows/windows.yml`, **indépendant** de celui d'Android : à chaque envoi, il
+construit l'application, la **démarre pour de vrai** sur un serveur Windows (`integration_test/demarrage_windows_test.dart`) puis
+publie le `.zip`. Le workflow Android (analyse, tests, APK signé) n'a pas changé.
+
+Pour construire à la main sur un PC Windows (avec Flutter) : `flutter pub get`, `dart run build_runner build --delete-conflicting-outputs`,
+`bash tool/setup_windows.sh` (Git Bash), puis `flutter run -d windows` ou `flutter build windows --release`.
+
 ## Structure du dépôt
 
 ```
 lib/            code de l'application : presentation, domain, data (voir ARCHITECTURE.md)
 assets/         logo, icônes, police Poppins
 test/           tests automatiques
-tool/           scripts : génération des icônes et du dossier android/, signature de l'APK, annotations de la CI
-.github/        construction automatique de l'APK
+integration_test/  test de démarrage de la vraie application sous Windows (lancé par la CI Windows)
+tool/           scripts : génération des icônes et des dossiers android/ et windows/, signature de l'APK, annotations de la CI
+.github/        constructions automatiques : APK Android (android.yml) et dossier .zip Windows (windows.yml)
 ```
 
 L'organisation détaillée du code est expliquée dans [ARCHITECTURE.md](ARCHITECTURE.md).

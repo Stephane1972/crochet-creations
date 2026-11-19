@@ -1250,6 +1250,42 @@ l'APK » appelle `tool/empreinte_signature_apk.py`, qui lit le certificat dans l
 dans Google Cloud pour la connexion à Google Drive (étapes suivantes). Les deux scripts ont leurs tests dans `tool/tests/`
 (`python3 -m unittest discover -s tool/tests -v`), lancés par la CI avant la préparation de la clé.
 
+## Version Windows
+
+L'application Android est la version de référence ; la version Windows en est une **déclinaison** : le même code Dart, avec quelques
+différences isolées derrière une seule abstraction.
+
+### `Plateforme` (`lib/core/plateforme.dart`)
+Deux valeurs : `Plateforme.android()` et `Plateforme.windows()`, chacune dit ce que la machine sait faire (`appareilPhoto`,
+`googleDrive`, `fenetreDeBureau`). `Plateforme.courante()` renvoie Windows seulement si `Platform.isWindows` ; **tout le reste (Android,
+Linux des tests) se comporte comme Android**, donc rien ne change pour le téléphone ni pour les tests existants. `plateformeProvider`
+la distribue ; les tests la remplacent (`aide_widget.dart` accepte un paramètre `plateforme`, `Plateforme.android()` par défaut).
+
+### Ce qui change selon la plateforme
+- **Démarrage** (`main.dart`) : sous Windows, la base SQLite (`AppDatabase.pourBureau()`) et les dossiers de photos/documents sont dans
+  `getApplicationSupportDirectory()` ; le compte Google est `CompteGoogleIndisponible` (aucun appel au plugin `google_sign_in`, qui ne
+  gère pas Windows) ; la récupération d'une photo perdue (spécifique à l'appareil photo d'Android) est ignorée.
+- **Partage de fichiers** (`ServicePartageFichiers`) : `ServicePartageFichiersBureau.enregistrerSous` ouvre « Enregistrer sous… »
+  (`FilePicker.saveFile`) puis copie le fichier ; `ServiceDocumentsBureau` fait de même pour les PDF (factures, devis) ;
+  l'impression ouvre le dialogue d'impression de Windows. Les écrans ne le savent pas : ils appellent la même interface (`providers.dart` choisit l'implémentation).
+- **Écrans** : le choix photo/vidéo n'offre pas l'appareil photo (`demanderSourcePieceJointe(appareilPhoto: false)`) ; l'écran et la tuile
+  *Google Drive* expliquent l'indisponibilité ; l'écran *Sauvegarde et export* adapte sa phrase sur Drive.
+- **Fenêtre** (`app.dart`) : `MaterialApp.builder` centre le contenu et limite sa largeur à 640 px sous Windows ; rien sous Android.
+
+### Dossier `windows/` et construction
+Comme `android/`, le dossier `windows/` n'est pas versionné (`/windows/` dans `.gitignore`) : `tool/setup_windows.sh` le crée avec
+`flutter create --platforms=windows`, règle le titre de la fenêtre (« Un p'tit crochet dans les stocks », 720 × 960), les informations
+du fichier `.exe` et l'icône (`tool/flutter_launcher_icons_windows.yaml`). Il est idempotent et échoue bruyamment si un modèle de Flutter
+change. `.github/workflows/windows.yml` (serveur `windows-latest`) : dépendances, génération Drift, `setup_windows.sh`,
+`flutter build windows --release`, **test de démarrage** (`integration_test/demarrage_windows_test.dart` : lance `lib/main.dart` pour de
+vrai et attend l'accueil, avec la vraie base SQLite), copie des trois DLL Visual C++ (`msvcp140`, `vcruntime140`, `vcruntime140_1`) pour les PC qui ne
+les ont pas, `LISEZMOI.txt`, `.zip` publié dans la pré-version `windows-<branche>` même si le test de démarrage échoue (avec un avertissement).
+Ce workflow est indépendant d'`android.yml`.
+
+### Limites
+Pas de Google Drive (il faudra un client OAuth « bureau » et un autre mode de connexion) ; pas d'appareil photo ; photos non réduites
+(`image_picker` ignore `maxWidth`/`imageQuality` sous Windows) ; exécutable non signé ; `share_plus` n'est pas utilisé sous Windows.
+
 ## Choix techniques
 
 | Sujet | Décision | État |

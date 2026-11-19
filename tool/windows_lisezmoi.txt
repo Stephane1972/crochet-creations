@@ -1,0 +1,26 @@
+UN P'TIT CROCHET DANS LES STOCKS - version Windows
+===================================================
+
+Installer (rien à installer) :
+  1. Faites un clic droit sur le fichier .zip, puis « Extraire tout... ».
+  2. Ouvrez le dossier obtenu et double-cliquez sur « crochet_creations.exe ».
+
+Si Windows affiche « Windows a protégé votre ordinateur » (application non reconnue) :
+cliquez sur « Informations complémentaires », puis sur « Exécuter quand même ».
+L'application n'est pas signée par un éditeur payant : c'est le seul motif de cet avertissement.
+
+Ne déplacez pas le .exe seul : il a besoin des autres fichiers du dossier.
+
+Vos données
+  Elles restent sur cet ordinateur, dans votre dossier « AppData\Roaming » (ouvrez-le avec Windows + R,
+  puis tapez %APPDATA%), dossier « fr.crochetcreations ». Rien n'est envoyé sur Internet.
+
+Passer vos données du téléphone Android à Windows (ou l'inverse) :
+  1. Sur l'appareil qui contient les données : Réglages > Sauvegarde et export > « Sauvegarder maintenant »,
+     puis « Partager » (sous Windows : « Enregistrer sous... »).
+  2. Faites passer le fichier .zip à l'autre appareil (e-mail, clé USB, Drive...).
+  3. Sur l'autre appareil : Réglages > Sauvegarde et export > « Restaurer une sauvegarde », et choisissez ce fichier.
+
+Ce qui ne marche pas encore sous Windows
+  - La connexion à Google Drive (elle existe sur Android).
+  - Prendre une photo ou filmer : on choisit un fichier déjà présent sur l'ordinateur.

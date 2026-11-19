@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/constants/app_constants.dart';
+import '../../core/plateforme.dart';
 import '../../core/router/app_routes.dart';
 import '../../core/theme/theme_mode_provider.dart';
 import '../../core/utils/date_fr.dart';
@@ -431,7 +432,7 @@ class _SauvegardeScreenState extends ConsumerState<SauvegardeScreen> {
                   title: Text('Exporter le catalogue (produits et photos)', style: theme.textTheme.titleSmall),
                   subtitle: Text(
                     'Un fichier .zip à donner à quelqu’un : le tableau des produits avec leurs prix de vente, et leurs photos. '
-                    'Sans les coûts, les stocks ni les clients. Vous pouvez aussi l’envoyer sur Google Drive (Réglages › Google Drive › Partages).',
+                    'Sans les coûts, les stocks ni les clients.${ref.watch(plateformeProvider).googleDrive ? ' Vous pouvez aussi l’envoyer sur Google Drive (Réglages › Google Drive › Partages).' : ''}',
                     style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
                   ),
                   enabled: !_occupe,

@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/constants/app_constants.dart';
+import 'core/plateforme.dart';
 import 'core/router/app_routes.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_mode_provider.dart';
@@ -16,6 +17,7 @@ class CrochetApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final ThemeMode modeTheme = ref.watch(themeModeProvider);
+    final Plateforme plateforme = ref.watch(plateformeProvider);
 
     return MaterialApp(
       title: AppConstants.nomApplication,
@@ -32,7 +34,19 @@ class CrochetApp extends ConsumerWidget {
         GlobalCupertinoLocalizations.delegate,
       ],
       builder: (BuildContext context, Widget? child) {
-        return AdaptiveSystemOverlay(child: child ?? const SizedBox.shrink());
+        final Widget contenu = AdaptiveSystemOverlay(child: child ?? const SizedBox.shrink());
+        if (!plateforme.fenetreDeBureau) return contenu;
+        // Windows : la même interface que sur téléphone, à la largeur d'un téléphone, centrée dans la fenêtre
+        // (le fond de la fenêtre reprend celui des écrans : pas de bande d'une autre couleur).
+        return ColoredBox(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: Plateforme.largeurMaxContenu),
+              child: contenu,
+            ),
+          ),
+        );
       },
       initialRoute: AppRoutes.splash,
       onGenerateRoute: AppRouter.onGenerateRoute,

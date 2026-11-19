@@ -1,0 +1,10 @@
+# Icône de la version Windows (voir tool/setup_windows.sh). Configuration à part : la section « flutter_launcher_icons » de
+# pubspec.yaml ne concerne qu'Android et reste inchangée.
+flutter_launcher_icons:
+  android: false
+  ios: false
+  image_path: "assets/icon/logo_source.png"
+  windows:
+    generate: true
+    image_path: "assets/icon/logo_source.png"
+    icon_size: 256

@@ -6,6 +6,42 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
 
 ## [Non publié]
 
+## [0.23.0] — Version Windows
+
+La **version Android est inchangée** : mêmes écrans, mêmes calculs, même workflow, même APK signé. Cette version ajoute, à côté, une
+construction pour **Windows** (dossier `.zip` portable), demandée par Stéphane.
+
+### Ajouté
+- **Application Windows** : la même interface que sur le téléphone, dans une fenêtre redimensionnable (contenu centré, 640 px au plus de
+  largeur ; une mise en page pour grand écran pourra venir plus tard, par étapes). Titre de fenêtre, nom du programme et icône de
+  l'application.
+- **`Plateforme`** (`lib/core/plateforme.dart`) : un seul endroit qui dit ce qui change selon la machine (appareil photo, Google Drive, fenêtre
+  d'ordinateur). Tout ce qui n'est pas Windows (dont les tests, sous Linux) se comporte exactement comme Android.
+- **Sous Windows** : « **Enregistrer sous…** » à la place de la feuille de partage d'Android (sauvegardes, exports, factures, devis, documents) ;
+  choix d'un fichier à la place de l'appareil photo ; **Google Drive annoncé comme indisponible** (écran *Google Drive*, tuile des Réglages, phrase de
+  l'écran *Sauvegarde et export*), avec l'explication pour passer ses données d'un appareil à l'autre par la sauvegarde `.zip`.
+- **Données** rangées dans le dossier « données d'application » de l'utilisateur (`%APPDATA%\fr.crochetcreations\…`), base SQLite comprise.
+- **Workflow `windows.yml`** (GitHub Actions, serveur Windows) : construit l'application, la **démarre pour de vrai** (test de démarrage
+  `integration_test/demarrage_windows_test.dart`), ajoute les bibliothèques Visual C++ et un `LISEZMOI.txt`, puis publie le `.zip` dans une
+  pré-version `windows-<branche>`.
+- Scripts `tool/setup_windows.sh` (dossier `windows/` généré par `flutter create`, comme `android/`) et `tool/windows_lisezmoi.txt`.
+- Tests : `test/core/plateforme_test.dart`, `test/data/compte_google_indisponible_test.dart`, `test/presentation/windows_test.dart`
+  (écrans en mode « Windows », et vérification que le mode Android est inchangé).
+
+### Limites connues (dites ici pour ne rien cacher)
+- **Pas de Google Drive sous Windows pour l'instant** (il faudra créer un identifiant Google de type « application de bureau »).
+- Pas d'appareil photo ni de caméra : on choisit un fichier existant.
+- Les photos ne sont **pas réduites** à l'ajout sous Windows (le sélecteur de fichiers de Windows ignore la taille demandée).
+- L'exécutable n'est **pas signé** par un éditeur : Windows peut afficher un avertissement au premier lancement.
+- La construction et le démarrage sont vérifiés par la CI GitHub (serveur Windows) ; l'application n'a pas encore été essayée sur un vrai PC :
+  Stéphane est invité à l'essayer et à signaler tout écart. Le test de démarrage n'ouvre pas la fenêtre « Enregistrer sous… » : c'est le point
+  à essayer en premier (sauvegarde, facture PDF).
+
+### Technique
+- `AppDatabase.pourBureau()` (SQLite dans le dossier de données de l'utilisateur) ; `CompteGoogleIndisponible` (aucun appel à `google_sign_in`) ;
+  `ServicePartageFichiersBureau` et `ServiceDocumentsBureau` ; `MaterialApp.builder` limite la largeur du contenu sous Windows.
+- `integration_test` ajouté aux dépendances de développement (test de démarrage, ignoré par `flutter test`).
+
 ## [0.22.1] — Pièces jointes des notes : des limites plus larges
 
 ### Modifié

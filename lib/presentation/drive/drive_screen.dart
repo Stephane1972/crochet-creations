@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/plateforme.dart';
 import '../../core/router/app_routes.dart';
 import '../../core/utils/date_fr.dart';
 import '../../data/drive/compte_google.dart';
@@ -26,6 +27,8 @@ class DriveScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Windows : la connexion Google n'est pas (encore) disponible ; on l'explique et on montre le chemin qui marche.
+    if (!ref.watch(plateformeProvider).googleDrive) return const _DriveIndisponible();
     final bool connecte = ref.watch(profilGoogleProvider).valueOrNull != null;
     return Scaffold(
       appBar: AppBar(title: const Text('Google Drive')),
@@ -44,6 +47,42 @@ class DriveScreen extends ConsumerWidget {
           ],
           const SizedBox(height: 12),
           const _CarteDernierEnvoi(),
+        ],
+      ),
+    );
+  }
+}
+
+/// Sous Windows : Google Drive n'est pas encore disponible. Les données passent d'un appareil à l'autre par la sauvegarde `.zip`.
+class _DriveIndisponible extends StatelessWidget {
+  const _DriveIndisponible();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Google Drive')),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+        children: <Widget>[
+          CarteDrive(
+            key: const Key('drive-indisponible'),
+            titre: 'Pas encore disponible sous Windows',
+            enfants: <Widget>[
+              const Text(
+                'La connexion à Google Drive existe pour l’instant dans la version Android de l’application. '
+                'Ici, rien n’est envoyé sur Internet : tout reste sur cet ordinateur.',
+              ),
+              const SizedBox(height: 12),
+              Text('Pour passer vos données d’un appareil à l’autre', style: Theme.of(context).textTheme.titleSmall),
+              const SizedBox(height: 6),
+              const Text(
+                '1. Dans la version qui contient vos données : Réglages › Sauvegarde et export › « Sauvegarder maintenant », '
+                'puis « Partager » (sous Windows : « Enregistrer sous… »).\n'
+                '2. Faites passer le fichier .zip à l’autre appareil (e-mail, clé USB, Drive...).\n'
+                '3. Sur l’autre appareil : Réglages › Sauvegarde et export › « Restaurer une sauvegarde », et choisissez ce fichier.',
+              ),
+            ],
+          ),
         ],
       ),
     );

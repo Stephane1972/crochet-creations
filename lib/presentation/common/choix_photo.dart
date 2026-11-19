@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/plateforme.dart';
 import '../../core/widgets/dialogues.dart';
 import '../../data/providers.dart';
 import '../../data/stockage/selecteur_photo.dart';
@@ -19,6 +20,8 @@ enum ChoixPhoto { appareil, galerie, retirer, retrouvee }
 Future<ChoixPhoto?> demanderChoixPhoto(BuildContext context, WidgetRef ref, {required bool retirable}) {
   final String? retrouvee = ref.read(photoRetrouveeProvider);
   final bool proposerRetrouvee = retrouvee != null && File(retrouvee).existsSync();
+  // Sous Windows, il n'y a pas d'appareil photo : on choisit une photo dans les fichiers de l'ordinateur.
+  final bool appareilPhoto = ref.read(plateformeProvider).appareilPhoto;
   if (retrouvee != null && !proposerRetrouvee) ref.read(photoRetrouveeProvider.notifier).oublier();
 
   return showModalBottomSheet<ChoixPhoto>(
@@ -35,14 +38,15 @@ Future<ChoixPhoto?> demanderChoixPhoto(BuildContext context, WidgetRef ref, {req
               subtitle: const Text('Prise juste avant la fermeture de l’application.'),
               onTap: () => Navigator.of(contexteFeuille).pop(ChoixPhoto.retrouvee),
             ),
-          ListTile(
-            leading: const Icon(Icons.photo_camera_outlined),
-            title: const Text('Prendre une photo'),
-            onTap: () => Navigator.of(contexteFeuille).pop(ChoixPhoto.appareil),
-          ),
+          if (appareilPhoto)
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: const Text('Prendre une photo'),
+              onTap: () => Navigator.of(contexteFeuille).pop(ChoixPhoto.appareil),
+            ),
           ListTile(
             leading: const Icon(Icons.photo_library_outlined),
-            title: const Text('Choisir dans la galerie'),
+            title: Text(appareilPhoto ? 'Choisir dans la galerie' : 'Choisir une photo sur l’ordinateur'),
             onTap: () => Navigator.of(contexteFeuille).pop(ChoixPhoto.galerie),
           ),
           if (retirable)

@@ -1,0 +1,124 @@
+name: Windows (dossier .zip portable)
+
+# Se lance à chaque envoi sur main, sur chaque pull request, et à la demande
+# (onglet « Actions » → « Windows » → « Run workflow »).
+# Ce workflow est INDÉPENDANT du workflow « Android » : il ne modifie rien de ce qui produit l'APK. Il construit la même
+# application pour Windows, la démarre pour de vrai (test de démarrage), et publie un dossier .zip portable.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Droit d'écriture : nécessaire pour publier le .zip dans une « pré-version » GitHub.
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    # Tous les scripts sont écrits pour bash (Git Bash est fourni avec le serveur Windows de GitHub).
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Installer Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Version de Flutter
+        run: flutter --version
+
+      - name: Installer les dépendances
+        run: |
+          set +e
+          flutter pub get 2>&1 | tee pub-get.log
+          code=${PIPESTATUS[0]}
+          if [ "$code" -ne 0 ]; then bash tool/ci_annoter.sh "Échec de flutter pub get" pub-get.log; fi
+          exit $code
+
+      # Drift (base de données) génère du code : fichiers *.g.dart, non versionnés.
+      - name: Générer le code de la base de données (Drift)
+        run: |
+          set +e
+          dart run build_runner build --delete-conflicting-outputs 2>&1 | tee build-runner.log
+          code=${PIPESTATUS[0]}
+          if [ "$code" -ne 0 ]; then bash tool/ci_annoter.sh "Échec de la génération du code (build_runner)" build-runner.log "SEVERE|Error|error"; fi
+          exit $code
+
+      - name: Préparer Windows (dossier windows/, titre, icône)
+        run: bash tool/setup_windows.sh
+
+      - name: Construire l'application Windows
+        id: construction
+        run: |
+          set +e
+          flutter build windows --release 2>&1 | tee build-windows.log
+          code=${PIPESTATUS[0]}
+          if [ "$code" -ne 0 ]; then bash tool/ci_annoter.sh "Échec de la construction Windows" build-windows.log "(error|Error|FAILED|fatal)"; fi
+          exit $code
+
+      # Le vrai test : l'application (lib/main.dart) est lancée sur Windows, avec sa vraie base SQLite et ses vrais dossiers,
+      # et doit arriver jusqu'à l'accueil. Le .zip est publié même si ce test échoue, pour pouvoir toujours essayer.
+      - name: Tester le démarrage de l'application sous Windows
+        id: demarrage
+        if: ${{ !cancelled() && steps.construction.outcome == 'success' }}
+        run: |
+          set +e
+          timeout 20m flutter test integration_test/demarrage_windows_test.dart -d windows --reporter expanded 2>&1 | tee demarrage.log
+          code=${PIPESTATUS[0]}
+          if [ "$code" -ne 0 ]; then bash tool/ci_annoter.sh "Le test de démarrage sous Windows a échoué" demarrage.log "(\[E\]|Expected|Actual|reason|EXCEPTION|Exception|Error)"; fi
+          exit $code
+
+      # Dossier portable : l'application construite, les trois bibliothèques Visual C++ (pour les PC qui ne les ont pas) et un
+      # mode d'emploi. Les bibliothèques sont copiées du serveur de construction, qui les possède.
+      - name: Fabriquer le dossier .zip portable
+        id: zip
+        if: ${{ !cancelled() && steps.construction.outcome == 'success' }}
+        env:
+          COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          COURT="${COMMIT:0:7}"
+          DOSSIER="Un-ptit-crochet-dans-les-stocks"
+          rm -rf "sortie"
+          mkdir -p "sortie/$DOSSIER"
+          cp -r build/windows/x64/runner/Release/. "sortie/$DOSSIER/"
+          for dll in msvcp140.dll vcruntime140.dll vcruntime140_1.dll; do
+            if [ -f "/c/Windows/System32/$dll" ]; then cp "/c/Windows/System32/$dll" "sortie/$DOSSIER/"; else echo "::warning title=Windows::$dll introuvable sur le serveur : il ne sera pas dans le .zip."; fi
+          done
+          cp tool/windows_lisezmoi.txt "sortie/$DOSSIER/LISEZMOI.txt"
+          ls -la "sortie/$DOSSIER" | head -40
+          test -f "sortie/$DOSSIER/crochet_creations.exe" || { echo "::error title=Windows::crochet_creations.exe est absent du dossier construit."; exit 1; }
+          (cd sortie && 7z a -tzip "../crochet-creations-windows-$COURT.zip" "$DOSSIER" > /dev/null)
+          ls -la "crochet-creations-windows-$COURT.zip"
+          echo "zip=crochet-creations-windows-$COURT.zip" >> "$GITHUB_OUTPUT"
+
+      # Publication : pré-version GitHub (onglet « Releases » du dépôt), remplacée à chaque nouvel envoi sur la branche.
+      - name: Publier le .zip dans une pré-version
+        if: ${{ !cancelled() && steps.zip.outcome == 'success' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCHE: ${{ github.head_ref || github.ref_name }}
+          COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+          ZIP: ${{ steps.zip.outputs.zip }}
+          DEMARRAGE: ${{ steps.demarrage.outcome }}
+        run: |
+          COURT="${COMMIT:0:7}"
+          TAG="windows-$(echo "$BRANCHE" | tr '/' '-')"
+          if [ "$DEMARRAGE" = "success" ]; then
+            VERIF="Le test de démarrage sous Windows a réussi : l'application s'ouvre jusqu'à l'accueil, avec sa vraie base de données."
+          else
+            VERIF="ATTENTION : le test de démarrage sous Windows n'a pas réussi (voir l'exécution du workflow)."
+          fi
+          gh release delete "$TAG" --cleanup-tag --yes 2>/dev/null || true
+          gh release create "$TAG" "$ZIP" \
+            --repo "$GITHUB_REPOSITORY" --target "$COMMIT" --prerelease \
+            --title "Windows (dossier .zip portable) — $BRANCHE ($COURT)" \
+            --notes "Version Windows construite automatiquement à partir du commit $COURT : décompressez le .zip puis double-cliquez sur crochet_creations.exe (voir LISEZMOI.txt dans le dossier). Remplacée à chaque nouvel envoi sur la branche."$'\n\n'"$VERIF"

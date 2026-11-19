@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/plateforme.dart';
 import '../domain/document_devis.dart';
 import '../domain/document_facture.dart';
 import 'database/app_database.dart';
@@ -152,7 +153,9 @@ final factureRepositoryProvider = Provider<FactureRepository>(
 
 /// Partage et impression du PDF (feuille de partage et dialogue d'impression d'Android).
 /// Les tests le remplacent par un faux service.
-final serviceDocumentsProvider = Provider<ServiceDocuments>((ref) => ServiceDocumentsSysteme());
+final serviceDocumentsProvider = Provider<ServiceDocuments>(
+  (ref) => ref.watch(plateformeProvider).fenetreDeBureau ? ServiceDocumentsBureau() : ServiceDocumentsSysteme(),
+);
 
 /// Fabrique le PDF d'un devis. Les tests le remplacent par un générateur rapide, sans ressources.
 final generateurDevisPdfProvider = Provider<GenerateurDevisPdf>((ref) {
@@ -252,5 +255,6 @@ final selecteurFichierSauvegardeProvider = Provider<SelecteurFichierSauvegarde>(
 /// Partage d'un fichier (sauvegarde, export) par la feuille de partage d'Android. Les tests le remplacent par
 /// un faux service.
 final servicePartageFichiersProvider = Provider<ServicePartageFichiers>(
-  (ref) => ServicePartageFichiersSysteme(),
+  // Android : la feuille de partage du téléphone. Windows : « Enregistrer sous… » (voir `ServicePartageFichiersBureau`).
+  (ref) => ref.watch(plateformeProvider).fenetreDeBureau ? ServicePartageFichiersBureau() : ServicePartageFichiersSysteme(),
 );

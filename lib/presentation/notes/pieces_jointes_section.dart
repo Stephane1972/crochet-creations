@@ -140,7 +140,8 @@ class _Apercu extends StatelessWidget {
 }
 
 /// Feuille du bas « Que voulez-vous joindre ? ». Retourne `null` si on la referme.
-Future<SourcePieceJointe?> demanderSourcePieceJointe(BuildContext context) {
+/// [appareilPhoto] : proposer « Prendre une photo » et « Filmer une vidéo » (un téléphone ; pas un ordinateur).
+Future<SourcePieceJointe?> demanderSourcePieceJointe(BuildContext context, {bool appareilPhoto = true}) {
   return showModalBottomSheet<SourcePieceJointe>(
     context: context,
     showDragHandle: true,
@@ -149,24 +150,26 @@ Future<SourcePieceJointe?> demanderSourcePieceJointe(BuildContext context) {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            ListTile(
-              leading: const Icon(Icons.photo_camera_outlined),
-              title: const Text('Prendre une photo'),
-              onTap: () => Navigator.of(contexteFeuille).pop(SourcePieceJointe.photoAppareil),
-            ),
+            if (appareilPhoto)
+              ListTile(
+                leading: const Icon(Icons.photo_camera_outlined),
+                title: const Text('Prendre une photo'),
+                onTap: () => Navigator.of(contexteFeuille).pop(SourcePieceJointe.photoAppareil),
+              ),
             ListTile(
               leading: const Icon(Icons.photo_library_outlined),
-              title: const Text('Choisir une photo dans la galerie'),
+              title: Text(appareilPhoto ? 'Choisir une photo dans la galerie' : 'Choisir une photo sur l’ordinateur'),
               onTap: () => Navigator.of(contexteFeuille).pop(SourcePieceJointe.photoGalerie),
             ),
-            ListTile(
-              leading: const Icon(Icons.videocam_outlined),
-              title: const Text('Filmer une vidéo'),
-              onTap: () => Navigator.of(contexteFeuille).pop(SourcePieceJointe.videoAppareil),
-            ),
+            if (appareilPhoto)
+              ListTile(
+                leading: const Icon(Icons.videocam_outlined),
+                title: const Text('Filmer une vidéo'),
+                onTap: () => Navigator.of(contexteFeuille).pop(SourcePieceJointe.videoAppareil),
+              ),
             ListTile(
               leading: const Icon(Icons.video_library_outlined),
-              title: const Text('Choisir une vidéo dans la galerie'),
+              title: Text(appareilPhoto ? 'Choisir une vidéo dans la galerie' : 'Choisir une vidéo sur l’ordinateur'),
               onTap: () => Navigator.of(contexteFeuille).pop(SourcePieceJointe.videoGalerie),
             ),
             ListTile(

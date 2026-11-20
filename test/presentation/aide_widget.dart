@@ -238,7 +238,7 @@ class EnvironnementTest {
   final FauxSelecteurPieceJointe selecteurPieceJointe = FauxSelecteurPieceJointe();
   final FauxOuvreurPieceJointe ouvreurPieceJointe = FauxOuvreurPieceJointe();
   /// Faux compte Google et faux Drive : aucun réseau, aucune fenêtre de connexion.
-  final FauxCompteGoogle compteGoogle = FauxCompteGoogle();
+  FauxCompteGoogle compteGoogle = FauxCompteGoogle();
   final FauxClientDrive clientDrive = FauxClientDrive();
   late final ServiceDrive serviceDrive = ServiceDrive(
     client: clientDrive,

@@ -27,8 +27,6 @@ class DriveScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Windows : la connexion Google n'est pas (encore) disponible ; on l'explique et on montre le chemin qui marche.
-    if (!ref.watch(plateformeProvider).googleDrive) return const _DriveIndisponible();
     final bool connecte = ref.watch(profilGoogleProvider).valueOrNull != null;
     return Scaffold(
       appBar: AppBar(title: const Text('Google Drive')),
@@ -47,42 +45,6 @@ class DriveScreen extends ConsumerWidget {
           ],
           const SizedBox(height: 12),
           const _CarteDernierEnvoi(),
-        ],
-      ),
-    );
-  }
-}
-
-/// Sous Windows : Google Drive n'est pas encore disponible. Les données passent d'un appareil à l'autre par la sauvegarde `.zip`.
-class _DriveIndisponible extends StatelessWidget {
-  const _DriveIndisponible();
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Google Drive')),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-        children: <Widget>[
-          CarteDrive(
-            key: const Key('drive-indisponible'),
-            titre: 'Pas encore disponible sous Windows',
-            enfants: <Widget>[
-              const Text(
-                'La connexion à Google Drive existe pour l’instant dans la version Android de l’application. '
-                'Ici, rien n’est envoyé sur Internet : tout reste sur cet ordinateur.',
-              ),
-              const SizedBox(height: 12),
-              Text('Pour passer vos données d’un appareil à l’autre', style: Theme.of(context).textTheme.titleSmall),
-              const SizedBox(height: 6),
-              const Text(
-                '1. Dans la version qui contient vos données : Réglages › Sauvegarde et export › « Sauvegarder maintenant », '
-                'puis « Partager » (sous Windows : « Enregistrer sous… »).\n'
-                '2. Faites passer le fichier .zip à l’autre appareil (e-mail, clé USB, Drive...).\n'
-                '3. Sur l’autre appareil : Réglages › Sauvegarde et export › « Restaurer une sauvegarde », et choisissez ce fichier.',
-              ),
-            ],
-          ),
         ],
       ),
     );
@@ -115,7 +77,9 @@ class _CarteConnexionState extends ConsumerState<_CarteConnexion> {
 
   @override
   Widget build(BuildContext context) {
-    final bool configure = ref.watch(clientWebProvider).configure;
+    final EtatClientWeb acces = ref.watch(clientWebProvider);
+    final bool configure = acces.configure;
+    final bool bureau = acces.demandeCodeSecret;
     final AsyncValue<ProfilGoogle?> profil = ref.watch(profilGoogleProvider);
     final bool occupe = ref.watch(envoiDriveProvider).occupe || ref.watch(sauvegardeDriveProvider).occupe;
 
@@ -124,7 +88,10 @@ class _CarteConnexionState extends ConsumerState<_CarteConnexion> {
         titre: 'Connexion à Google',
         enfants: <Widget>[
           Text(
-            'La connexion à Google n’est pas encore configurée : renseignez l’ID client Web dans la carte ci-dessous.',
+            bureau
+                ? 'La connexion à Google n’est pas encore configurée : renseignez l’ID client et le code secret de l’accès '
+                      '« application de bureau » dans la carte ci-dessous.'
+                : 'La connexion à Google n’est pas encore configurée : renseignez l’ID client Web dans la carte ci-dessous.',
             key: const Key('drive-non-configure'),
             style: Theme.of(context).textTheme.bodyMedium,
           ),
@@ -141,15 +108,19 @@ class _CarteConnexionState extends ConsumerState<_CarteConnexion> {
 
     final ProfilGoogle? connecte = profil.valueOrNull;
     if (profil.isLoading) {
-      return const CarteDrive(
+      return CarteDrive(
         titre: 'Connexion à Google',
         enfants: <Widget>[
           Row(
-            key: Key('drive-chargement'),
+            key: const Key('drive-chargement'),
             children: <Widget>[
-              SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2)),
-              SizedBox(width: 12),
-              Expanded(child: Text('Connexion en cours…')),
+              const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  bureau ? 'Connexion en cours : terminez-la dans la fenêtre de votre navigateur…' : 'Connexion en cours…',
+                ),
+              ),
             ],
           ),
         ],
@@ -221,6 +192,7 @@ class _CarteClientWeb extends ConsumerStatefulWidget {
 
 class _CarteClientWebState extends ConsumerState<_CarteClientWeb> {
   late final TextEditingController _champ;
+  late final TextEditingController _champSecret;
   String? _erreur;
   bool _enregistre = false;
   bool _occupe = false;
@@ -230,11 +202,13 @@ class _CarteClientWebState extends ConsumerState<_CarteClientWeb> {
     super.initState();
     final EtatClientWeb etat = ref.read(clientWebProvider);
     _champ = TextEditingController(text: etat.surLeTelephone ? etat.id : '');
+    _champSecret = TextEditingController();
   }
 
   @override
   void dispose() {
     _champ.dispose();
+    _champSecret.dispose();
     super.dispose();
   }
 
@@ -244,13 +218,21 @@ class _CarteClientWebState extends ConsumerState<_CarteClientWeb> {
       _erreur = null;
       _enregistre = false;
     });
-    final String? erreur = await ref.read(clientWebProvider.notifier).enregistrer(_champ.text);
+    final ClientWebNotifier controle = ref.read(clientWebProvider.notifier);
+    String? erreur = await controle.enregistrer(_champ.text);
+    // Sous Windows, le code secret est enregistré avec l'ID (s'il vient d'être saisi : sinon celui déjà enregistré reste).
+    if (erreur == null && ref.read(clientWebProvider).demandeCodeSecret && _champSecret.text.trim().isNotEmpty) {
+      erreur = await controle.enregistrerCodeSecret(_champSecret.text);
+    }
     if (!mounted) return;
     setState(() {
       _occupe = false;
       _erreur = erreur;
       _enregistre = erreur == null;
-      if (erreur == null) _champ.text = ref.read(clientWebProvider).id;
+      if (erreur == null) {
+        _champ.text = ref.read(clientWebProvider).id;
+        _champSecret.clear();
+      }
     });
   }
 
@@ -265,7 +247,10 @@ class _CarteClientWebState extends ConsumerState<_CarteClientWeb> {
     setState(() {
       _occupe = false;
       _erreur = erreur;
-      if (erreur == null) _champ.clear();
+      if (erreur == null) {
+        _champ.clear();
+        _champSecret.clear();
+      }
     });
   }
 
@@ -273,27 +258,45 @@ class _CarteClientWebState extends ConsumerState<_CarteClientWeb> {
   Widget build(BuildContext context) {
     final EtatClientWeb etat = ref.watch(clientWebProvider);
     final ThemeData theme = Theme.of(context);
+    // Sous Windows : l'accès est de type « application de bureau », avec un ID client ET un code secret, gardés sur l'ordinateur.
+    final bool bureau = etat.demandeCodeSecret;
+    final String appareil = bureau ? 'cet ordinateur' : 'ce téléphone';
 
     return CarteDrive(
-      titre: 'ID client Web Google',
+      titre: bureau ? 'Accès Google « application de bureau »' : 'ID client Web Google',
       enfants: <Widget>[
         Text(
-          etat.configure
-              ? (etat.surLeTelephone ? 'ID enregistré sur ce téléphone :' : 'ID fourni avec l’application :')
+          etat.id.isNotEmpty
+              ? (etat.surLeTelephone ? 'ID enregistré sur $appareil :' : 'ID fourni avec l’application :')
+              : bureau
+              ? 'Aucun accès n’est enregistré : la connexion à Google est impossible.'
               : 'Aucun ID client Web n’est enregistré : la connexion à Google est impossible.',
           key: const Key('drive-client-web-etat'),
           style: theme.textTheme.bodyMedium,
         ),
-        if (etat.configure) ...<Widget>[
+        if (etat.id.isNotEmpty) ...<Widget>[
           const SizedBox(height: 4),
           Text(etat.id, key: const Key('drive-client-web-id'), style: theme.textTheme.bodySmall),
+        ],
+        if (bureau) ...<Widget>[
+          const SizedBox(height: 4),
+          Text(
+            etat.codeSecretEnregistre ? 'Code secret : enregistré sur $appareil.' : 'Code secret : pas encore enregistré.',
+            key: const Key('drive-code-secret-etat'),
+            style: theme.textTheme.bodySmall,
+          ),
         ],
         const SizedBox(height: 8),
         texteDiscretDrive(
           context,
-          'Dans la console Google Cloud : API et services → Identifiants → l’accès de type « Application Web » → copiez '
-          'l’« ID client » (il se termine par $suffixeIdClientGoogle) et collez-le ici. Ce n’est pas un secret ; ne collez '
-          'jamais le « code secret ».',
+          bureau
+              ? 'Dans la console Google Cloud : API et services → Identifiants → l’accès de type « Application de bureau » → '
+                    'copiez l’« ID client » (il se termine par $suffixeIdClientGoogle) et le « code secret du client » (il '
+                    'commence par $debutCodeSecretGoogle), puis collez-les ici. Ils restent sur cet ordinateur : ne les '
+                    'publiez nulle part.'
+              : 'Dans la console Google Cloud : API et services → Identifiants → l’accès de type « Application Web » → copiez '
+                    'l’« ID client » (il se termine par $suffixeIdClientGoogle) et collez-le ici. Ce n’est pas un secret ; '
+                    'ne collez jamais le « code secret ».',
         ),
         const SizedBox(height: 12),
         TextField(
@@ -304,12 +307,28 @@ class _CarteClientWebState extends ConsumerState<_CarteClientWeb> {
           maxLines: 3,
           autocorrect: false,
           enableSuggestions: false,
-          decoration: const InputDecoration(
-            labelText: 'ID client Web',
+          decoration: InputDecoration(
+            labelText: bureau ? 'ID client' : 'ID client Web',
             hintText: '123456789012-xxxxxxxx$suffixeIdClientGoogle',
-            border: OutlineInputBorder(),
+            border: const OutlineInputBorder(),
           ),
         ),
+        if (bureau) ...<Widget>[
+          const SizedBox(height: 12),
+          TextField(
+            key: const Key('drive-code-secret-champ'),
+            controller: _champSecret,
+            enabled: !_occupe,
+            obscureText: true,
+            autocorrect: false,
+            enableSuggestions: false,
+            decoration: InputDecoration(
+              labelText: 'Code secret du client',
+              hintText: etat.codeSecretEnregistre ? 'Déjà enregistré (laisser vide pour le garder)' : '${debutCodeSecretGoogle}xxxxxxxx',
+              border: const OutlineInputBorder(),
+            ),
+          ),
+        ],
         if (_erreur != null) ...<Widget>[
           const SizedBox(height: 8),
           texteErreurDrive(context, _erreur!, key: const Key('drive-client-web-erreur')),
@@ -320,6 +339,10 @@ class _CarteClientWebState extends ConsumerState<_CarteClientWeb> {
             etat.redemarrageNecessaire
                 ? 'ID enregistré. Pour qu’il soit pris en compte, fermez complètement l’application (retirez-la des '
                       'applications récentes), puis rouvrez-la.'
+                : bureau && !etat.configure
+                ? 'ID enregistré. Il manque encore le code secret du client.'
+                : bureau
+                ? 'Accès enregistré. Vous pouvez vous connecter à Google.'
                 : 'ID enregistré. Vous pouvez vous connecter à Google.',
             key: const Key('drive-client-web-ok'),
             style: theme.textTheme.bodyMedium,
@@ -342,13 +365,13 @@ class _CarteClientWebState extends ConsumerState<_CarteClientWeb> {
               key: const Key('drive-client-web-enregistrer'),
               onPressed: _occupe ? null : _enregistrer,
               icon: const Icon(Icons.save_outlined),
-              label: const Text('Enregistrer l’ID'),
+              label: Text(bureau ? 'Enregistrer' : 'Enregistrer l’ID'),
             ),
             if (etat.surLeTelephone)
               TextButton(
                 key: const Key('drive-client-web-oublier'),
                 onPressed: _occupe ? null : _oublier,
-                child: const Text('Oublier l’ID enregistré'),
+                child: Text(bureau ? 'Oublier l’accès enregistré' : 'Oublier l’ID enregistré'),
               ),
           ],
         ),
@@ -407,10 +430,15 @@ class _CarteEnvoi extends ConsumerWidget {
         contenu.addAll(<Widget>[
           const LinearProgressIndicator(key: Key('drive-verification-en-cours')),
           const SizedBox(height: 8),
-          texteDiscretDrive(context, 'Comparaison du téléphone et de Drive…'),
+          texteDiscretDrive(
+            context,
+            ref.watch(plateformeProvider).fenetreDeBureau
+                ? 'Comparaison de l’ordinateur et de Drive…'
+                : 'Comparaison du téléphone et de Drive…',
+          ),
         ]);
       case PhaseEnvoi.verifie:
-        contenu.addAll(<Widget>[_ResumeVerification(verification: etat.verification!), const SizedBox(height: 12), boutons]);
+        contenu.addAll(<Widget>[_ResumeVerification(verification: etat.verification!, surOrdinateur: ref.watch(plateformeProvider).fenetreDeBureau), const SizedBox(height: 12), boutons]);
       case PhaseEnvoi.envoi:
         contenu.add(_Progression(etat: etat, onArreter: controle.arreter));
       case PhaseEnvoi.termine:
@@ -450,7 +478,10 @@ class _CarteEnvoi extends ConsumerWidget {
 }
 
 class _ResumeVerification extends StatelessWidget {
-  const _ResumeVerification({required this.verification});
+  const _ResumeVerification({required this.verification, this.surOrdinateur = false});
+
+  /// Vrai sous Windows : les fichiers sont « sur l'ordinateur » et non « sur le téléphone ».
+  final bool surOrdinateur;
 
   final VerificationDrive verification;
 
@@ -473,7 +504,7 @@ class _ResumeVerification extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 2),
             child: Text(
-              '${plan.dossier.nomDrive} : ${_pluriel(plan.nombreLocaux, 'fichier')} sur le téléphone · '
+              '${plan.dossier.nomDrive} : ${_pluriel(plan.nombreLocaux, 'fichier')} sur ${surOrdinateur ? 'l’ordinateur' : 'le téléphone'} · '
               '${plan.dejaSurDrive} déjà sur Drive · ${plan.aEnvoyer.length} à envoyer',
               key: Key('drive-plan-${plan.dossier.name}'),
               style: theme.textTheme.bodyMedium,

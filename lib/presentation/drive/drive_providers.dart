@@ -84,12 +84,14 @@ class ClientWebNotifier extends Notifier<EtatClientWeb> {
 
   EtatClientWeb _lire() {
     final CompteGoogle compte = ref.read(compteGoogleProvider);
+    // `CompteAvecCodeSecret` est une interface à part (Windows) : un simple test de type ne suffit pas à « promouvoir » le compte.
+    final CompteAvecCodeSecret? avecCode = compte is CompteAvecCodeSecret ? compte as CompteAvecCodeSecret : null;
     return EtatClientWeb(
       id: compte.clientWeb,
       surLeTelephone: compte.clientWebEnregistre,
       redemarrageNecessaire: compte.redemarrageNecessaire,
-      demandeCodeSecret: compte is CompteAvecCodeSecret,
-      codeSecretEnregistre: compte is CompteAvecCodeSecret && compte.codeSecretEnregistre,
+      demandeCodeSecret: avecCode != null,
+      codeSecretEnregistre: avecCode != null && avecCode.codeSecretEnregistre,
     );
   }
 
@@ -97,8 +99,9 @@ class ClientWebNotifier extends Notifier<EtatClientWeb> {
   Future<String?> enregistrerCodeSecret(String saisie) async {
     final CompteGoogle compte = ref.read(compteGoogleProvider);
     if (compte is! CompteAvecCodeSecret) return 'Ce compte Google ne demande pas de code secret.';
+    final CompteAvecCodeSecret avecCode = compte as CompteAvecCodeSecret;
     try {
-      await compte.enregistrerCodeSecret(saisie);
+      await avecCode.enregistrerCodeSecret(saisie);
     } on ErreurDrive catch (erreur) {
       return erreur.message;
     } catch (erreur) {

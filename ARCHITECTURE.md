@@ -1263,15 +1263,38 @@ la distribue ; les tests la remplacent (`aide_widget.dart` accepte un paramètre
 
 ### Ce qui change selon la plateforme
 - **Démarrage** (`main.dart`) : sous Windows, la base SQLite (`AppDatabase.pourBureau()`) et les dossiers de photos/documents sont dans
-  `getApplicationSupportDirectory()` ; le compte Google est `CompteGoogleIndisponible` (aucun appel au plugin `google_sign_in`, qui ne
-  gère pas Windows) ; la récupération d'une photo perdue (spécifique à l'appareil photo d'Android) est ignorée.
+  `getApplicationSupportDirectory()` ; le compte Google est `CompteGoogleBureau` (connexion dans le navigateur, voir plus bas : le plugin
+  `google_sign_in` ne gère pas Windows et n'est jamais appelé) ; la récupération d'une photo perdue (spécifique à l'appareil photo d'Android) est ignorée.
 - **Partage de fichiers** (`ServicePartageFichiers`) : `ServicePartageFichiersBureau.enregistrerSous` ouvre « Enregistrer sous… »
   (`FilePicker.saveFile`, qui exige les octets du fichier et les écrit lui-même : ils lui sont donnés jusqu'à 32 Mo, au-delà un octet de
   remplissage suffit puis le vrai fichier est copié ; la taille du fichier rangé est vérifiée) ; `ServiceDocumentsBureau` fait de même pour les PDF (factures, devis) ;
   l'impression ouvre le dialogue d'impression de Windows. Les écrans ne le savent pas : ils appellent la même interface (`providers.dart` choisit l'implémentation).
-- **Écrans** : le choix photo/vidéo n'offre pas l'appareil photo (`demanderSourcePieceJointe(appareilPhoto: false)`) ; l'écran et la tuile
-  *Google Drive* expliquent l'indisponibilité ; l'écran *Sauvegarde et export* adapte sa phrase sur Drive.
+- **Écrans** : le choix photo/vidéo n'offre pas l'appareil photo (`demanderSourcePieceJointe(appareilPhoto: false)`) ; l'écran
+  *Google Drive* est le même qu'Android, sauf la carte d'accès (ID client **et code secret**) et quelques mots (« ordinateur » pour
+  « téléphone »).
 - **Fenêtre** (`app.dart`) : `MaterialApp.builder` centre le contenu et limite sa largeur à 640 px sous Windows ; rien sous Android.
+
+### Google Drive sous Windows (`CompteGoogleBureau`)
+Toute la couche Drive (`ClientDrive`, `ServiceDrive`, sauvegardes, partages) ne dépend que de l'interface `CompteGoogle`
+(`jetonAcces()`, `seConnecter()`…) : seule la façon d'obtenir le jeton change. `CompteGoogleBureau` l'implémente (avec
+`CompteAvecCodeSecret`, interface séparée pour ne rien changer aux autres implémentations) :
+- **`ClientOAuthBureau`** (`oauth_bureau.dart`) : la méthode « application installée » de Google — **PKCE (S256) + adresse de retour locale**.
+  `HttpServer` écoute sur `127.0.0.1:<port libre>`, le navigateur s'ouvre (`rundll32 url.dll,FileProtocolHandler`) sur la page Google, Google
+  revient avec `?code=…&state=…` ; l'état est contrôlé (toute requête sans le bon état est ignorée), puis le code est échangé contre les jetons à
+  `oauth2.googleapis.com/token` (ID client + code secret + preuve PKCE). Délai d'attente de 3 minutes, relancer ou annuler abandonne la
+  connexion en cours, rien ne reste à l'écoute ensuite. Tout est injectable (client HTTP, navigateur, hasard, horloge) : testé sans réseau.
+- **Droits demandés** : `openid email profile` + `drive.file` (le seul droit Drive). La réponse doit contenir `drive.file` (Google laisse décocher
+  chaque droit) et un jeton d'actualisation (`access_type=offline`, `prompt=consent`), sinon la connexion est refusée avec une explication.
+- **Jetons** : le jeton d'accès est gardé en mémoire (une minute de marge) et renouvelé avec le jeton d'actualisation, un seul renouvellement
+  à la fois ; `invalid_grant` = autorisation retirée ou expirée → `ErreurDrive(autorisationAExpire)` et retour à « non connecté » (l'ID et le
+  code secret sont gardés) ; une panne de réseau n'efface rien. L'adresse e-mail et le nom viennent du jeton d'identité (JWT lu sans vérification
+  de signature : il vient directement de Google par une connexion chiffrée, et ne sert qu'à l'affichage).
+- **Stockage** (`stockage_google_bureau.dart`) : ID, code secret et jeton d'actualisation dans un petit fichier JSON du dossier de données de
+  l'utilisateur (`drive/google_bureau.json`), écrit par fichier provisoire puis renommage, hors base et hors sauvegardes. Il n'est pas chiffré
+  (comme la plupart des applications de bureau) : il ne donne que le droit `drive.file`, et *Se déconnecter* le révoque chez Google.
+- **Limite à connaître** : `drive.file` donne accès aux fichiers créés par « l'application » telle que Google l'identifie (le projet Google
+  Cloud). Les fichiers envoyés par le téléphone doivent donc être visibles depuis l'accès « bureau » du même projet : à confirmer au premier
+  essai réel (aucun test automatique ne peut le vérifier).
 
 ### Dossier `windows/` et construction
 Comme `android/`, le dossier `windows/` n'est pas versionné (`/windows/` dans `.gitignore`) : `tool/setup_windows.sh` le crée avec
@@ -1284,7 +1307,7 @@ les ont pas, `LISEZMOI.txt`, `.zip` publié dans la pré-version `windows-<branc
 Ce workflow est indépendant d'`android.yml`.
 
 ### Limites
-Pas de Google Drive (il faudra un client OAuth « bureau » et un autre mode de connexion) ; pas d'appareil photo ; photos non réduites
+Pas d'appareil photo ; photos non réduites
 (`image_picker` ignore `maxWidth`/`imageQuality` sous Windows) ; exécutable non signé ; `share_plus` n'est pas utilisé sous Windows.
 
 ## Choix techniques

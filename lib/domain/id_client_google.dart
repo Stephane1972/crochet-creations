@@ -18,9 +18,9 @@ final RegExp _formeIdClient = RegExp(r'^[0-9]{4,}-[A-Za-z0-9_-]{8,}$');
 String nettoyerIdClientWeb(String saisie) => saisie.replaceAll(_blancs, '').replaceAll(_signesAutour, '');
 
 /// Pourquoi [id] (déjà nettoyé par [nettoyerIdClientWeb]) n'est pas un ID client Google ; `null` s'il en a la forme.
-String? erreurIdClientWeb(String id) {
+String? erreurIdClientWeb(String id, {String nom = 'ID client Web'}) {
   if (id.isEmpty) {
-    return 'Collez l’ID client Web : il se termine par $suffixeIdClientGoogle.';
+    return 'Collez l’$nom : il se termine par $suffixeIdClientGoogle.';
   }
   if (id.startsWith(debutCodeSecretGoogle)) {
     return 'Ceci est un « code secret » : ne le collez pas ici, et gardez-le pour vous. Il faut l’« ID client » '
@@ -33,6 +33,29 @@ String? erreurIdClientWeb(String id) {
   if (!_formeIdClient.hasMatch(debut)) {
     return 'Cet ID n’a pas la forme attendue (des chiffres, un tiret, des lettres, puis $suffixeIdClientGoogle). '
         'Vérifiez qu’il est complet.';
+  }
+  return null;
+}
+
+final RegExp _formeCodeSecret = RegExp(r'^[A-Za-z0-9_-]{12,}$');
+
+/// Nettoie un « code secret » collé : mêmes soins que pour un ID (espaces, retours à la ligne, guillemets).
+String nettoyerCodeSecretGoogle(String saisie) => nettoyerIdClientWeb(saisie);
+
+/// Pourquoi [code] (déjà nettoyé) n'est pas un « code secret » de client Google ; `null` s'il en a la forme.
+///
+/// Le code secret n'est demandé que pour l'accès de type « application de bureau » (Windows) : Google le délivre avec l'ID
+/// client, et il commence par [debutCodeSecretGoogle]. Les anciens codes n'ont pas ce début : seule la forme est contrôlée.
+String? erreurCodeSecretGoogle(String code) {
+  if (code.isEmpty) {
+    return 'Collez le « code secret du client » : il commence par $debutCodeSecretGoogle.';
+  }
+  if (code.endsWith(suffixeIdClientGoogle)) {
+    return 'Ceci est l’ID client, pas le code secret. Le code secret est l’autre valeur affichée par Google : il commence par '
+        '$debutCodeSecretGoogle.';
+  }
+  if (!_formeCodeSecret.hasMatch(code)) {
+    return 'Ce code secret n’a pas la forme attendue (des lettres, des chiffres, « - » et « _ », sans espace). Vérifiez qu’il est complet.';
   }
   return null;
 }

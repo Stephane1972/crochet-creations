@@ -69,6 +69,17 @@ abstract class CompteGoogle {
   void invaliderJeton();
 }
 
+/// Un compte Google qui, en plus de l'ID client, demande le « code secret du client » : l'accès de type « application de
+/// bureau » (Windows). Sur Android, l'ID client Web suffit et ce code n'est jamais demandé.
+abstract class CompteAvecCodeSecret {
+  /// Vrai si un code secret est enregistré sur cet appareil.
+  bool get codeSecretEnregistre;
+
+  /// Enregistre le code secret saisi (nettoyé et vérifié ici). Lève une [ErreurDrive] si ce n'en est pas un ou si
+  /// l'enregistrement échoue.
+  Future<void> enregistrerCodeSecret(String saisie);
+}
+
 /// [CompteGoogle] réel : `google_sign_in` (Android : Google Play Services).
 class CompteGoogleReel implements CompteGoogle {
   /// [clientWeb] : l'ID fourni avec l'application ; [clientWebEnregistre] : celui que la personne a saisi (il passe avant) et

@@ -98,6 +98,32 @@ class FauxCompteGoogle implements CompteGoogle {
   void invaliderJeton() => jetonsInvalides++;
 }
 
+/// Faux compte Google « application de bureau » (Windows) : en plus de l'ID, un code secret est demandé.
+class FauxCompteGoogleBureau extends FauxCompteGoogle implements CompteAvecCodeSecret {
+  FauxCompteGoogleBureau() : super(configure: false);
+
+  /// Le code secret saisi (`null` : aucun).
+  String? codeSecret;
+
+  @override
+  bool get codeSecretEnregistre => codeSecret != null;
+
+  @override
+  Future<void> enregistrerClientWeb(String saisie) async {
+    await super.enregistrerClientWeb(saisie);
+    configure = codeSecret != null;
+  }
+
+  @override
+  Future<void> enregistrerCodeSecret(String saisie) async {
+    final String code = nettoyerCodeSecretGoogle(saisie);
+    final String? probleme = erreurCodeSecretGoogle(code);
+    if (probleme != null) throw ErreurDrive(probleme);
+    codeSecret = code;
+    configure = idEnregistre != null;
+  }
+}
+
 /// Un dossier du faux Drive.
 class DossierDriveFaux {
   DossierDriveFaux({required this.nom, required this.parentId});

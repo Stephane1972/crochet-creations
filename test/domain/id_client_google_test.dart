@@ -61,4 +61,35 @@ void main() {
       }
     });
   });
+
+  group('accès « application de bureau » (Windows)', () {
+    test('le nom de l’ID peut être précisé dans le message', () {
+      expect(erreurIdClientWeb('', nom: 'ID client'), contains('Collez l’ID client :'));
+      expect(erreurIdClientWeb(''), contains('Collez l’ID client Web'));
+    });
+
+    test('un code secret au format actuel est accepté', () {
+      expect(erreurCodeSecretGoogle('${debutCodeSecretGoogle}AbCdEfGhIjKlMnOpQrStUvWxYz12'), isNull);
+      // Les anciens codes n'ont pas ce début : seule la forme compte.
+      expect(erreurCodeSecretGoogle('abcdefghijklmnopqrstuvwx'), isNull);
+    });
+
+    test('vide : on demande de le coller', () {
+      expect(erreurCodeSecretGoogle(''), contains('code secret'));
+    });
+
+    test('l’ID client collé à la place du code secret est reconnu', () {
+      expect(erreurCodeSecretGoogle(_id), contains('ID client, pas le code secret'));
+    });
+
+    test('trop court ou avec des signes impossibles : refusé', () {
+      expect(erreurCodeSecretGoogle('court'), contains('pas la forme attendue'));
+      expect(erreurCodeSecretGoogle('GOCSPX-ab cdefghijkl'), contains('pas la forme attendue'));
+      expect(erreurCodeSecretGoogle('GOCSPX-abcdéfghijkl'), contains('pas la forme attendue'));
+    });
+
+    test('le nettoyage retire espaces, retours à la ligne et guillemets', () {
+      expect(nettoyerCodeSecretGoogle('  "GOCSPX-abc\ndefghijkl"\n'), 'GOCSPX-abcdefghijkl');
+    });
+  });
 }

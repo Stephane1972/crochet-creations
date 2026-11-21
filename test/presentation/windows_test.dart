@@ -162,16 +162,26 @@ void main() {
       expect(find.text('Accès Google « application de bureau »'), findsNothing);
     });
 
-    testWidgets('Windows et Android : l’entrée « Google Drive » des Réglages décrit l’envoi sur Drive', (WidgetTester tester) async {
-      for (final Plateforme plateforme in <Plateforme>[const Plateforme.windows(), const Plateforme.android()]) {
-        final EnvironnementTest env = await EnvironnementTest.creer(tester);
-        env.plateforme = plateforme;
-        await ouvrirAccueil(tester, env, taille: _fenetre);
-        await ouvrirRoute(tester, AppRoutes.reglages);
+    // Un environnement et un accueil par test : on n'en ouvre pas deux dans le même `testWidgets`.
+    testWidgets('Windows : l’entrée « Google Drive » des Réglages décrit l’envoi sur Drive', (WidgetTester tester) async {
+      final EnvironnementTest env = await EnvironnementTest.creer(tester);
+      env.plateforme = const Plateforme.windows();
+      await ouvrirAccueil(tester, env, taille: _fenetre);
+      await ouvrirRoute(tester, AppRoutes.reglages);
 
-        expect(find.textContaining('Envoyer photos, factures, devis'), findsOneWidget, reason: plateforme.nom);
-        expect(find.textContaining('Pas encore disponible'), findsNothing, reason: plateforme.nom);
-      }
+      expect(find.textContaining('Envoyer photos, factures, devis'), findsOneWidget);
+      expect(find.textContaining('Pas encore disponible'), findsNothing);
+    });
+
+    testWidgets('Android : l’entrée « Google Drive » des Réglages décrit l’envoi sur Drive, comme toujours', (
+      WidgetTester tester,
+    ) async {
+      final EnvironnementTest env = await EnvironnementTest.creer(tester);
+      await ouvrirAccueil(tester, env, taille: _fenetre);
+      await ouvrirRoute(tester, AppRoutes.reglages);
+
+      expect(find.textContaining('Envoyer photos, factures, devis'), findsOneWidget);
+      expect(find.textContaining('Pas encore disponible'), findsNothing);
     });
   });
 

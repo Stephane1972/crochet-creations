@@ -108,6 +108,11 @@ class FauxCompteGoogleBureau extends FauxCompteGoogle implements CompteAvecCodeS
   @override
   bool get codeSecretEnregistre => codeSecret != null;
 
+  /// Comme le vrai compte de bureau : l'ID saisi est rendu même quand le code secret manque encore (l'accès n'est alors pas
+  /// « configuré », mais l'écran ne doit pas vider le champ de l'ID).
+  @override
+  String get clientWeb => idEnregistre ?? '';
+
   @override
   Future<void> enregistrerClientWeb(String saisie) async {
     await super.enregistrerClientWeb(saisie);

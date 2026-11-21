@@ -12,11 +12,13 @@ import 'core/theme/theme_mode_provider.dart';
 import 'data/database/app_database.dart';
 import 'data/drive/client_drive.dart';
 import 'data/drive/compte_google.dart';
+import 'data/drive/compte_google_bureau.dart';
 import 'data/drive/compte_google_indisponible.dart';
 import 'data/drive/service_drive.dart';
 import 'data/drive/service_partages_drive.dart';
 import 'data/drive/service_sauvegarde_drive.dart';
 import 'data/drive/stockage_client_web.dart';
+import 'data/drive/stockage_google_bureau.dart';
 import 'data/providers.dart';
 import 'data/repositories/parametres_repository.dart';
 import 'data/sauvegarde/espace_libre.dart';
@@ -81,9 +83,17 @@ Future<void> main() async {
     // petit fichier à part (hors de la base et de la sauvegarde).
     // L'ID client Web saisi dans l'écran Google Drive est un petit fichier du téléphone, relu à chaque lancement.
     final String dossierDrive = '${documents.path}${Platform.pathSeparator}drive';
-    // Sous Windows, la connexion Google n'est pas disponible (pour l'instant) : un compte « indisponible » ne fait rien.
+    // Android : la connexion de Google Play Services. Windows : la connexion « application de bureau » (dans le navigateur),
+    // dont l'accès saisi et l'autorisation sont dans un petit fichier du dossier de données de l'utilisateur.
     final CompteGoogle compteGoogle;
-    if (plateforme.googleDrive) {
+    if (!plateforme.googleDrive) {
+      compteGoogle = const CompteGoogleIndisponible();
+    } else if (plateforme.fenetreDeBureau) {
+      final StockageGoogleBureau stockageBureau = StockageGoogleBureau(
+        File('$dossierDrive${Platform.pathSeparator}google_bureau.json'),
+      );
+      compteGoogle = CompteGoogleBureau(stockage: stockageBureau, reglages: await stockageBureau.lire());
+    } else {
       final StockageClientWeb stockageClientWeb = StockageClientWeb(
         File('$dossierDrive${Platform.pathSeparator}client_web.txt'),
       );
@@ -91,8 +101,6 @@ Future<void> main() async {
         stockage: stockageClientWeb,
         clientWebEnregistre: await stockageClientWeb.lire(),
       );
-    } else {
-      compteGoogle = const CompteGoogleIndisponible();
     }
     final ServiceDrive drive = ServiceDrive(
       client: ClientDriveGoogle(compteGoogle),

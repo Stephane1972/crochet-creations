@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:crochet_creations/core/plateforme.dart';
 import 'package:crochet_creations/core/router/app_routes.dart';
+import 'package:crochet_creations/domain/id_client_google.dart';
 import 'package:crochet_creations/presentation/common/choix_photo.dart';
 import 'package:crochet_creations/presentation/common/photo_retrouvee.dart';
 import 'package:crochet_creations/presentation/notes/pieces_jointes_section.dart';
@@ -9,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../data/aide_drive.dart';
 import 'aide_widget.dart';
 
 // Une grande fenêtre d'ordinateur.
@@ -85,46 +87,101 @@ void main() {
       expect(tester.getSize(find.byType(NavigationBar)).width, _fenetre.width);
     });
 
-    testWidgets('Windows : l’écran Google Drive dit que Drive n’est pas encore disponible et explique la sauvegarde .zip', (
+    testWidgets('Windows : l’écran Google Drive demande l’ID client et le code secret de l’accès « application de bureau »', (
       WidgetTester tester,
     ) async {
       final EnvironnementTest env = await EnvironnementTest.creer(tester);
       env.plateforme = const Plateforme.windows();
+      env.compteGoogle = FauxCompteGoogleBureau();
       await ouvrirAccueil(tester, env, taille: _fenetre);
       await ouvrirRoute(tester, AppRoutes.drive);
 
-      expect(find.byKey(const Key('drive-indisponible')), findsOneWidget);
-      expect(find.text('Pas encore disponible sous Windows'), findsOneWidget);
-      expect(find.textContaining('Enregistrer sous'), findsOneWidget);
-      expect(find.textContaining('Restaurer une sauvegarde'), findsOneWidget);
-      // Rien n'est proposé qui demande une connexion Google.
-      expect(find.byKey(const Key('drive-partages')), findsNothing);
+      expect(find.text('Accès Google « application de bureau »'), findsOneWidget);
+      expect(find.byKey(const Key('drive-client-web-champ')), findsOneWidget);
+      expect(find.byKey(const Key('drive-code-secret-champ')), findsOneWidget);
+      expect(find.text('Code secret : pas encore enregistré.'), findsOneWidget);
+      // Sans accès enregistré, pas de bouton de connexion : la carte de connexion dit de configurer d'abord.
+      expect(find.byKey(const Key('drive-connecter')), findsNothing);
+      expect(find.textContaining('sur ce téléphone'), findsNothing);
     });
 
-    testWidgets('Android : l’écran Google Drive reste celui de la connexion', (WidgetTester tester) async {
+    testWidgets('Windows : saisir l’ID puis le code secret rend la connexion possible', (WidgetTester tester) async {
+      final EnvironnementTest env = await EnvironnementTest.creer(tester);
+      final FauxCompteGoogleBureau compte = FauxCompteGoogleBureau();
+      env.plateforme = const Plateforme.windows();
+      env.compteGoogle = compte;
+      await ouvrirAccueil(tester, env, taille: _fenetre);
+      await ouvrirRoute(tester, AppRoutes.drive);
+
+      // L'ID seul ne suffit pas.
+      await tester.enterText(find.byKey(const Key('drive-client-web-champ')), '123456789012-abcdefghijkl$suffixeIdClientGoogle');
+      await tester.ensureVisible(find.byKey(const Key('drive-client-web-enregistrer')));
+      await tester.tap(find.byKey(const Key('drive-client-web-enregistrer')));
+      await tester.pump();
+      await laisserFinir(tester);
+      expect(find.text('ID enregistré. Il manque encore le code secret du client.'), findsOneWidget);
+      expect(find.byKey(const Key('drive-connecter')), findsNothing);
+
+      // Le code secret complète l'accès.
+      await tester.enterText(find.byKey(const Key('drive-code-secret-champ')), '${debutCodeSecretGoogle}AbCdEfGhIjKlMnOpQrStUvWxYz12');
+      await tester.ensureVisible(find.byKey(const Key('drive-client-web-enregistrer')));
+      await tester.tap(find.byKey(const Key('drive-client-web-enregistrer')));
+      await tester.pump();
+      await laisserFinir(tester);
+
+      expect(compte.codeSecret, isNotNull);
+      expect(find.text('Accès enregistré. Vous pouvez vous connecter à Google.'), findsOneWidget);
+      expect(find.text('Code secret : enregistré sur cet ordinateur.'), findsOneWidget);
+      expect(find.byKey(const Key('drive-connecter')), findsOneWidget);
+    });
+
+    testWidgets('Windows : un code secret qui est en fait l’ID client est refusé avec une explication', (WidgetTester tester) async {
+      final EnvironnementTest env = await EnvironnementTest.creer(tester);
+      env.plateforme = const Plateforme.windows();
+      env.compteGoogle = FauxCompteGoogleBureau();
+      await ouvrirAccueil(tester, env, taille: _fenetre);
+      await ouvrirRoute(tester, AppRoutes.drive);
+
+      await tester.enterText(find.byKey(const Key('drive-client-web-champ')), '123456789012-abcdefghijkl$suffixeIdClientGoogle');
+      await tester.enterText(find.byKey(const Key('drive-code-secret-champ')), '123456789012-abcdefghijkl$suffixeIdClientGoogle');
+      await tester.ensureVisible(find.byKey(const Key('drive-client-web-enregistrer')));
+      await tester.tap(find.byKey(const Key('drive-client-web-enregistrer')));
+      await tester.pump();
+      await laisserFinir(tester);
+
+      expect(find.textContaining('ID client, pas le code secret'), findsOneWidget);
+    });
+
+    testWidgets('Android : l’écran Google Drive reste celui de l’ID client Web, sans code secret', (WidgetTester tester) async {
       final EnvironnementTest env = await EnvironnementTest.creer(tester);
       await ouvrirAccueil(tester, env, taille: _fenetre);
       await ouvrirRoute(tester, AppRoutes.drive);
 
-      expect(find.byKey(const Key('drive-indisponible')), findsNothing);
+      expect(find.text('ID client Web Google'), findsOneWidget);
+      expect(find.byKey(const Key('drive-code-secret-champ')), findsNothing);
+      expect(find.text('Accès Google « application de bureau »'), findsNothing);
     });
 
-    testWidgets('Windows : l’entrée « Google Drive » des Réglages annonce l’indisponibilité', (WidgetTester tester) async {
+    // Un environnement et un accueil par test : on n'en ouvre pas deux dans le même `testWidgets`.
+    testWidgets('Windows : l’entrée « Google Drive » des Réglages décrit l’envoi sur Drive', (WidgetTester tester) async {
       final EnvironnementTest env = await EnvironnementTest.creer(tester);
       env.plateforme = const Plateforme.windows();
       await ouvrirAccueil(tester, env, taille: _fenetre);
       await ouvrirRoute(tester, AppRoutes.reglages);
 
-      expect(find.textContaining('Pas encore disponible sous Windows'), findsOneWidget);
-      expect(find.textContaining('Envoyer photos, factures, devis'), findsNothing);
+      expect(find.textContaining('Envoyer photos, factures, devis'), findsOneWidget);
+      expect(find.textContaining('Pas encore disponible'), findsNothing);
     });
 
-    testWidgets('Android : l’entrée « Google Drive » des Réglages décrit toujours l’envoi sur Drive', (WidgetTester tester) async {
+    testWidgets('Android : l’entrée « Google Drive » des Réglages décrit l’envoi sur Drive, comme toujours', (
+      WidgetTester tester,
+    ) async {
       final EnvironnementTest env = await EnvironnementTest.creer(tester);
       await ouvrirAccueil(tester, env, taille: _fenetre);
       await ouvrirRoute(tester, AppRoutes.reglages);
 
       expect(find.textContaining('Envoyer photos, factures, devis'), findsOneWidget);
+      expect(find.textContaining('Pas encore disponible'), findsNothing);
     });
   });
 

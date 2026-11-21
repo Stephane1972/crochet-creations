@@ -16,8 +16,9 @@ class Plateforme {
   /// Le téléphone Android : tout est disponible.
   const Plateforme.android() : this._(nom: 'Android', appareilPhoto: true, googleDrive: true, fenetreDeBureau: false);
 
-  /// L'ordinateur Windows : pas d'appareil photo, pas de connexion Google pour l'instant, une fenêtre redimensionnable.
-  const Plateforme.windows() : this._(nom: 'Windows', appareilPhoto: false, googleDrive: false, fenetreDeBureau: true);
+  /// L'ordinateur Windows : pas d'appareil photo, une fenêtre redimensionnable. Google Drive y est disponible, par une connexion
+  /// dans le navigateur (accès Google de type « application de bureau »).
+  const Plateforme.windows() : this._(nom: 'Windows', appareilPhoto: false, googleDrive: true, fenetreDeBureau: true);
 
   /// La machine sur laquelle l'application tourne.
   factory Plateforme.courante() => Platform.isWindows ? const Plateforme.windows() : const Plateforme.android();
@@ -29,8 +30,9 @@ class Plateforme {
   /// on choisit alors un fichier existant.
   final bool appareilPhoto;
 
-  /// Vrai si la connexion à Google Drive (étapes 6 à 8) est disponible. Sous Windows elle ne l'est pas encore : les données
-  /// passent d'un appareil à l'autre par le fichier de sauvegarde `.zip`.
+  /// Vrai si la connexion à Google Drive (étapes 6 à 8) est disponible. Elle l'est sur Android (Google Play Services) comme sous
+  /// Windows (connexion dans le navigateur) ; les données peuvent toujours aussi passer d'un appareil à l'autre par le fichier
+  /// de sauvegarde `.zip`.
   final bool googleDrive;
 
   /// Vrai si l'application vit dans une fenêtre d'ordinateur : le contenu garde alors la largeur d'un téléphone,

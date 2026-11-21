@@ -6,6 +6,32 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
 
 ## [Non publié]
 
+## [0.24.0] — Google Drive sous Windows (en attente de validation)
+
+Première des deux parties demandées par Stéphane pour **synchroniser téléphone et PC** : Drive est maintenant disponible sous Windows (la
+reprise d'un appareil à l'autre et l'envoi automatique à la fermeture viennent dans la partie 2). **Android est inchangé** (même connexion
+Google Play Services, mêmes écrans).
+
+### Ajouté
+- **Connexion à Google sous Windows**, dans le navigateur (PKCE + adresse de retour locale, méthode prévue par Google pour les applications
+  installées) : `ClientOAuthBureau`, `CompteGoogleBureau` (`lib/data/drive/`). Seul droit Drive demandé : `drive.file`.
+- **Écran Réglages › Google Drive sous Windows** : carte « Accès Google “application de bureau” » (ID client + code secret, collés une fois,
+  gardés sur l'ordinateur), connexion, envoi des fichiers, sauvegardes sur Drive, restauration, partages : tout ce qui existe sur Android.
+- Guide pas à pas dans le README (« Google Drive sous Windows ») pour créer l'accès « application de bureau » ; `LISEZMOI.txt` du dossier Windows mis à jour.
+- Tests : `oauth_bureau_test` (PKCE selon la RFC 7636, retour de Google, état contrôlé, refus, droit Drive décoché, délais, relance),
+  `compte_google_bureau_test`, `stockage_google_bureau_test`, écrans Windows et Android dans `windows_test`.
+
+### Modifié
+- `Plateforme.windows()` : `googleDrive` passe à vrai ; l'écran « Pas encore disponible sous Windows » et la mention dans les Réglages disparaissent.
+- `erreurIdClientWeb` accepte le nom de l'ID dans son message (« ID client » pour Windows, « ID client Web » pour Android, inchangé).
+
+### Limites connues
+- Il faut créer soi-même l'accès « application de bureau » (gratuit, ≈ 5 minutes, guide dans le README) : sans lui, Drive reste inactif sous Windows.
+- La connexion n'a pas pu être essayée avec un vrai compte Google : elle est vérifiée par des tests automatiques avec un faux Google, puis par le premier essai réel.
+- À confirmer au premier essai : les fichiers que le téléphone a déjà envoyés sur Drive doivent être vus depuis l'accès Windows (même projet Google).
+- L'autorisation est gardée dans un fichier non chiffré du dossier de l'utilisateur (droit `drive.file` seulement ; *Se déconnecter* la révoque).
+- Tant que l'application Google Cloud est en mode « test », Google coupe l'autorisation tous les 7 jours : il suffit de se reconnecter.
+
 ## [0.23.0] — Version Windows
 
 La **version Android est inchangée** : mêmes écrans, mêmes calculs, même workflow, même APK signé. Cette version ajoute, à côté, une

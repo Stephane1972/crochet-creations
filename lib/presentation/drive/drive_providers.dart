@@ -49,7 +49,13 @@ class ProfilGoogleNotifier extends AsyncNotifier<ProfilGoogle?> {
 /// L'ID client Web de Google Cloud utilisé par l'application (voir `google_config.dart`) : ce que la personne a saisi dans
 /// l'écran Google Drive, sinon celui qui a été fourni avec l'application.
 class EtatClientWeb {
-  const EtatClientWeb({required this.id, required this.surLeTelephone, required this.redemarrageNecessaire});
+  const EtatClientWeb({
+    required this.id,
+    required this.surLeTelephone,
+    required this.redemarrageNecessaire,
+    this.demandeCodeSecret = false,
+    this.codeSecretEnregistre = false,
+  });
 
   /// L'ID utilisé (vide : aucun, la connexion à Google est alors impossible).
   final String id;
@@ -60,7 +66,14 @@ class EtatClientWeb {
   /// Vrai si l'application doit être fermée complètement, puis rouverte, pour prendre en compte le nouvel ID.
   final bool redemarrageNecessaire;
 
-  bool get configure => id.isNotEmpty;
+  /// Vrai sous Windows : l'accès « application de bureau » demande, en plus de l'ID, un code secret.
+  final bool demandeCodeSecret;
+
+  /// Vrai si ce code secret est enregistré (sans objet quand il n'est pas demandé).
+  final bool codeSecretEnregistre;
+
+  /// Vrai si tout ce qu'il faut pour se connecter est renseigné.
+  bool get configure => id.isNotEmpty && (!demandeCodeSecret || codeSecretEnregistre);
 }
 
 final clientWebProvider = NotifierProvider<ClientWebNotifier, EtatClientWeb>(ClientWebNotifier.new);
@@ -71,11 +84,31 @@ class ClientWebNotifier extends Notifier<EtatClientWeb> {
 
   EtatClientWeb _lire() {
     final CompteGoogle compte = ref.read(compteGoogleProvider);
+    // `CompteAvecCodeSecret` est une interface à part (Windows) : un simple test de type ne suffit pas à « promouvoir » le compte.
+    final CompteAvecCodeSecret? avecCode = compte is CompteAvecCodeSecret ? compte as CompteAvecCodeSecret : null;
     return EtatClientWeb(
       id: compte.clientWeb,
       surLeTelephone: compte.clientWebEnregistre,
       redemarrageNecessaire: compte.redemarrageNecessaire,
+      demandeCodeSecret: avecCode != null,
+      codeSecretEnregistre: avecCode != null && avecCode.codeSecretEnregistre,
     );
+  }
+
+  /// Enregistre le code secret collé (sous Windows). Retourne `null` si c'est fait, sinon le message à montrer.
+  Future<String?> enregistrerCodeSecret(String saisie) async {
+    final CompteGoogle compte = ref.read(compteGoogleProvider);
+    if (compte is! CompteAvecCodeSecret) return 'Ce compte Google ne demande pas de code secret.';
+    final CompteAvecCodeSecret avecCode = compte as CompteAvecCodeSecret;
+    try {
+      await avecCode.enregistrerCodeSecret(saisie);
+    } on ErreurDrive catch (erreur) {
+      return erreur.message;
+    } catch (erreur) {
+      return 'Enregistrement impossible : $erreur';
+    }
+    state = _lire();
+    return null;
   }
 
   /// Enregistre l'ID collé. Retourne `null` si c'est fait, sinon le message à montrer.

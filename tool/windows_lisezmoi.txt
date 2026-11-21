@@ -15,12 +15,17 @@ Vos données
   Elles restent sur cet ordinateur, dans votre dossier « AppData\Roaming » (ouvrez-le avec Windows + R,
   puis tapez %APPDATA%), dossier « fr.crochetcreations ». Rien n'est envoyé sur Internet.
 
-Passer vos données du téléphone Android à Windows (ou l'inverse) :
+Google Drive (même Drive que sur le téléphone)
+  Réglages > Google Drive. Il faut d'abord renseigner, une seule fois, l'accès Google de type « application de bureau »
+  (ID client et code secret, créés gratuitement dans la console Google Cloud : le guide est dans le fichier README du projet,
+  section « Google Drive sous Windows »). Ensuite, « Se connecter à Google » ouvre votre navigateur : connectez-vous, laissez
+  la case Drive cochée, puis revenez à l'application. L'ID et le code secret restent sur cet ordinateur : ne les publiez nulle part.
+
+Passer vos données du téléphone Android à Windows (ou l'inverse), sans Drive :
   1. Sur l'appareil qui contient les données : Réglages > Sauvegarde et export > « Sauvegarder maintenant »,
      puis « Partager » (sous Windows : « Enregistrer sous... »).
   2. Faites passer le fichier .zip à l'autre appareil (e-mail, clé USB, Drive...).
   3. Sur l'autre appareil : Réglages > Sauvegarde et export > « Restaurer une sauvegarde », et choisissez ce fichier.
 
-Ce qui ne marche pas encore sous Windows
-  - La connexion à Google Drive (elle existe sur Android).
+Ce qui ne marche pas sous Windows
   - Prendre une photo ou filmer : on choisit un fichier déjà présent sur l'ordinateur.

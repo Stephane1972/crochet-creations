@@ -572,7 +572,8 @@ La même application, construite pour Windows 10/11 par GitHub, **sans rien inst
 2. Clic droit sur le .zip › **Extraire tout…**, puis ouvrir le dossier obtenu et double-cliquer sur **`crochet_creations.exe`**
    (le fichier `LISEZMOI.txt` du dossier explique la suite). Windows peut afficher « Windows a protégé votre ordinateur » : le
    programme n'est pas signé par un éditeur payant ; *Informations complémentaires › Exécuter quand même*.
-3. Les données restent sur l'ordinateur (dossier `%APPDATA%\fr.crochetcreations`), rien n'est envoyé sur Internet.
+3. Les données restent sur l'ordinateur (dossier `%APPDATA%\fr.crochetcreations`) ; rien n'est envoyé sur Internet, sauf si vous
+   connectez Google Drive (voir ci-dessous).
 
 **Ce qui est pareil** : tous les écrans, les calculs, les factures et devis en PDF, les statistiques, la sauvegarde et la restauration.
 La fenêtre se redimensionne ; le contenu garde la largeur d'un grand téléphone, centré.
@@ -581,14 +582,44 @@ La fenêtre se redimensionne ; le contenu garde la largeur d'un grand téléphon
 
 | Sur Android | Sous Windows |
 |-------------|--------------|
-| Google Drive (connexion, envoi, partage) | **pas encore disponible** ; l'écran l'explique |
+| Google Drive : connexion par Google Play Services, avec l'**ID client Web** | Google Drive : connexion **dans le navigateur**, avec un accès « **application de bureau** » (ID client + code secret) — voir « Google Drive sous Windows » |
 | Appareil photo, caméra | on **choisit un fichier** déjà sur l'ordinateur |
 | Feuille de partage d'Android | **« Enregistrer sous… »** (fenêtre Windows de choix d'emplacement) |
 | Photos réduites à l'ajout | photos **gardées à leur taille d'origine** (le sélecteur Windows ne sait pas les réduire) |
 
-**Passer ses données du téléphone au PC (ou l'inverse)** : *Réglages › Sauvegarde et export › Sauvegarder maintenant*, enregistrer
+**Passer ses données du téléphone au PC (ou l'inverse)**, de deux façons : par **Google Drive** (voir ci-dessous), ou sans Drive : *Réglages › Sauvegarde et export › Sauvegarder maintenant*, enregistrer
 le `.zip` (Android : « Partager » ; Windows : « Enregistrer sous… »), le faire passer à l'autre appareil (e-mail, clé USB…),
 puis *Restaurer une sauvegarde* sur l'autre appareil.
+
+#### Google Drive sous Windows (version 0.24.0)
+
+Même Drive, mêmes dossiers, mêmes sauvegardes que sur le téléphone : l'écran *Réglages › Google Drive* de Windows envoie les fichiers,
+sauvegarde les données et restaure comme sur Android. Seule la **connexion** diffère : Google Play Services n'existe pas sur Windows, la
+connexion se fait donc **dans votre navigateur** (méthode que Google prévoit pour les applications installées).
+
+**Configuration unique, gratuite (≈ 5 minutes)** — dans le **même projet Google Cloud** que pour le téléphone (voir « Configurer Google
+Cloud » plus haut) :
+
+1. Console Google Cloud → **API et services → Identifiants** (ou *Google Auth Platform → Clients*) → **Créer un client** → type
+   d'application **Application de bureau** (*Desktop app*) → nom « Windows » → **Créer**.
+2. Google affiche l'**ID client** (il se termine par `.apps.googleusercontent.com`) et le **code secret du client** (il commence par
+   `GOCSPX-`). Pour une application installée, Google considère ce code comme non confidentiel, mais **ne le publiez nulle part** (ni GitHub,
+   ni message public) : il n'est pas dans le code du projet.
+3. Vérifiez que l'application est **publiée** (*Audience → Publier l'application*) : tant qu'elle est en « test », Google coupe
+   l'autorisation tous les **7 jours** (il faut alors simplement se reconnecter).
+4. Dans la version Windows : *Réglages → Google Drive → carte « Accès Google “application de bureau” »* → coller l'ID et le code secret →
+   **Enregistrer**, puis **Se connecter à Google** : le navigateur s'ouvre, connectez-vous, **laissez la case Drive cochée**, puis revenez à
+   l'application.
+
+- **Où c'est gardé** : l'ID, le code secret et l'autorisation durable sont dans un petit fichier du dossier de données de l'utilisateur
+  (`…\fr.crochetcreations\…\drive\google_bureau.json`). Ce fichier n'est ni dans la base ni dans les sauvegardes. *Se déconnecter* oublie
+  l'autorisation et la fait retirer chez Google ; *Oublier l'accès enregistré* efface aussi l'ID et le code secret.
+- **Droit demandé** : toujours **`drive.file`** (seuls les fichiers créés par l'application) pour Drive, plus l'identité (adresse e-mail et nom,
+  pour afficher « Connecté en tant que… »). L'application ne supprime rien sur Drive.
+- **Pas de connexion tant que l'accès n'est pas saisi** : l'application fonctionne normalement sans Drive.
+- **Si la connexion échoue** : l'écran affiche la raison. Causes habituelles : accès créé avec un autre type que « Application de bureau »,
+  ID et code secret qui viennent de deux accès différents, case Drive décochée dans la fenêtre de Google, API Google Drive non activée,
+  application non publiée et adresse absente des utilisateurs test, pare-feu ou antivirus qui bloque l'écoute locale pendant la connexion.
 
 La construction est faite par le workflow `.github/workflows/windows.yml`, **indépendant** de celui d'Android : à chaque envoi, il
 construit l'application, la **démarre pour de vrai** sur un serveur Windows (`integration_test/demarrage_windows_test.dart`) puis

@@ -11,11 +11,11 @@ void main() {
       expect(p.fenetreDeBureau, isFalse);
     });
 
-    test('Windows : ni appareil photo ni Google Drive, une fenêtre d’ordinateur', () {
+    test('Windows : pas d’appareil photo, une fenêtre d’ordinateur, Google Drive par le navigateur', () {
       const Plateforme p = Plateforme.windows();
       expect(p.nom, 'Windows');
       expect(p.appareilPhoto, isFalse);
-      expect(p.googleDrive, isFalse);
+      expect(p.googleDrive, isTrue);
       expect(p.fenetreDeBureau, isTrue);
     });
 

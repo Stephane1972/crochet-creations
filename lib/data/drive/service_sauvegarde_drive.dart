@@ -392,6 +392,7 @@ class ServiceSauvegardeDrive {
       date: dateDeNomSauvegardeDrive(bilan.nom) ?? bilan.date,
       empreinteLocale: donnees.empreinteLocale,
     );
+    debugPrint('[synchro-svc] état à écrire'); // DIAGNOSTIC TEMPORAIRE
     await _modifierEtat(
       (EtatSauvegardesDrive etat) => etat.copier(
         derniereVerification: maintenant,
@@ -420,11 +421,15 @@ class ServiceSauvegardeDrive {
     final File archive = File('${_dossierSauvegardes.path}${Platform.pathSeparator}$nom');
     try {
       await _sauvegarde.ecrireDonneesSeules(donnees, archive);
+      debugPrint('[synchro-svc] archive écrite'); // DIAGNOSTIC TEMPORAIRE
       final int octets = await archive.length();
+      debugPrint('[synchro-svc] taille lue'); // DIAGNOSTIC TEMPORAIRE
       await _client.envoyer(fichier: archive, nom: nom, dossierId: dossierId, empreinte: donnees.empreinte);
+      debugPrint('[synchro-svc] envoyé'); // DIAGNOSTIC TEMPORAIRE
 
       // Vérification : le fichier est bien dans le dossier Drive, de la bonne taille.
       final List<FichierDistant> apres = await _client.lister(dossierId);
+      debugPrint('[synchro-svc] relisté'); // DIAGNOSTIC TEMPORAIRE
       final bool retrouvee = apres.any((FichierDistant f) => f.nom == nom && (f.octets == null || f.octets == octets));
       if (!retrouvee) {
         throw const ErreurDrive(
@@ -435,6 +440,7 @@ class ServiceSauvegardeDrive {
     } finally {
       await _effacerFichier(archive);
       await _effacerFichier(File('${archive.path}.tmp'));
+      debugPrint('[synchro-svc] fichiers effacés'); // DIAGNOSTIC TEMPORAIRE
     }
   }
 

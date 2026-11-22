@@ -34,6 +34,12 @@ final DateTime _mardi = DateTime(2026, 11, 17, 9, 30);
 
 const ProfilGoogle _camille = ProfilGoogle(email: 'camille@exemple.fr', nom: 'Camille');
 
+// Repères dans le journal de la CI (utiles si un test se bloque).
+void _t(String message) {
+  // ignore: avoid_print
+  print('[synchro] $message');
+}
+
 Finder _cle(String nom) => find.byKey(Key(nom));
 
 Finder _dansDialogue(Finder cible) => find.descendant(of: find.byType(AlertDialog), matching: cible);
@@ -42,19 +48,22 @@ String _dateHeure(DateTime date) => '${formatDateLongue(date)} à ${formatHeure(
 
 /// Fait avancer le temps, en laissant la base et les fichiers travailler, jusqu'à ce que [cible] apparaisse.
 Future<void> _attendre(WidgetTester tester, Finder cible) async {
-  await attendreJusqua(tester, () => cible.evaluate().isNotEmpty, essais: 600);
+  _t('attente de $cible');
+  await attendreJusqua(tester, () => cible.evaluate().isNotEmpty, essais: 300);
   expect(cible, findsWidgets, reason: 'Élément attendu : $cible');
   await tester.pump(const Duration(milliseconds: 100));
 }
 
 /// Fait avancer le temps jusqu'à ce que [cible] ait disparu.
 Future<void> _attendreDisparition(WidgetTester tester, Finder cible) async {
-  await attendreJusqua(tester, () => cible.evaluate().isEmpty, essais: 600);
+  _t('attente de la disparition de $cible');
+  await attendreJusqua(tester, () => cible.evaluate().isEmpty, essais: 300);
   expect(cible, findsNothing, reason: 'Élément qui aurait dû disparaître : $cible');
 }
 
 /// Appuie sur un élément, laisse finir les animations et les lectures de la base, sans « pumpAndSettle ».
 Future<void> _toucher(WidgetTester tester, Finder cible) async {
+  _t('toucher $cible');
   await tester.ensureVisible(cible);
   await tester.pump();
   await tester.tap(cible);
@@ -91,15 +100,18 @@ Future<EnvironnementTest> _telephoneSynchronise(
   bool automatique = true,
   Plateforme plateforme = const Plateforme.android(),
 }) async {
+  _t('téléphone : création');
   final EnvironnementTest env = await EnvironnementTest.creer(tester);
   env.plateforme = plateforme;
   env.compteGoogle.dejaConnecte = _camille;
   await env.creerProduit(tester, nom: 'Doudou lapin');
   env.maintenant = _lundi;
+  _t('téléphone : envoi de lundi');
   await env.travailler(tester, () => env.serviceSauvegardeDrive.sauvegarder());
   if (automatique) {
     await env.travailler(tester, () => env.serviceSauvegardeDrive.reglerEnvoiAutomatique(actif: true));
   }
+  _t('téléphone : prêt');
   return env;
 }
 
@@ -111,6 +123,7 @@ class _AutreAppareil {
   final ServiceSauvegardeDrive service;
 
   static Future<_AutreAppareil> creer(WidgetTester tester, EnvironnementTest telephone) async {
+    _t('autre appareil : création');
     final EnvironnementTest env = await EnvironnementTest.creer(tester);
     DateTime horloge() => env.maintenant ?? DateTime.now();
     final ServiceDrive envoi = ServiceDrive(
@@ -141,7 +154,9 @@ class _AutreAppareil {
   Future<void> envoyerAvecProduit(WidgetTester tester, String nomProduit, DateTime quand) async {
     await env.creerProduit(tester, nom: nomProduit);
     env.maintenant = quand;
+    _t('autre appareil : envoi de $nomProduit');
     await env.travailler(tester, () => service.sauvegarder());
+    _t('autre appareil : envoyé');
   }
 
   Future<void> fermer(WidgetTester tester) => env.fermer(tester);
@@ -156,11 +171,14 @@ Future<ProviderContainer> _ouvrir(
   bool declencher = true,
 }) async {
   env.maintenant = quand;
+  _t('ouverture de l’application');
   await ouvrirAccueil(tester, env, taille: _grandEcran);
   final ProviderContainer conteneur = ProviderScope.containerOf(tester.element(find.byType(NavigationBar)));
   if (declencher) {
+    _t('lancerSiBesoin');
     await env.ecrireEcranOuvert(tester, () => conteneur.read(sauvegardeDriveProvider.notifier).lancerSiBesoin());
     await tester.pump();
+    _t('lancerSiBesoin terminé');
   }
   return conteneur;
 }
@@ -177,9 +195,9 @@ void _arrierePlanPuisRetour(WidgetTester tester) {
   _etatDeLApplication(tester, AppLifecycleState.resumed);
 }
 
-/// Comme `testWidgets`, mais un test qui reste bloqué échoue au bout de 90 s (avec son nom) au lieu de bloquer toute la suite.
+/// Comme `testWidgets`, mais un test qui reste bloqué échoue au bout de 30 s (avec son nom) au lieu de bloquer toute la suite.
 void _ecran(String description, WidgetTesterCallback test) =>
-    testWidgets(description, test, timeout: const Timeout(Duration(seconds: 90)));
+    testWidgets(description, test, timeout: const Timeout(Duration(seconds: 30)));
 
 void main() {
   group('proposition de reprise à l’ouverture', () {
@@ -211,8 +229,10 @@ void main() {
       await _attendre(tester, find.text('Restauration terminée'));
       await _toucher(tester, _dansDialogue(find.text('Retour à l’accueil')));
 
+      _t('test 1 : vérifications finales');
       await tester.pumpWidget(const SizedBox()); // plus aucun écran ne lit la base en direct
       expect(await _nomsProduits(tester, env), <String>['Bonnet']);
+      _t('test 1 : produits lus');
       final EtatSauvegardesDrive etat = await env.travailler(tester, () => env.serviceSauvegardeDrive.lireEtat());
       expect(etat.reference!.nom, nomSauvegardeDrive(_mardi));
       // Rien n'a été supprimé, ni ajouté, sur Drive.

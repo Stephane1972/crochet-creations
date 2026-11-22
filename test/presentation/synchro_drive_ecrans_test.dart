@@ -159,7 +159,7 @@ Future<ProviderContainer> _ouvrir(
   await ouvrirAccueil(tester, env, taille: _grandEcran);
   final ProviderContainer conteneur = ProviderScope.containerOf(tester.element(find.byType(NavigationBar)));
   if (declencher) {
-    await env.travailler(tester, () => conteneur.read(sauvegardeDriveProvider.notifier).lancerSiBesoin());
+    await env.ecrireEcranOuvert(tester, () => conteneur.read(sauvegardeDriveProvider.notifier).lancerSiBesoin());
     await tester.pump();
   }
   return conteneur;
@@ -177,9 +177,13 @@ void _arrierePlanPuisRetour(WidgetTester tester) {
   _etatDeLApplication(tester, AppLifecycleState.resumed);
 }
 
+/// Comme `testWidgets`, mais un test qui reste bloqué échoue au bout de 90 s (avec son nom) au lieu de bloquer toute la suite.
+void _ecran(String description, WidgetTesterCallback test) =>
+    testWidgets(description, test, timeout: const Timeout(Duration(seconds: 90)));
+
 void main() {
   group('proposition de reprise à l’ouverture', () {
-    testWidgets('rien n’a changé ici, Drive a une version plus récente : on propose de la reprendre, puis on la reprend', (
+    _ecran('rien n’a changé ici, Drive a une version plus récente : on propose de la reprendre, puis on la reprend', (
       WidgetTester tester,
     ) async {
       final EnvironnementTest env = await _telephoneSynchronise(tester);
@@ -219,7 +223,7 @@ void main() {
       await autre.fermer(tester);
     });
 
-    testWidgets('les deux ont changé : on choisit ; « garder cet appareil » ne supprime rien et ne remplace rien', (
+    _ecran('les deux ont changé : on choisit ; « garder cet appareil » ne supprime rien et ne remplace rien', (
       WidgetTester tester,
     ) async {
       final EnvironnementTest env = await _telephoneSynchronise(tester);
@@ -243,7 +247,7 @@ void main() {
       // Drive est intact, rien n'est parti, rien n'a été repris.
       expect(_nombreDeSauvegardes(env), 2);
       expect(env.clientDrive.envoyes, hasLength(envoyesAvant));
-      final ConstatSynchro apres = await env.travailler(tester, () => env.serviceSauvegardeDrive.constater());
+      final ConstatSynchro apres = await env.ecrireEcranOuvert(tester, () => env.serviceSauvegardeDrive.constater());
       expect(apres.situation, SituationSynchro.aEnvoyer); // les données d'ici partiront au prochain envoi
       expect(apres.demandeUneDecision, isFalse);
 
@@ -254,7 +258,7 @@ void main() {
       await autre.fermer(tester);
     });
 
-    testWidgets('« Plus tard » ne change rien : la proposition reste sur l’écran Google Drive, d’où on peut décider', (
+    _ecran('« Plus tard » ne change rien : la proposition reste sur l’écran Google Drive, d’où on peut décider', (
       WidgetTester tester,
     ) async {
       final EnvironnementTest env = await _telephoneSynchronise(tester);
@@ -282,7 +286,7 @@ void main() {
       await autre.fermer(tester);
     });
 
-    testWidgets('tant que la décision n’est pas prise, rien ne part tout seul (ouverture, arrière-plan, fermeture)', (
+    _ecran('tant que la décision n’est pas prise, rien ne part tout seul (ouverture, arrière-plan, fermeture)', (
       WidgetTester tester,
     ) async {
       final EnvironnementTest env = await _telephoneSynchronise(tester);
@@ -298,7 +302,7 @@ void main() {
       // Les jours passent : à l'ouverture suivante, en arrière-plan, à la fermeture, aucun envoi.
       env.maintenant = _mardi.add(const Duration(days: 3));
       final SauvegardeDriveNotifier notifier = conteneur.read(sauvegardeDriveProvider.notifier);
-      await env.travailler(tester, () async {
+      await env.ecrireEcranOuvert(tester, () async {
         await notifier.lancerSiBesoin();
         await notifier.envoyerEnArrierePlan();
         await notifier.envoyerEnQuittant();
@@ -312,7 +316,7 @@ void main() {
       await autre.fermer(tester);
     });
 
-    testWidgets('rien de plus récent sur Drive : ni fenêtre ni carte', (WidgetTester tester) async {
+    _ecran('rien de plus récent sur Drive : ni fenêtre ni carte', (WidgetTester tester) async {
       final EnvironnementTest env = await _telephoneSynchronise(tester);
 
       final ProviderContainer conteneur = await _ouvrir(tester, env, _lundi.add(const Duration(minutes: 30)));
@@ -328,7 +332,7 @@ void main() {
       await env.fermer(tester);
     });
 
-    testWidgets('envoi automatique désactivé : rien n’est comparé, rien n’est proposé', (WidgetTester tester) async {
+    _ecran('envoi automatique désactivé : rien n’est comparé, rien n’est proposé', (WidgetTester tester) async {
       final EnvironnementTest env = await _telephoneSynchronise(tester, automatique: false);
       final _AutreAppareil autre = await _AutreAppareil.creer(tester, env);
       await autre.envoyerAvecProduit(tester, 'Bonnet', _mardi);
@@ -347,7 +351,7 @@ void main() {
   });
 
   group('envoi de ce qui a changé', () {
-    testWidgets('à l’ouverture : du neuf ici (un envoi manqué) part le jour même ; sans rien de neuf, rien ne part', (
+    _ecran('à l’ouverture : du neuf ici (un envoi manqué) part le jour même ; sans rien de neuf, rien ne part', (
       WidgetTester tester,
     ) async {
       final EnvironnementTest env = await _telephoneSynchronise(tester);
@@ -366,14 +370,14 @@ void main() {
       // Rien de plus de neuf : l'ouverture suivante, le même jour, n'envoie rien.
       final int envoyesApres = env.clientDrive.envoyes.length;
       env.maintenant = plusTard.add(const Duration(hours: 1));
-      await env.travailler(tester, () => conteneur.read(sauvegardeDriveProvider.notifier).lancerSiBesoin());
+      await env.ecrireEcranOuvert(tester, () => conteneur.read(sauvegardeDriveProvider.notifier).lancerSiBesoin());
       expect(env.clientDrive.envoyes, hasLength(envoyesApres));
       expect(_cle('reprise-dialogue'), findsNothing);
 
       await env.fermer(tester);
     });
 
-    testWidgets('Android : en passant en arrière-plan, ce qui a changé part, au plus toutes les 10 minutes', (
+    _ecran('Android : en passant en arrière-plan, ce qui a changé part, au plus toutes les 10 minutes', (
       WidgetTester tester,
     ) async {
       final EnvironnementTest env = await _telephoneSynchronise(tester);
@@ -408,7 +412,7 @@ void main() {
       await env.fermer(tester);
     });
 
-    testWidgets('Android : sans envoi automatique, le passage en arrière-plan n’envoie rien', (WidgetTester tester) async {
+    _ecran('Android : sans envoi automatique, le passage en arrière-plan n’envoie rien', (WidgetTester tester) async {
       final EnvironnementTest env = await _telephoneSynchronise(tester, automatique: false);
       await env.creerProduit(tester, nom: 'Écharpe');
       await _ouvrir(tester, env, _lundi.add(const Duration(hours: 1)), declencher: false);
@@ -424,7 +428,7 @@ void main() {
       await env.fermer(tester);
     });
 
-    testWidgets('Windows : passer en arrière-plan n’envoie rien (c’est la fermeture de la fenêtre qui envoie)', (
+    _ecran('Windows : passer en arrière-plan n’envoie rien (c’est la fermeture de la fenêtre qui envoie)', (
       WidgetTester tester,
     ) async {
       final EnvironnementTest env = await _telephoneSynchronise(tester, plateforme: const Plateforme.windows());
@@ -447,7 +451,7 @@ void main() {
     SynchroDriveObservateurState observateur(WidgetTester tester) =>
         tester.state<SynchroDriveObservateurState>(find.byType(SynchroDriveObservateur));
 
-    testWidgets('ce qui a changé part avant la fermeture, qui est toujours permise', (WidgetTester tester) async {
+    _ecran('ce qui a changé part avant la fermeture, qui est toujours permise', (WidgetTester tester) async {
       final EnvironnementTest env = await _telephoneSynchronise(tester, plateforme: const Plateforme.windows());
       await env.creerProduit(tester, nom: 'Écharpe');
       final DateTime t0 = _lundi.add(const Duration(hours: 1));
@@ -465,7 +469,7 @@ void main() {
       await env.fermer(tester);
     });
 
-    testWidgets('rien de neuf : la fenêtre se ferme tout de suite, sans message ni envoi', (WidgetTester tester) async {
+    _ecran('rien de neuf : la fenêtre se ferme tout de suite, sans message ni envoi', (WidgetTester tester) async {
       final EnvironnementTest env = await _telephoneSynchronise(tester, plateforme: const Plateforme.windows());
       await _ouvrir(tester, env, _lundi.add(const Duration(hours: 1)), declencher: false);
       final int envoyesAvant = env.clientDrive.envoyes.length;
@@ -481,7 +485,7 @@ void main() {
       await env.fermer(tester);
     });
 
-    testWidgets('envoi automatique désactivé : on ferme sans rien envoyer', (WidgetTester tester) async {
+    _ecran('envoi automatique désactivé : on ferme sans rien envoyer', (WidgetTester tester) async {
       final EnvironnementTest env = await _telephoneSynchronise(
         tester,
         automatique: false,
@@ -501,7 +505,7 @@ void main() {
       await env.fermer(tester);
     });
 
-    testWidgets('un envoi qui traîne : un message le dit, et « Fermer sans attendre » ferme tout de suite', (
+    _ecran('un envoi qui traîne : un message le dit, et « Fermer sans attendre » ferme tout de suite', (
       WidgetTester tester,
     ) async {
       final EnvironnementTest env = await _telephoneSynchronise(tester, plateforme: const Plateforme.windows());
@@ -535,7 +539,7 @@ void main() {
       await env.fermer(tester);
     });
 
-    testWidgets('une version plus récente attend une décision : rien n’est envoyé à la fermeture', (
+    _ecran('une version plus récente attend une décision : rien n’est envoyé à la fermeture', (
       WidgetTester tester,
     ) async {
       final EnvironnementTest env = await _telephoneSynchronise(tester, plateforme: const Plateforme.windows());

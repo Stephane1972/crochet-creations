@@ -168,16 +168,30 @@ Future<ProviderContainer> _ouvrir(
   return conteneur;
 }
 
-/// Le système change l'état de l'application (au premier plan, en arrière-plan...).
-void _etatDeLApplication(WidgetTester tester, AppLifecycleState etat) {
-  // ignore: invalid_use_of_protected_member
-  tester.binding.handleAppLifecycleStateChanged(etat);
+const List<AppLifecycleState> _etatsEnOrdre = <AppLifecycleState>[
+  AppLifecycleState.resumed,
+  AppLifecycleState.inactive,
+  AppLifecycleState.hidden,
+  AppLifecycleState.paused,
+];
+
+/// Le système amène l'application à l'état [cible] (au premier plan, en arrière-plan...). Comme sur un vrai appareil, il passe par
+/// tous les états intermédiaires : `resumed` ↔ `inactive` ↔ `hidden` ↔ `paused` (Flutter refuse les autres transitions).
+void _allerA(WidgetTester tester, AppLifecycleState cible) {
+  AppLifecycleState courant = tester.binding.lifecycleState ?? AppLifecycleState.resumed;
+  if (!_etatsEnOrdre.contains(courant)) courant = AppLifecycleState.resumed;
+  while (courant != cible) {
+    final int pas = _etatsEnOrdre.indexOf(cible) > _etatsEnOrdre.indexOf(courant) ? 1 : -1;
+    courant = _etatsEnOrdre[_etatsEnOrdre.indexOf(courant) + pas];
+    // ignore: invalid_use_of_protected_member
+    tester.binding.handleAppLifecycleStateChanged(courant);
+  }
 }
 
 /// L'application passe en arrière-plan, puis revient.
 void _arrierePlanPuisRetour(WidgetTester tester) {
-  _etatDeLApplication(tester, AppLifecycleState.paused);
-  _etatDeLApplication(tester, AppLifecycleState.resumed);
+  _allerA(tester, AppLifecycleState.paused);
+  _allerA(tester, AppLifecycleState.resumed);
 }
 
 /// Comme `testWidgets`, mais un test qui reste bloqué échoue au bout de 30 s (avec son nom) au lieu de bloquer toute la suite.
@@ -387,7 +401,7 @@ void main() {
       await env.creerProduit(tester, nom: 'Écharpe');
       final DateTime t0 = _lundi.add(const Duration(hours: 1));
       final ProviderContainer conteneur = await _ouvrir(tester, env, t0, declencher: false);
-      addTearDown(() => _etatDeLApplication(tester, AppLifecycleState.resumed));
+      addTearDown(() => _allerA(tester, AppLifecycleState.resumed));
 
       // 1. Premier passage en arrière-plan : l'envoi part.
       _arrierePlanPuisRetour(tester);
@@ -419,7 +433,7 @@ void main() {
       final EnvironnementTest env = await _telephoneSynchronise(tester, automatique: false);
       await env.creerProduit(tester, nom: 'Écharpe');
       await _ouvrir(tester, env, _lundi.add(const Duration(hours: 1)), declencher: false);
-      addTearDown(() => _etatDeLApplication(tester, AppLifecycleState.resumed));
+      addTearDown(() => _allerA(tester, AppLifecycleState.resumed));
       final int envoyesAvant = env.clientDrive.envoyes.length;
 
       _arrierePlanPuisRetour(tester);
@@ -437,7 +451,7 @@ void main() {
       final EnvironnementTest env = await _telephoneSynchronise(tester, plateforme: const Plateforme.windows());
       await env.creerProduit(tester, nom: 'Écharpe');
       await _ouvrir(tester, env, _lundi.add(const Duration(hours: 1)), declencher: false);
-      addTearDown(() => _etatDeLApplication(tester, AppLifecycleState.resumed));
+      addTearDown(() => _allerA(tester, AppLifecycleState.resumed));
       final int envoyesAvant = env.clientDrive.envoyes.length;
 
       _arrierePlanPuisRetour(tester);
@@ -467,6 +481,8 @@ void main() {
       expect(reponse, AppExitResponse.exit);
       expect(env.clientDrive.nomsDans(nomDossierSauvegardesDrive), contains(nomSauvegardeDrive(t0)));
       expect(_nombreDeSauvegardes(env), 2);
+      // Si l'envoi a pris plus de 0,7 s, le message a été montré : il est refermé une fois l'envoi fini.
+      await tester.pump(const Duration(milliseconds: 500));
       expect(_cle('fermeture-dialogue'), findsNothing);
 
       await env.fermer(tester);

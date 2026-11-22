@@ -21,14 +21,20 @@ import '../ventes/panier_provider.dart';
 import 'drive_providers.dart';
 
 /// Réglages › Google Drive › Restaurer depuis Drive (étape 7 de l'évolution) : liste les sauvegardes qui sont sur Drive, et
-/// restaure celle qu'on choisit, après confirmation. Sert aussi à **changer de téléphone** : on se connecte au même compte
-/// Google, puis on restaure.
+/// restaure celle qu'on choisit, après confirmation. Sert aussi à **changer de téléphone** et à **reprendre sur un appareil
+/// ce qu'un autre a envoyé** (le téléphone et l'ordinateur) : on se connecte au même compte Google, puis on restaure.
+///
+/// Avec [aReprendre] (la proposition faite à l'ouverture de l'application, voir `reprise_drive.dart`), la sauvegarde est déjà
+/// choisie : le téléchargement et la confirmation commencent tout de suite, comme si on l'avait touchée dans la liste.
 ///
 /// La restauration remplace toutes les données ; une copie de sécurité est faite juste avant (elle reste dans la liste de
 /// Réglages › Sauvegarde et export). Les photos et documents sont retéléchargés depuis leurs dossiers Drive et contrôlés
 /// avant que quoi que ce soit ne soit touché.
 class DriveRestaurationScreen extends ConsumerStatefulWidget {
-  const DriveRestaurationScreen({super.key});
+  const DriveRestaurationScreen({super.key, this.aReprendre});
+
+  /// La sauvegarde à reprendre sans passer par la liste (`null` : on choisit dans la liste).
+  final SauvegardeDrive? aReprendre;
 
   @override
   ConsumerState<DriveRestaurationScreen> createState() => _DriveRestaurationScreenState();
@@ -50,6 +56,17 @@ class _DriveRestaurationScreenState extends ConsumerState<DriveRestaurationScree
   /// Pour ne pas redessiner l'écran à chaque morceau reçu : au plus un changement tous les 150 ms (sauf changement d'étape ou
   /// de fichier).
   final Stopwatch _chrono = Stopwatch();
+
+  @override
+  void initState() {
+    super.initState();
+    final SauvegardeDrive? choisie = widget.aReprendre;
+    if (choisie != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) unawaited(_choisir(choisie));
+      });
+    }
+  }
 
   void _surProgression(ProgressionRestaurationDrive progression) {
     if (!mounted) return;
@@ -141,6 +158,9 @@ class _DriveRestaurationScreenState extends ConsumerState<DriveRestaurationScree
       ref.read(themeModeProvider.notifier).definir(mode);
       ref.invalidate(venteEnCoursProvider);
       ref.invalidate(sauvegardesLocalesProvider);
+      // Les données de cet appareil sont celles de Drive : plus de proposition de reprise en attente.
+      ref.invalidate(repriseDriveProvider);
+      ref.invalidate(etatSauvegardesDriveProvider);
     } on ErreurDrive catch (erreur) {
       _echec(erreur.message, autorisationAExpire: erreur.autorisationAExpire);
       return;
@@ -239,8 +259,8 @@ class _DriveRestaurationScreenState extends ConsumerState<DriveRestaurationScree
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Pour changer de téléphone : installez l’application, connectez-vous au même compte Google, puis '
-                      'restaurez ici la sauvegarde la plus récente.',
+                      'Pour changer de téléphone, ou passer d’un appareil à l’autre : installez l’application, connectez-vous au même '
+                      'compte Google, puis restaurez ici la sauvegarde la plus récente.',
                       style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
                     ),
                   ],
@@ -304,7 +324,7 @@ class _DriveRestaurationScreenState extends ConsumerState<DriveRestaurationScree
                       padding: const EdgeInsets.all(16),
                       child: Text(
                         'Aucune sauvegarde trouvée sur ce Drive. Faites d’abord « Sauvegarder maintenant sur Drive » sur '
-                        'le téléphone d’origine, avec le même compte Google.',
+                        'l’appareil d’origine, avec le même compte Google.',
                         key: const Key('drive-restauration-aucune'),
                         style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
                       ),

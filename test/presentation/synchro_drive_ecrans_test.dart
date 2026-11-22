@@ -155,7 +155,12 @@ class _AutreAppareil {
     await env.creerProduit(tester, nom: nomProduit);
     env.maintenant = quand;
     _t('autre appareil : envoi de $nomProduit');
-    await env.travailler(tester, () => service.sauvegarder());
+    await env.travailler(
+      tester,
+      () => service
+          .sauvegarder(progression: (ProgressionSauvegardeDrive p) => _t('autre appareil : étape ${p.etape}'))
+          .timeout(const Duration(seconds: 10)),
+    );
     _t('autre appareil : envoyé');
   }
 

@@ -6,7 +6,43 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
 
 ## [Non publié]
 
-## [0.24.0] — Google Drive sous Windows (en attente de validation)
+## [0.25.0] — Synchroniser téléphone et PC (en attente de validation)
+
+Seconde partie de la demande de Stéphane : retrouver les **mêmes données sur Android et sur Windows**. Choix : **reprise d'un appareil à
+l'autre + envoi automatique à la fermeture**, un seul appareil actif à la fois, **pas de fusion** de modifications simultanées, **jamais
+d'écrasement silencieux**. **Android est inchangé** (mêmes écrans, mêmes données, même connexion) ; rien ne change tant que l'envoi
+automatique reste désactivé. Aucun changement de la base (schéma 6) ni du format des sauvegardes.
+
+### Ajouté
+- **Proposition de reprise à l'ouverture** : si Drive a une version plus récente, envoyée depuis l'autre appareil, une fenêtre le dit.
+  *Reprendre* ouvre l'écran de restauration avec cette version déjà choisie (résumé, confirmation, copie de sécurité). Si l'appareil a aussi
+  changé : « Deux versions différentes », avec *Garder cet appareil* (la version de Drive reste sur Drive, rien n'est supprimé). *Plus tard*
+  garde la proposition en haut de l'écran Google Drive. Tant qu'on n'a pas choisi, **aucun envoi automatique** ne part.
+- **Envoi à la fermeture sous Windows** (avec un message et « Fermer sans attendre » si cela traîne ; la fenêtre se ferme toujours) et
+  **envoi en passant en arrière-plan sous Android** (au plus toutes les 10 minutes, au mieux). À l'ouverture, un envoi manqué est refait le
+  jour même (détection du « du neuf » par une empreinte des données, sans réseau).
+- `ReferenceSynchro` (dernière version de Drive envoyée ou reprise par cet appareil, avec l'empreinte de ses données), `constaterSynchro`
+  (règles pures : à jour / à envoyer / à reprendre / à choisir), `ServiceSauvegardeDrive.constater` et `garderCetAppareil`,
+  `ServiceSauvegarde.empreinteLocale` et `donneesVierges`, `SynchroDriveObservateur`, `CarteRepriseDrive`.
+- Tests : règles de comparaison (`drive_synchro_test`), deux appareils simulés sur un même faux Drive (`synchro_drive_test`), écrans
+  (`synchro_drive_ecrans_test` : proposition, carte, garde, arrière-plan Android, fermeture Windows).
+
+### Modifié
+- L'interrupteur devient « Envoi automatique et reprise entre appareils » (même réglage, toujours désactivé au départ).
+- Après une restauration depuis Drive, la version reprise devient la référence de l'appareil ; un ancien fichier d'état reste lisible
+  (la première comparaison demande alors de choisir plutôt que d'écraser).
+
+### Limites connues
+- Pas de fusion : si les deux appareils ont changé, on garde l'un ou l'autre (l'autre version reste sur Drive, restaurable).
+- Les deux appareils utilisés en même temps laissent une petite fenêtre où une version peut en dépasser une autre.
+- L'envoi en arrière-plan d'Android est au mieux (le système peut l'interrompre) ; un arrêt brutal de Windows ne laisse pas le temps d'envoyer :
+  l'envoi est alors refait à la prochaine ouverture.
+- Le bouton manuel *Sauvegarder maintenant* n'est pas bloqué par une proposition en attente.
+- Une sauvegarde de plus sur Drive à chaque fermeture où quelque chose a changé (rien n'est supprimé par l'application).
+- Un devis qui expire tout seul compte comme une modification.
+- Non essayé avec un vrai compte Google : vérifié par des tests automatiques, puis par le premier essai réel, téléphone et PC ensemble.
+
+## [0.24.0] — Google Drive sous Windows
 
 Première des deux parties demandées par Stéphane pour **synchroniser téléphone et PC** : Drive est maintenant disponible sous Windows (la
 reprise d'un appareil à l'autre et l'envoi automatique à la fermeture viennent dans la partie 2). **Android est inchangé** (même connexion

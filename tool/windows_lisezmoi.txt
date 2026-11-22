@@ -21,6 +21,13 @@ Google Drive (même Drive que sur le téléphone)
   section « Google Drive sous Windows »). Ensuite, « Se connecter à Google » ouvre votre navigateur : connectez-vous, laissez
   la case Drive cochée, puis revenez à l'application. L'ID et le code secret restent sur cet ordinateur : ne les publiez nulle part.
 
+Retrouver les mêmes données sur le téléphone et sur ce PC (par Drive)
+  Sur chaque appareil : Réglages > Google Drive, même compte Google, puis activez « Envoi automatique et reprise entre appareils ».
+  Utilisez un seul appareil à la fois. Quand vous fermez la fenêtre, ce qui a changé part sur Drive (un message s'affiche si
+  cela dure ; « Fermer sans attendre » ferme tout de suite, l'envoi sera refait à la prochaine ouverture). Quand vous ouvrez l'autre
+  appareil, il vous propose de reprendre la version de Drive, après confirmation et copie de sécurité. Si les deux appareils ont
+  changé chacun de leur côté, vous choisissez : rien n'est écrasé sans votre accord et rien n'est supprimé sur Drive.
+
 Passer vos données du téléphone Android à Windows (ou l'inverse), sans Drive :
   1. Sur l'appareil qui contient les données : Réglages > Sauvegarde et export > « Sauvegarder maintenant »,
      puis « Partager » (sous Windows : « Enregistrer sous... »).

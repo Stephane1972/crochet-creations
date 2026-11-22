@@ -231,9 +231,9 @@ minutes à se propager.
 - **Un fichier qui n'a pas pu partir** n'empêche pas la sauvegarde, mais n'est **pas listé** dedans, et l'écran le dit (« 1 fichier n’a pas pu
   partir sur Drive… Relancez la sauvegarde »). Relancer ajoute une sauvegarde qui le liste.
 - **Envoi automatique** (interrupteur, **désactivé au départ**) : à l'ouverture de l'application, **au plus une fois par jour**, et seulement
-  si quelque chose a changé, la sauvegarde sur Drive se fait toute seule, à condition d'être connecté à Google. **Rien ne tourne en
-  arrière-plan** : l'application doit être ouverte. Un échec (pas de réseau) est dit sur l'écran *Google Drive* et retenté à l'ouverture
-  suivante.
+  si quelque chose a changé, la sauvegarde sur Drive se fait toute seule, à condition d'être connecté à Google. Depuis la version 0.25.0,
+  l'envoi se fait aussi quand on ferme l'application (voir « Synchroniser le téléphone et le PC » plus bas). Un échec (pas de réseau) est dit
+  sur l'écran *Google Drive* et retenté à l'ouverture suivante.
 - **Tout est gardé** : chaque sauvegarde reste sur Drive, l'application n'en supprime aucune (vous pouvez les supprimer vous-même dans Drive).
 - **Restaurer / changer de téléphone** : *Google Drive → Restaurer depuis Drive…* liste les sauvegardes (la plus récente en premier).
   Sur un téléphone neuf : installez l'application (même signature, voir plus bas), **connectez-vous au même compte Google**, puis restaurez la
@@ -627,6 +627,54 @@ publie le `.zip`. Le workflow Android (analyse, tests, APK signé) n'a pas chang
 
 Pour construire à la main sur un PC Windows (avec Flutter) : `flutter pub get`, `dart run build_runner build --delete-conflicting-outputs`,
 `bash tool/setup_windows.sh` (Git Bash), puis `flutter run -d windows` ou `flutter build windows --release`.
+
+#### Synchroniser le téléphone et le PC (version 0.25.0)
+
+Pour retrouver les **mêmes données** sur le téléphone Android et sur le PC Windows, en passant par votre Drive. Le principe : **un seul
+appareil est utilisé à la fois**. Quand vous le quittez, ses données partent sur Drive ; quand vous ouvrez l'autre, il vous propose de les
+reprendre. **Il n'y a pas de fusion** : si les deux appareils ont changé chacun de leur côté, c'est vous qui choisissez, et rien n'est jamais
+écrasé en silence.
+
+**À faire une fois, sur chaque appareil** : *Réglages → Google Drive* → se connecter au **même compte Google**, puis activer
+**« Envoi automatique et reprise entre appareils »** (désactivé au départ).
+
+**Ce qui se passe ensuite** (envoi automatique activé et Google connecté) :
+
+- **Quand vous quittez un appareil** : sous **Windows**, à la fermeture de la fenêtre, ce qui a changé part sur Drive (un message s'affiche si
+  cela dure plus d'un instant, avec un bouton **« Fermer sans attendre »** : l'envoi est alors refait à la prochaine ouverture) ; sous
+  **Android**, quand vous quittez l'application (retour à l'écran d'accueil du téléphone), l'envoi part en arrière-plan, **au plus toutes
+  les 10 minutes**. Rien ne part si rien n'a changé.
+- **Quand vous ouvrez l'autre appareil** : l'application compare avec Drive. Si Drive a une **version plus récente, envoyée depuis l'autre
+  appareil**, une fenêtre vous le dit.
+  - Si **rien n'a changé** sur cet appareil depuis la dernière synchronisation : **Reprendre** ouvre l'écran de restauration avec cette
+    version déjà choisie (téléchargement, résumé de ce qu'elle contient, **demande de confirmation**, copie de sécurité faite avant de
+    remplacer).
+  - Si cet appareil **a aussi changé** : **Deux versions différentes**. *Reprendre la version de Drive* remplace les données de cet appareil
+    (après confirmation et copie de sécurité) ; *Garder cet appareil* laisse la version de Drive sur Drive, sans la reprendre : le prochain
+    envoi ajoutera celle de cet appareil comme version la plus récente, et l'autre reste restaurable depuis *Google Drive → Restaurer*.
+  - **Plus tard** ne change rien : la proposition reste affichée en haut de l'écran *Google Drive* (bouton **Décider**).
+  - **Tant que vous n'avez pas choisi, rien n'est envoyé automatiquement** (ni à l'ouverture, ni en arrière-plan, ni à la fermeture).
+- **Rien n'est jamais supprimé sur Drive** : chaque envoi ajoute une sauvegarde datée (toutes restent restaurables). Comptez donc **une
+  sauvegarde de plus à chaque fermeture où quelque chose a changé** ; vous pouvez les supprimer vous-même dans Drive.
+
+**Comment l'application sait ce qui a changé** : chaque appareil retient la dernière version de Drive qu'il a envoyée ou reprise, et une
+empreinte de ses données à ce moment-là. En comparant cette empreinte à ses données du moment, il sait s'il a changé, **sans accès au
+réseau**. Les photos et documents ne comptent pas dans cette comparaison (chacun est cité par une ligne des données). Aucun changement de la
+base ni du format des sauvegardes (schéma 6).
+
+**Limites** (à connaître) :
+
+- **Pas de fusion** de modifications faites en même temps sur les deux appareils : on garde l'une ou l'autre.
+- Les deux appareils utilisés **en même temps** laissent une petite fenêtre où une version peut en dépasser une autre avant que l'écran ne
+  le propose ; l'ancienne version reste sur Drive et restaurable.
+- Sous **Android**, l'envoi en arrière-plan est **fait au mieux** : le système peut l'interrompre (économie d'énergie, application fermée de
+  force). Dans ce cas, il est refait à la prochaine ouverture. Sous **Windows**, un arrêt brutal (extinction, fermeture forcée) ne laisse pas
+  le temps d'envoyer.
+- Le bouton manuel *Sauvegarder maintenant sur Drive* n'est pas bloqué par la proposition en attente : l'utiliser pendant « Deux versions
+  différentes » ajoute simplement une version plus récente (rien n'est écrasé, tout reste restaurable).
+- Un devis qui **expire tout seul** modifie les données : il compte comme un changement et déclenche un envoi.
+- Cette fonction n'a pas pu être essayée avec un vrai compte Google pendant le développement : elle est vérifiée par des tests automatiques
+  (faux Google, deux appareils simulés). Le premier essai réel, téléphone et PC ensemble, est le vrai test.
 
 ## Structure du dépôt
 

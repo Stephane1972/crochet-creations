@@ -9,7 +9,6 @@ import 'package:crochet_creations/data/database/app_database.dart';
 import 'package:crochet_creations/data/drive/compte_google.dart';
 import 'package:crochet_creations/data/drive/service_drive.dart';
 import 'package:crochet_creations/data/drive/service_sauvegarde_drive.dart';
-import 'package:crochet_creations/data/sauvegarde/service_sauvegarde.dart';
 import 'package:crochet_creations/domain/drive_envoi.dart';
 import 'package:crochet_creations/domain/drive_sauvegardes.dart';
 import 'package:crochet_creations/domain/drive_synchro.dart';
@@ -35,12 +34,6 @@ final DateTime _mardi = DateTime(2026, 11, 17, 9, 30);
 
 const ProfilGoogle _camille = ProfilGoogle(email: 'camille@exemple.fr', nom: 'Camille');
 
-// Repères dans le journal de la CI (utiles si un test se bloque).
-void _t(String message) {
-  // ignore: avoid_print
-  print('[synchro] $message');
-}
-
 Finder _cle(String nom) => find.byKey(Key(nom));
 
 Finder _dansDialogue(Finder cible) => find.descendant(of: find.byType(AlertDialog), matching: cible);
@@ -49,7 +42,6 @@ String _dateHeure(DateTime date) => '${formatDateLongue(date)} à ${formatHeure(
 
 /// Fait avancer le temps, en laissant la base et les fichiers travailler, jusqu'à ce que [cible] apparaisse.
 Future<void> _attendre(WidgetTester tester, Finder cible) async {
-  _t('attente de $cible');
   await attendreJusqua(tester, () => cible.evaluate().isNotEmpty, essais: 300);
   expect(cible, findsWidgets, reason: 'Élément attendu : $cible');
   await tester.pump(const Duration(milliseconds: 100));
@@ -57,14 +49,12 @@ Future<void> _attendre(WidgetTester tester, Finder cible) async {
 
 /// Fait avancer le temps jusqu'à ce que [cible] ait disparu.
 Future<void> _attendreDisparition(WidgetTester tester, Finder cible) async {
-  _t('attente de la disparition de $cible');
   await attendreJusqua(tester, () => cible.evaluate().isEmpty, essais: 300);
   expect(cible, findsNothing, reason: 'Élément qui aurait dû disparaître : $cible');
 }
 
 /// Appuie sur un élément, laisse finir les animations et les lectures de la base, sans « pumpAndSettle ».
 Future<void> _toucher(WidgetTester tester, Finder cible) async {
-  _t('toucher $cible');
   await tester.ensureVisible(cible);
   await tester.pump();
   await tester.tap(cible);
@@ -101,18 +91,15 @@ Future<EnvironnementTest> _telephoneSynchronise(
   bool automatique = true,
   Plateforme plateforme = const Plateforme.android(),
 }) async {
-  _t('téléphone : création');
   final EnvironnementTest env = await EnvironnementTest.creer(tester);
   env.plateforme = plateforme;
   env.compteGoogle.dejaConnecte = _camille;
   await env.creerProduit(tester, nom: 'Doudou lapin');
   env.maintenant = _lundi;
-  _t('téléphone : envoi de lundi');
   await env.travailler(tester, () => env.serviceSauvegardeDrive.sauvegarder());
   if (automatique) {
     await env.travailler(tester, () => env.serviceSauvegardeDrive.reglerEnvoiAutomatique(actif: true));
   }
-  _t('téléphone : prêt');
   return env;
 }
 
@@ -124,59 +111,40 @@ class _AutreAppareil {
   final ServiceSauvegardeDrive service;
 
   static Future<_AutreAppareil> creer(WidgetTester tester, EnvironnementTest telephone) async {
-    _t('autre appareil : création');
     final EnvironnementTest env = await EnvironnementTest.creer(tester);
     DateTime horloge() => env.maintenant ?? DateTime.now();
-    telephone.clientDrive.avantEnvoi = (String n) => _t('diag : Drive reçoit $n'); // DIAGNOSTIC TEMPORAIRE
-    final ServiceDrive envoi = ServiceDrive(
-      client: telephone.clientDrive,
-      dossiers: <DossierDrive, Directory>{
-        DossierDrive.photos: env.dossierPhotos,
-        DossierDrive.factures: env.dossierFactures,
-        DossierDrive.devis: env.dossierDevis,
-        DossierDrive.notes: env.dossierPiecesJointes,
-      },
-      fichierBilan: File('${env.dossier.path}/drive/dernier_envoi.json'),
-      horloge: horloge,
-    );
-    return _AutreAppareil(
-      env,
-      ServiceSauvegardeDrive(
+    // Les services sont créés hors du temps simulé (comme `env.serviceSauvegardeDrive`, créé au premier appel dans `travailler`) :
+    // leurs files d'attente internes (des `Future` déjà prêts) y seraient sinon à la merci des microtâches du test, et rien ne
+    // finirait pendant `travailler`.
+    final ServiceSauvegardeDrive service = await env.travailler(tester, () async {
+      final ServiceDrive envoi = ServiceDrive(
+        client: telephone.clientDrive,
+        dossiers: <DossierDrive, Directory>{
+          DossierDrive.photos: env.dossierPhotos,
+          DossierDrive.factures: env.dossierFactures,
+          DossierDrive.devis: env.dossierDevis,
+          DossierDrive.notes: env.dossierPiecesJointes,
+        },
+        fichierBilan: File('${env.dossier.path}/drive/dernier_envoi.json'),
+        horloge: horloge,
+      );
+      return ServiceSauvegardeDrive(
         client: telephone.clientDrive,
         envoi: envoi,
         sauvegarde: env.sauvegarde,
         dossierTravail: Directory('${env.dossier.path}/drive/travail'),
         fichierEtat: File('${env.dossier.path}/drive/sauvegardes_drive.json'),
         horloge: horloge,
-      ),
-    );
+      );
+    });
+    return _AutreAppareil(env, service);
   }
 
   /// Saisit un produit sur cet appareil, puis envoie ses données sur Drive à l'heure [quand].
   Future<void> envoyerAvecProduit(WidgetTester tester, String nomProduit, DateTime quand) async {
     await env.creerProduit(tester, nom: nomProduit);
     env.maintenant = quand;
-    _t('autre appareil : envoi de $nomProduit');
-    // DIAGNOSTIC TEMPORAIRE : où l'envoi se bloque-t-il ?
-    final DonneesSeules diag = await env.travailler(
-      tester,
-      () => env.sauvegarde.lireDonneesSeules(fichiersConfirmes: <String>{}).timeout(const Duration(seconds: 5)),
-    );
-    _t('diag : données lues');
-    await env.travailler(
-      tester,
-      () => env.sauvegarde
-          .ecrireDonneesSeules(diag, File('${env.dossier.path}/diag.zip'))
-          .timeout(const Duration(seconds: 5)),
-    );
-    _t('diag : archive écrite');
-    await env.travailler(
-      tester,
-      () => service
-          .sauvegarder(progression: (ProgressionSauvegardeDrive p) => _t('autre appareil : étape ${p.etape}'))
-          .timeout(const Duration(seconds: 10)),
-    );
-    _t('autre appareil : envoyé');
+    await env.travailler(tester, () => service.sauvegarder());
   }
 
   Future<void> fermer(WidgetTester tester) => env.fermer(tester);
@@ -191,14 +159,11 @@ Future<ProviderContainer> _ouvrir(
   bool declencher = true,
 }) async {
   env.maintenant = quand;
-  _t('ouverture de l’application');
   await ouvrirAccueil(tester, env, taille: _grandEcran);
   final ProviderContainer conteneur = ProviderScope.containerOf(tester.element(find.byType(NavigationBar)));
   if (declencher) {
-    _t('lancerSiBesoin');
     await env.ecrireEcranOuvert(tester, () => conteneur.read(sauvegardeDriveProvider.notifier).lancerSiBesoin());
     await tester.pump();
-    _t('lancerSiBesoin terminé');
   }
   return conteneur;
 }
@@ -249,10 +214,8 @@ void main() {
       await _attendre(tester, find.text('Restauration terminée'));
       await _toucher(tester, _dansDialogue(find.text('Retour à l’accueil')));
 
-      _t('test 1 : vérifications finales');
       await tester.pumpWidget(const SizedBox()); // plus aucun écran ne lit la base en direct
       expect(await _nomsProduits(tester, env), <String>['Bonnet']);
-      _t('test 1 : produits lus');
       final EtatSauvegardesDrive etat = await env.travailler(tester, () => env.serviceSauvegardeDrive.lireEtat());
       expect(etat.reference!.nom, nomSauvegardeDrive(_mardi));
       // Rien n'a été supprimé, ni ajouté, sur Drive.

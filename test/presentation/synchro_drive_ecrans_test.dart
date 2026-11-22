@@ -9,6 +9,7 @@ import 'package:crochet_creations/data/database/app_database.dart';
 import 'package:crochet_creations/data/drive/compte_google.dart';
 import 'package:crochet_creations/data/drive/service_drive.dart';
 import 'package:crochet_creations/data/drive/service_sauvegarde_drive.dart';
+import 'package:crochet_creations/data/sauvegarde/service_sauvegarde.dart';
 import 'package:crochet_creations/domain/drive_envoi.dart';
 import 'package:crochet_creations/domain/drive_sauvegardes.dart';
 import 'package:crochet_creations/domain/drive_synchro.dart';
@@ -126,6 +127,7 @@ class _AutreAppareil {
     _t('autre appareil : création');
     final EnvironnementTest env = await EnvironnementTest.creer(tester);
     DateTime horloge() => env.maintenant ?? DateTime.now();
+    telephone.clientDrive.avantEnvoi = (String n) => _t('diag : Drive reçoit $n'); // DIAGNOSTIC TEMPORAIRE
     final ServiceDrive envoi = ServiceDrive(
       client: telephone.clientDrive,
       dossiers: <DossierDrive, Directory>{
@@ -155,6 +157,19 @@ class _AutreAppareil {
     await env.creerProduit(tester, nom: nomProduit);
     env.maintenant = quand;
     _t('autre appareil : envoi de $nomProduit');
+    // DIAGNOSTIC TEMPORAIRE : où l'envoi se bloque-t-il ?
+    final DonneesSeules diag = await env.travailler(
+      tester,
+      () => env.sauvegarde.lireDonneesSeules(fichiersConfirmes: <String>{}).timeout(const Duration(seconds: 5)),
+    );
+    _t('diag : données lues');
+    await env.travailler(
+      tester,
+      () => env.sauvegarde
+          .ecrireDonneesSeules(diag, File('${env.dossier.path}/diag.zip'))
+          .timeout(const Duration(seconds: 5)),
+    );
+    _t('diag : archive écrite');
     await env.travailler(
       tester,
       () => service

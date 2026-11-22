@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui' show AppExitResponse;
 
 import 'package:crochet_creations/core/plateforme.dart';
 import 'package:crochet_creations/core/router/app_routes.dart';

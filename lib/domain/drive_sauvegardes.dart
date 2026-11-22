@@ -96,6 +96,39 @@ class BilanSauvegardeDrive {
   }
 }
 
+/// La dernière version des données sur Drive que **cet appareil** a envoyée ou reprise : c'est à partir d'elle qu'il sait si
+/// Drive a du plus récent (envoyé depuis un autre appareil) et s'il a lui-même changé depuis (voir `drive_synchro.dart`).
+class ReferenceSynchro {
+  const ReferenceSynchro({required this.nom, required this.date, this.empreinteLocale});
+
+  /// Nom de la sauvegarde sur Drive (`crochet-creations-sauvegarde-…zip`).
+  final String nom;
+
+  /// Date de cette sauvegarde, lue dans son nom.
+  final DateTime date;
+
+  /// Empreinte des données de cet appareil au moment où elles étaient identiques à cette sauvegarde (voir
+  /// `ServiceSauvegarde.empreinteLocale`) ; `null` si on ne la connaît pas (état d'avant la synchronisation).
+  final String? empreinteLocale;
+
+  Map<String, Object?> versJson() => <String, Object?>{
+    'nom': nom,
+    'date': date.toIso8601String(),
+    'empreinteLocale': empreinteLocale,
+  };
+
+  static ReferenceSynchro? depuisJson(Object? json) {
+    if (json is! Map<String, Object?>) return null;
+    final Object? nom = json['nom'];
+    final Object? date = json['date'];
+    final Object? empreinte = json['empreinteLocale'];
+    if (nom is! String || date is! String) return null;
+    final DateTime? quand = DateTime.tryParse(date);
+    if (quand == null) return null;
+    return ReferenceSynchro(nom: nom, date: quand, empreinteLocale: empreinte is String ? empreinte : null);
+  }
+}
+
 /// Ce que le téléphone retient des sauvegardes Drive : le réglage « envoi automatique », la dernière sauvegarde et le dernier
 /// contrôle. Gardé dans un petit fichier, hors de la base et de la sauvegarde.
 class EtatSauvegardesDrive {
@@ -104,6 +137,7 @@ class EtatSauvegardesDrive {
     this.derniereVerification,
     this.derniere,
     this.fichiersNonEnvoyes = const <String>[],
+    this.reference,
   });
 
   /// L'envoi automatique est activé (désactivé au départ).
@@ -118,16 +152,21 @@ class EtatSauvegardesDrive {
   /// Fichiers (`photos_produits/photo_1.jpg`) qui n'ont pas pu partir lors de la dernière sauvegarde : elle ne les liste pas.
   final List<String> fichiersNonEnvoyes;
 
+  /// La dernière version de Drive que cet appareil a envoyée ou reprise (`null` : jamais, ou état d'avant la synchronisation).
+  final ReferenceSynchro? reference;
+
   EtatSauvegardesDrive copier({
     bool? envoiAutomatique,
     DateTime? derniereVerification,
     BilanSauvegardeDrive? derniere,
     List<String>? fichiersNonEnvoyes,
+    ReferenceSynchro? reference,
   }) => EtatSauvegardesDrive(
     envoiAutomatique: envoiAutomatique ?? this.envoiAutomatique,
     derniereVerification: derniereVerification ?? this.derniereVerification,
     derniere: derniere ?? this.derniere,
     fichiersNonEnvoyes: fichiersNonEnvoyes ?? this.fichiersNonEnvoyes,
+    reference: reference ?? this.reference,
   );
 
   Map<String, Object?> versJson() => <String, Object?>{
@@ -135,6 +174,7 @@ class EtatSauvegardesDrive {
     'derniereVerification': derniereVerification?.toIso8601String(),
     'derniere': derniere?.versJson(),
     'fichiersNonEnvoyes': fichiersNonEnvoyes,
+    'reference': reference?.versJson(),
   };
 
   /// Relit l'état enregistré. Un fichier illisible ou incomplet donne les valeurs de départ (envoi automatique désactivé) :
@@ -149,6 +189,7 @@ class EtatSauvegardesDrive {
       derniereVerification: verification is String ? DateTime.tryParse(verification) : null,
       derniere: BilanSauvegardeDrive.depuisJson(json['derniere']),
       fichiersNonEnvoyes: nonEnvoyes is List<Object?> ? <String>[for (final Object? n in nonEnvoyes) if (n is String) n] : const <String>[],
+      reference: ReferenceSynchro.depuisJson(json['reference']),
     );
   }
 }

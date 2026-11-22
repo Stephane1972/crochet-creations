@@ -562,6 +562,34 @@ class ServiceSauvegarde {
   // Sauvegarde « données seules » (Google Drive, étape 7)
   // ---------------------------------------------------------------------------
 
+  /// L'empreinte (SHA-256) des **données** de cet appareil, toutes tables : identique tant que rien n'a été saisi ni modifié
+  /// (les fichiers ne comptent pas : chacun est cité par une ligne des tables). Sert à savoir, entre deux passages, si cet
+  /// appareil a changé depuis la dernière version envoyée sur Drive ou reprise (voir `drive_synchro.dart`).
+  Future<String> empreinteLocale() async => _empreinteDesTables((await _lireBase()).tables);
+
+  /// Vrai si rien n'a encore été saisi sur cet appareil (une installation toute neuve) : tout est vide, hormis ce que
+  /// l'application crée au départ (catégories, lieux, profil de l'entreprise).
+  Future<bool> donneesVierges() async {
+    for (final String table in FormatSauvegarde.tables) {
+      if (_tablesDeDepart.contains(table)) continue;
+      final QueryRow ligne = await _base.customSelect('SELECT COUNT(*) AS n FROM "$table"').getSingle();
+      if (ligne.read<int>('n') > 0) return false;
+    }
+    return true;
+  }
+
+  /// Les tables que l'application remplit elle-même à la création de la base.
+  static const Set<String> _tablesDeDepart = <String>{
+    'parametres_entreprise',
+    'numerotation_documents',
+    'categories_produit',
+    'lieux_vente',
+    'categories_note',
+  };
+
+  static String _empreinteDesTables(Map<String, List<Map<String, Object?>>> tables) =>
+      sha256.convert(utf8.encode(jsonEncode(tables))).toString();
+
   /// Prend un instantané des données et de la liste des fichiers **confirmés sur Drive** ([fichiersConfirmes], sous la forme
   /// `dossier/nom`), sans écrire ni calculer d'empreinte de fichier : c'est rapide, et [DonneesSeules.empreinte] dit si quelque
   /// chose a changé depuis la dernière sauvegarde Drive.
@@ -590,7 +618,7 @@ class ServiceSauvegarde {
           ),
         )
         .toString();
-    return DonneesSeules._(base, fichiers, empreinte, absents);
+    return DonneesSeules._(base, fichiers, empreinte, _empreinteDesTables(base.tables), absents);
   }
 
   /// Écrit dans [destination] l'archive « données seules » de [donnees] : `donnees.json` et `fichiers.json` (la liste des
@@ -1101,13 +1129,16 @@ typedef RecuperateurFichiers =
 /// Les données du moment et la liste des fichiers confirmés sur Drive, prêtes à être écrites dans une sauvegarde « données
 /// seules » (voir [ServiceSauvegarde.lireDonneesSeules]).
 class DonneesSeules {
-  const DonneesSeules._(this._base, this._fichiers, this.empreinte, this.fichiersAbsents);
+  const DonneesSeules._(this._base, this._fichiers, this.empreinte, this.empreinteLocale, this.fichiersAbsents);
 
   final _InstantaneBase _base;
   final List<_FichierMesure> _fichiers;
 
   /// SHA-256 des données et de la liste des fichiers (nom et taille) : identique tant que rien n'a changé.
   final String empreinte;
+
+  /// SHA-256 des seules données de l'appareil au moment de l'instantané (voir [ServiceSauvegarde.empreinteLocale]).
+  final String empreinteLocale;
 
   /// Photos citées par les données mais pas dans la liste (elles n'ont pas pu partir sur Drive).
   final List<String> fichiersAbsents;

@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../domain/drive_envoi.dart';
 import '../../domain/drive_sauvegardes.dart';
+import '../../domain/drive_synchro.dart';
 import '../sauvegarde/format_sauvegarde.dart';
 import '../sauvegarde/service_sauvegarde.dart';
 import 'client_drive.dart';
@@ -185,6 +186,9 @@ class ServiceSauvegardeDrive {
   // Une seule opération à la fois (sauvegarde, préparation ou restauration).
   bool _occupe = false;
 
+  /// Une sauvegarde ou une restauration est en cours (une seule opération à la fois).
+  bool get occupe => _occupe;
+
   Directory get _dossierSauvegardes => Directory('${_travail.path}${Platform.pathSeparator}sauvegardes');
   Directory get _dossierRestauration => Directory('${_travail.path}${Platform.pathSeparator}restauration');
 
@@ -266,6 +270,48 @@ class ServiceSauvegardeDrive {
   }
 
   // ---------------------------------------------------------------------------
+  // Reprise d'un appareil à l'autre
+  // ---------------------------------------------------------------------------
+
+  /// Compare cet appareil et Drive, **sans rien modifier** : Drive a-t-il une version plus récente, envoyée d'un autre
+  /// appareil ? cet appareil a-t-il du neuf à envoyer ? (voir `drive_synchro.dart`). Lève une [ErreurDrive] si Drive est
+  /// injoignable.
+  Future<ConstatSynchro> constater() async {
+    final List<SauvegardeDrive> existantes = await listerSauvegardes();
+    final EtatSauvegardesDrive etat = await lireEtat();
+    final String empreinte = await _sauvegarde.empreinteLocale();
+
+    // Un appareil qui a envoyé des sauvegardes avant la synchronisation a gardé la dernière : c'est sa référence, sans
+    // l'empreinte de ses données d'alors (on ne peut pas dire s'il a changé depuis).
+    ReferenceSynchro? reference = etat.reference;
+    final BilanSauvegardeDrive? derniere = etat.derniere;
+    if (reference == null && derniere != null) {
+      reference = ReferenceSynchro(nom: derniere.nom, date: dateDeNomSauvegardeDrive(derniere.nom) ?? derniere.date);
+    }
+
+    final SauvegardeDrive? distante = existantes.firstOrNull;
+    final bool vierge = reference == null && await _sauvegarde.donneesVierges();
+    return constaterSynchro(
+      reference: reference,
+      distante: distante,
+      empreinteLocale: empreinte,
+      donneesVierges: vierge,
+      fichiersEnAttente: etat.fichiersNonEnvoyes.isNotEmpty,
+    );
+  }
+
+  /// La personne garde les données de cet appareil plutôt que de reprendre la version [distante] de Drive : celle-ci reste sur
+  /// Drive (rien n'est supprimé) mais n'est plus proposée ; le prochain envoi ajoutera une version plus récente, celle de
+  /// cet appareil.
+  Future<void> garderCetAppareil(SauvegardeDrive distante) {
+    return _modifierEtat(
+      (EtatSauvegardesDrive etat) => etat.copier(
+        reference: ReferenceSynchro(nom: distante.nom, date: distante.date, empreinteLocale: etat.reference?.empreinteLocale),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
   // Sauvegarder
   // ---------------------------------------------------------------------------
 
@@ -339,9 +385,20 @@ class ServiceSauvegardeDrive {
       bilan = await _envoyerSauvegarde(donnees, dossierId, maintenant, progression);
     }
 
+    // Cet appareil et cette version de Drive sont identiques : c'est la référence de la prochaine comparaison. (L'empreinte est
+    // celle de l'instantané envoyé : ce qui a été saisi pendant l'envoi compte comme du neuf.)
+    final ReferenceSynchro reference = ReferenceSynchro(
+      nom: bilan.nom,
+      date: dateDeNomSauvegardeDrive(bilan.nom) ?? bilan.date,
+      empreinteLocale: donnees.empreinteLocale,
+    );
     await _modifierEtat(
-      (EtatSauvegardesDrive etat) =>
-          etat.copier(derniereVerification: maintenant, derniere: bilan, fichiersNonEnvoyes: nonEnvoyes),
+      (EtatSauvegardesDrive etat) => etat.copier(
+        derniereVerification: maintenant,
+        derniere: bilan,
+        fichiersNonEnvoyes: nonEnvoyes,
+        reference: reference,
+      ),
     );
     return ResultatSauvegardeDrive(
       issue: issue,
@@ -412,7 +469,7 @@ class ServiceSauvegardeDrive {
   }) {
     return _exclusif(() async {
       try {
-        return await _sauvegarde.restaurerDonneesSeules(
+        final ResultatRestauration resultat = await _sauvegarde.restaurerDonneesSeules(
           preparation.archive,
           recuperer: (List<EmpreinteFichier> annonces, Directory Function(String dossier) destination) =>
               _recuperer(annonces, destination, progression),
@@ -425,10 +482,28 @@ class ServiceSauvegardeDrive {
             if (etape != null) progression?.call(ProgressionRestaurationDrive.locale(etape, p.fraction));
           },
         );
+        await _noterReprise(preparation.sauvegarde);
+        return resultat;
       } finally {
         await _viderDossier(_dossierRestauration, recreer: false);
       }
     });
+  }
+
+  /// Après une restauration réussie : les données de cet appareil sont celles de [reprise], qui devient sa référence. Ne fait
+  /// jamais échouer la restauration (sans référence, la prochaine comparaison demandera simplement à la personne de choisir).
+  Future<void> _noterReprise(SauvegardeDrive reprise) async {
+    try {
+      final String empreinte = await _sauvegarde.empreinteLocale();
+      await _modifierEtat(
+        (EtatSauvegardesDrive etat) => etat.copier(
+          reference: ReferenceSynchro(nom: reprise.nom, date: reprise.date, empreinteLocale: empreinte),
+          fichiersNonEnvoyes: const <String>[],
+        ),
+      );
+    } catch (erreur) {
+      debugPrint('Référence de synchronisation non enregistrée après la restauration : $erreur');
+    }
   }
 
   /// La personne renonce : efface le téléchargement préparé.

@@ -71,9 +71,10 @@ pour l'instant** (les données passent par la sauvegarde `.zip`), **dossier `.zi
 fenêtre redimensionnable.
 
 - [x] Version Windows de base : construction GitHub, test de démarrage, `.zip` portable (PR #27, 0.23.0)
-- [x] Google Drive sous Windows : connexion dans le navigateur, accès « application de bureau » (0.24.0, en attente de validation)
-- [ ] Synchroniser téléphone et PC (demandé par Stéphane, choix : **reprise d'un appareil à l'autre + envoi automatique à la fermeture**, un seul
-  appareil actif à la fois, pas de fusion de modifications simultanées) : partie 2, après la connexion Windows
+- [x] Google Drive sous Windows : connexion dans le navigateur, accès « application de bureau » (PR #28 fusionnée, 0.24.0)
+- [x] Synchroniser téléphone et PC (demandé par Stéphane, choix : **reprise d'un appareil à l'autre + envoi automatique à la fermeture**, un seul
+  appareil actif à la fois, pas de fusion de modifications simultanées) : proposition de reprise à l'ouverture, envoi à la fermeture
+  (Windows) et en arrière-plan (Android) (0.25.0, en attente de validation)
 - [ ] Plus tard, par étapes et seulement sur demande : mise en page pour grand écran, photos réduites à l'ajout, installateur ou signature du programme
 
 ## Version 2 : confort et échanges (propositions, non engagées)

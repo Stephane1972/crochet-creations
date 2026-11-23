@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/router/app_routes.dart';
+import '../../domain/drive_sauvegardes.dart';
 import '../clients/client_fiche_screen.dart';
 import '../clients/client_form_screen.dart';
 import '../common/placeholder_screen.dart';
@@ -58,7 +59,9 @@ abstract final class AppRouter {
       case AppRoutes.drive:
         return _page(settings, const DriveScreen());
       case AppRoutes.driveRestauration:
-        return _page(settings, const DriveRestaurationScreen());
+        // Avec une sauvegarde en argument (la proposition de reprise), elle est déjà choisie.
+        final Object? aReprendre = settings.arguments;
+        return _page(settings, DriveRestaurationScreen(aReprendre: aReprendre is SauvegardeDrive ? aReprendre : null));
       case AppRoutes.drivePartages:
         return _page(settings, const DrivePartagesScreen());
       case AppRoutes.drivePartageFichier:

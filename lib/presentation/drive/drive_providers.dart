@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/drive/compte_google.dart';
@@ -7,6 +10,7 @@ import '../../data/drive/service_sauvegarde_drive.dart';
 import '../../data/providers.dart';
 import '../../domain/drive_envoi.dart';
 import '../../domain/drive_sauvegardes.dart';
+import '../../domain/drive_synchro.dart';
 import '../../domain/erreurs.dart';
 
 /// Le compte Google connecté (`null` : personne n'est connecté). Au premier affichage de l'écran Google Drive, retrouve le
@@ -369,22 +373,84 @@ final sauvegardeDriveProvider = NotifierProvider<SauvegardeDriveNotifier, SuiviS
 class SauvegardeDriveNotifier extends Notifier<SuiviSauvegardeDrive> {
   AnnulationEnvoi? _annulation;
 
+  /// Se termine quand la sauvegarde en cours est finie (`null` : aucune).
+  Future<void>? _enCours;
+
   @override
   SuiviSauvegardeDrive build() => const SuiviSauvegardeDrive.repos();
 
   /// « Sauvegarder maintenant sur Drive ».
   Future<void> sauvegarder() => _lancer(automatique: false);
 
-  /// À l'ouverture de l'application : sauvegarde si l'envoi automatique est activé, que Google est connecté et que rien n'est
-  /// passé depuis un jour. Ne fait rien (et ne dit rien) sinon : un échec s'affiche sur l'écran Google Drive, jamais ailleurs.
+  /// À l'ouverture de l'application, si l'envoi automatique est activé et que Google est connecté :
+  /// - si Drive a une version plus récente, envoyée d'un autre appareil, **rien n'est envoyé** : la proposition de la
+  ///   reprendre est signalée (voir [repriseDriveProvider]) ;
+  /// - sinon, sauvegarde si rien n'est passé depuis un jour, ou si cet appareil a du neuf (un envoi manqué à la fermeture).
+  /// Ne fait rien (et ne dit rien) sinon : un échec s'affiche sur l'écran Google Drive, jamais ailleurs.
   Future<void> lancerSiBesoin() async {
     if (state.occupe || ref.read(envoiDriveProvider).occupe) return;
     try {
-      if (!await ref.read(serviceSauvegardeDriveProvider).automatiqueEstDu()) return;
+      final ServiceSauvegardeDrive service = ref.read(serviceSauvegardeDriveProvider);
+      if (!(await service.lireEtat()).envoiAutomatique) return;
       if (await ref.read(compteGoogleProvider).restaurer() == null) return;
+      final bool jourPasse = await service.automatiqueEstDu();
+      ConstatSynchro? constat;
+      try {
+        constat = await service.constater();
+      } on ErreurDrive {
+        // Drive injoignable : l'envoi ci-dessous le dira (et sera retenté à la prochaine ouverture).
+        constat = null;
+      }
+      if (constat != null && constat.demandeUneDecision) {
+        ref.read(repriseDriveProvider.notifier).signaler(constat);
+        return;
+      }
+      if (!jourPasse && constat?.situation != SituationSynchro.aEnvoyer) return;
     } catch (_) {
       return;
     }
+    await _lancer(automatique: true);
+  }
+
+  /// En quittant l'application (Windows) : envoie ce qui a changé ici. Ne lève jamais d'erreur (la fenêtre doit pouvoir se
+  /// fermer) ; un envoi raté est retenté à la prochaine ouverture.
+  Future<void> envoyerEnQuittant() async {
+    try {
+      await _enCours; // un envoi déjà en route finit d'abord
+      await _envoyerSiNecessaire();
+    } catch (erreur) {
+      debugPrint('Envoi en quittant impossible : $erreur');
+    }
+  }
+
+  /// En passant l'application en arrière-plan (Android) : même chose, sans rien montrer.
+  Future<void> envoyerEnArrierePlan() async {
+    if (state.occupe) return;
+    try {
+      await _envoyerSiNecessaire();
+    } catch (erreur) {
+      debugPrint('Envoi en arrière-plan impossible : $erreur');
+    }
+  }
+
+  /// Envoie ce qui a changé ici si l'envoi automatique est activé, que Google est connecté et qu'**aucune version plus
+  /// récente n'attend une décision** (Drive est revérifié juste avant : jamais d'écrasement en silence).
+  Future<void> _envoyerSiNecessaire() async {
+    final ServiceSauvegardeDrive service = ref.read(serviceSauvegardeDriveProvider);
+    if (service.occupe || ref.read(envoiDriveProvider).occupe) return;
+    if (!(await service.lireEtat()).envoiAutomatique) return;
+    if (await ref.read(compteGoogleProvider).restaurer() == null) return;
+    final ConstatSynchro constat;
+    try {
+      constat = await service.constater();
+    } on ErreurDrive {
+      return; // Drive injoignable : à la prochaine ouverture
+    }
+    if (constat.demandeUneDecision) {
+      ref.read(repriseDriveProvider.notifier).signaler(constat);
+      return;
+    }
+    if (constat.situation != SituationSynchro.aEnvoyer) return;
     await _lancer(automatique: true);
   }
 
@@ -392,6 +458,8 @@ class SauvegardeDriveNotifier extends Notifier<SuiviSauvegardeDrive> {
     if (state.occupe || ref.read(envoiDriveProvider).occupe) return;
     final AnnulationEnvoi annulation = AnnulationEnvoi();
     _annulation = annulation;
+    final Completer<void> fin = Completer<void>();
+    _enCours = fin.future;
     state = SuiviSauvegardeDrive.enCours(const ProgressionSauvegardeDrive.preparation(), automatique: automatique);
 
     // La progression arrive à chaque morceau envoyé : on ne rafraîchit l'écran que s'il y a du nouveau (autre étape, autre
@@ -422,6 +490,8 @@ class SauvegardeDriveNotifier extends Notifier<SuiviSauvegardeDrive> {
       ref.invalidate(etatSauvegardesDriveProvider);
       ref.invalidate(dernierBilanDriveProvider);
       ref.invalidate(sauvegardesDriveProvider);
+      // Cet appareil et Drive sont alignés : une proposition de reprise en attente n'a plus lieu d'être.
+      if (resultat.issue != IssueSauvegardeDrive.interrompue) ref.invalidate(repriseDriveProvider);
       if (resultat.arret?.autorisationAExpire ?? false) ref.read(profilGoogleProvider.notifier).connexionPerdue();
     } on ErreurDrive catch (erreur) {
       state = SuiviSauvegardeDrive.enErreur(
@@ -436,6 +506,8 @@ class SauvegardeDriveNotifier extends Notifier<SuiviSauvegardeDrive> {
       state = SuiviSauvegardeDrive.enErreur('Sauvegarde impossible : $erreur', automatique: automatique);
     } finally {
       _annulation = null;
+      _enCours = null;
+      fin.complete();
     }
   }
 
@@ -453,5 +525,35 @@ class SauvegardeDriveNotifier extends Notifier<SuiviSauvegardeDrive> {
   /// Revient à « rien en cours » (après une déconnexion, par exemple). Sans effet pendant une sauvegarde.
   void reinitialiser() {
     if (!state.occupe) state = const SuiviSauvegardeDrive.repos();
+  }
+}
+
+/// Drive a une version plus récente, envoyée d'un autre appareil, et la personne doit décider : la reprendre ici, ou garder
+/// cet appareil (voir `drive_synchro.dart`). `null` : aucune proposition en attente.
+final repriseDriveProvider = NotifierProvider<RepriseDriveNotifier, ConstatSynchro?>(RepriseDriveNotifier.new);
+
+class RepriseDriveNotifier extends Notifier<ConstatSynchro?> {
+  /// La proposition a déjà été montrée (une fenêtre) depuis l'ouverture de l'application : on ne la remontre pas à chaque
+  /// écran ; elle reste visible sur l'écran Google Drive tant qu'elle n'est pas réglée.
+  bool dejaProposee = false;
+
+  @override
+  ConstatSynchro? build() => null;
+
+  /// Une version plus récente attend une décision.
+  void signaler(ConstatSynchro constat) {
+    if (!constat.demandeUneDecision) return;
+    // Une version encore plus récente que celle déjà proposée : on la propose de nouveau.
+    if (state?.distante?.nom != constat.distante?.nom) dejaProposee = false;
+    state = constat;
+  }
+
+  /// « Garder cet appareil » : la version de Drive reste sur Drive, mais n'est plus proposée.
+  Future<void> garderCetAppareil() async {
+    final SauvegardeDrive? distante = state?.distante;
+    if (distante == null) return;
+    await ref.read(serviceSauvegardeDriveProvider).garderCetAppareil(distante);
+    state = null;
+    ref.invalidate(etatSauvegardesDriveProvider);
   }
 }

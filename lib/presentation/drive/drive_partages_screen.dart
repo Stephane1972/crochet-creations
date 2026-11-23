@@ -52,7 +52,7 @@ class _DrivePartagesScreenState extends ConsumerState<DrivePartagesScreen> {
       final String manquantes = catalogue.photosManquantes.isEmpty
           ? ''
           : ' ${_pluriel(catalogue.photosManquantes.length, 'photo')} introuvable${catalogue.photosManquantes.length > 1 ? 's' : ''} '
-                'sur le téléphone (voir LISEZMOI.txt dans l’archive).';
+                'sur cet appareil (voir LISEZMOI.txt dans l’archive).';
       resultat =
           '${remplace ? 'Catalogue mis à jour' : 'Catalogue envoyé'} sur Drive, dans le dossier « $nomDossierExportsDrive » : '
           '${catalogue.fichier.uri.pathSegments.last} (${_pluriel(catalogue.produits, 'produit')}, '

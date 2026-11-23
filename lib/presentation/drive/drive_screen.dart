@@ -14,6 +14,7 @@ import '../../domain/id_client_google.dart';
 import '../../domain/pieces_jointes.dart';
 import 'drive_providers.dart';
 import 'drive_widgets.dart';
+import 'reprise_drive.dart';
 
 /// Réglages › Google Drive : se connecter à Google (étape 6), vérifier ce qui est déjà sur Drive, envoyer à la demande les
 /// photos des produits, les factures, les devis et les pièces jointes des notes, et voir le bilan du dernier envoi ; sauvegarder
@@ -36,6 +37,7 @@ class DriveScreen extends ConsumerWidget {
           const _CarteConnexion(),
           if (!connecte) ...<Widget>[const SizedBox(height: 12), const _CarteClientWeb()],
           if (connecte) ...<Widget>[
+            const CarteRepriseDrive(),
             const SizedBox(height: 12),
             const _CarteEnvoi(),
             const SizedBox(height: 12),
@@ -642,10 +644,12 @@ class _CarteSauvegardes extends ConsumerWidget {
       SwitchListTile(
         key: const Key('drive-auto-interrupteur'),
         contentPadding: EdgeInsets.zero,
-        title: const Text('Envoi automatique'),
+        title: const Text('Envoi automatique et reprise entre appareils'),
         subtitle: const Text(
-          'À l’ouverture de l’application, au plus une fois par jour, seulement si quelque chose a changé. Rien ne tourne '
-          'en arrière-plan.',
+          'À l’ouverture de l’application, seulement si quelque chose a changé (au plus une vérification par jour sinon) ; '
+          'à la fermeture sous Windows, et quand l’application passe en arrière-plan sur Android (au plus toutes les 10 '
+          'minutes). Si une version plus récente a été envoyée depuis un autre appareil, elle vous est proposée : rien n’est '
+          'envoyé tant que vous n’avez pas choisi.',
         ),
         value: reglages?.envoiAutomatique ?? false,
         onChanged: occupe || reglages == null

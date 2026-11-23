@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../clients/clients_screen.dart';
+import '../drive/reprise_drive.dart';
 import '../home/home_screen.dart';
 import '../more/more_screen.dart';
 import '../produits/produits_screen.dart';
@@ -48,28 +49,30 @@ class MainShell extends ConsumerWidget {
     final int index = ref.watch(navIndexProvider);
 
     // Le bouton « retour » d'Android ramène d'abord à l'accueil avant de quitter l'application.
-    return PopScope(
-      canPop: index == OngletsNav.accueil,
-      onPopInvokedWithResult: (bool didPop, Object? result) {
-        if (!didPop) {
-          ref.read(navIndexProvider.notifier).aller(OngletsNav.accueil);
-        }
-      },
-      child: Scaffold(
-        body: IndexedStack(
-          index: index,
-          children: const <Widget>[
-            HomeScreen(),
-            ProduitsScreen(),
-            VenteScreen(),
-            ClientsScreen(),
-            MoreScreen(),
-          ],
-        ),
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: index,
-          onDestinationSelected: (int i) => ref.read(navIndexProvider.notifier).aller(i),
-          destinations: _destinations,
+    return SynchroDriveObservateur(
+      child: PopScope(
+        canPop: index == OngletsNav.accueil,
+        onPopInvokedWithResult: (bool didPop, Object? result) {
+          if (!didPop) {
+            ref.read(navIndexProvider.notifier).aller(OngletsNav.accueil);
+          }
+        },
+        child: Scaffold(
+          body: IndexedStack(
+            index: index,
+            children: const <Widget>[
+              HomeScreen(),
+              ProduitsScreen(),
+              VenteScreen(),
+              ClientsScreen(),
+              MoreScreen(),
+            ],
+          ),
+          bottomNavigationBar: NavigationBar(
+            selectedIndex: index,
+            onDestinationSelected: (int i) => ref.read(navIndexProvider.notifier).aller(i),
+            destinations: _destinations,
+          ),
         ),
       ),
     );

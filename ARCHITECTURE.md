@@ -69,6 +69,7 @@ crochet-creations/
 │   │   ├── document_devis.dart               DocumentDevis : tout ce qui s'imprime sur un devis (réutilise les lignes et parties de la facture)
 │   │   ├── drive_envoi.dart                  envoi vers Drive, sans réseau : dossiers, comparaison téléphone / Drive (planifierEnvoi), bilan d'un envoi
 │   │   ├── drive_sauvegardes.dart            sauvegardes sur Drive, sans réseau : noms datés, liste, état gardé (envoi automatique, dernière sauvegarde), envoiAutomatiqueDu
+│   │   ├── drive_synchro.dart                reprise d'un appareil à l'autre, sans réseau : constaterSynchro (à jour / à envoyer / à reprendre / à choisir), délai de l'envoi en arrière-plan
 │   │   ├── drive_partage.dart                partage sur Drive, sans réseau : rubriques partageables, accès d'un fichier, règles de l'adresse e-mail
 │   │   ├── catalogue_export.dart             archive « catalogue » sans réseau : produits sans coûts ni stocks, CSV, JSON, chemins des photos, LISEZMOI
 │   │   └── calculs/
@@ -157,6 +158,7 @@ crochet-creations/
 │       ├── drive/                            Google Drive (voir « Google Drive »)
 │       │   ├── drive_screen.dart             écran Réglages › Google Drive : connexion, vérifier / envoyer, sauvegarder mes données, bilan du dernier envoi
 │       │   ├── drive_restauration_screen.dart écran Restaurer depuis Drive : liste, confirmation, progression, compte rendu
+│       │   ├── reprise_drive.dart            reprise entre appareils : fenêtre de proposition, carte sur l'écran Drive, envoi en arrière-plan (Android) et à la fermeture (Windows)
 │       │   ├── drive_partages_screen.dart    écran Partages : catalogue sur Drive, factures / devis / exports avec « Partagé » ou « Privé »
 │       │   ├── drive_partage_fichier_screen.dart écran d'un fichier : qui a accès, partager avec une personne, lien public (confirmations)
 │       │   ├── drive_widgets.dart            carte et textes communs aux écrans Google Drive
@@ -1221,6 +1223,57 @@ confirmations** (`confirmer`) : activer le lien public (le texte explique ce qu'
 retirer un accès. Une autorisation expirée remet le compte à « non connecté » (`connexionPerdue`). Les éléments portent des `Key` (`drive-partages`,
 `partages-envoyer-catalogue`, `partages-catalogue-resultat`, `partages-fichier-<nom>`, `partages-etat-<nom>`, `partage-courriel`, `partage-partager`,
 `partage-retirer-$i`, `partage-activer-lien`, `partage-arreter-lien`, `partage-copier-lien`, `partage-resume`, `partage-info`, `partage-erreur`…) pour les tests.
+
+### Partie 4 (0.25.0) : reprise d'un appareil à l'autre (téléphone et PC)
+
+Demande de Stéphane : retrouver les mêmes données sur Android et sur Windows. Choix : **un seul appareil actif à la fois**, envoi
+automatique en quittant, **proposition de reprise** à l'ouverture de l'autre, **jamais d'écrasement silencieux**, **pas de fusion**. Aucun
+changement de schéma (6) ni de format de sauvegarde : on réutilise les sauvegardes « données seules » de la partie 2 (leur nom date
+l'envoi, `nomSauvegardeDrive`).
+
+**Savoir s'il y a du neuf, sans réseau** : `ServiceSauvegarde.empreinteLocale()` = SHA-256 de `jsonEncode(tables)` (toutes les tables de
+`FormatSauvegarde.tables`, triées par `id`) ; **les fichiers n'y entrent pas** (chacun est cité par une ligne des tables, et un PDF refait ne
+doit pas passer pour une modification). `ServiceSauvegarde.donneesVierges()` dit si rien n'est saisi (hors catégories, lieux, profil et
+numérotation que la base crée au départ). Chaque appareil retient une **`ReferenceSynchro`** (`nom`, `date`, `empreinteLocale?`) dans son
+fichier d'état (`EtatSauvegardesDrive.reference`, lu avec tolérance : un ancien fichier donne `null`) :
+- après `sauvegarder()` (issue `faite` **ou** `dejaAJour`) : la sauvegarde de Drive la plus récente, avec l'empreinte de l'instantané envoyé
+  (ce qui est saisi pendant l'envoi compte comme du neuf) ;
+- après `restaurer()` (`_noterReprise`, qui ne fait jamais échouer la restauration) : la sauvegarde reprise, avec l'empreinte des données
+  obtenues, et la liste `fichiersNonEnvoyes` vidée ;
+- **migration** : un appareil qui n'a que l'ancien champ `derniere` en tire une référence **sans empreinte** (on ne sait pas s'il a changé).
+
+**`constaterSynchro`** (`domain/drive_synchro.dart`, pure) compare la référence, la sauvegarde la plus récente de Drive (`distante`) et
+l'empreinte du moment : une version est **plus récente** si elle n'a pas le nom de la référence **et** est plus récente qu'elle (une référence
+disparue de Drive, qui ne laisse que des sauvegardes plus anciennes, n'est pas une nouveauté). Alors :
+`aReprendre` si l'appareil n'a pas changé (`modifieIci == false`) ou si c'est une installation vierge jamais synchronisée ; `aChoisir` sinon
+(y compris quand on **ne peut pas savoir**, `modifieIci == null` : rien n'est écrasé en silence). Sinon : `aEnvoyer` s'il y a du neuf (ou un
+doute, ou des fichiers restés en attente), `aJour` sinon. `ServiceSauvegardeDrive.constater()` rassemble les trois informations (une
+lecture du dossier Sauvegardes, l'état, l'empreinte) **sans rien modifier**, et lève `ErreurDrive` si Drive est injoignable.
+`garderCetAppareil(distante)` fixe la référence sur la version de Drive en gardant l'ancienne empreinte : la version de Drive n'est plus
+proposée, l'appareil a du neuf (`aEnvoyer`), et **rien n'est supprimé sur Drive** (le prochain envoi ajoute une version plus récente).
+
+**Quand ça se déclenche** (`SauvegardeDriveNotifier` et `SynchroDriveObservateur`, tous deux soumis à : envoi automatique actif, Google connecté,
+aucune autre opération Drive en cours) :
+- **ouverture** (`lancerSiBesoin`, appelé par `main.dart`) : `constater()` ; si une décision est due → `repriseDriveProvider.signaler` et on
+  s'arrête (rien n'est envoyé) ; sinon envoi si le jour est passé **ou** si la situation est `aEnvoyer` (un envoi manqué la veille) ;
+  Drive injoignable → on laisse l'envoi dire l'erreur comme avant ;
+- **fermeture sous Windows** : `AppLifecycleListener.onExitRequested` → `demandeDeSortie()` → `envoyerEnQuittant()` (attend un envoi déjà en
+  route, puis envoie si `aEnvoyer`). Au-delà de 700 ms (un `Timer` annulé s'il finit avant), une fenêtre montre l'étape en cours avec **« Fermer
+  sans attendre »**. La réponse est **toujours `AppExitResponse.exit`** : la fenêtre ne doit jamais rester bloquée ;
+- **arrière-plan sous Android** : `onPause` → `envoyerEnArrierePlan()`, espacé de 10 minutes (`envoiEnArrierePlanPermis`,
+  `delaiEntreEnvoisEnArrierePlan`). Un échec reste silencieux : l'ouverture suivante détecte le « du neuf » par l'empreinte et réessaie.
+- **Garde** : une version plus récente en attente de décision **bloque tous les envois automatiques** (`_envoyerSiNecessaire` s'arrête sur
+  `demandeUneDecision`). Le bouton manuel *Sauvegarder maintenant* n'est volontairement pas bloqué (limite documentée).
+
+**Écrans** (`presentation/drive/reprise_drive.dart`) : `proposerReprise` (fenêtre « Reprendre la version de Drive ? » ou « Deux versions
+différentes » ; *Plus tard* ne change rien ; *Reprendre* ouvre `DriveRestaurationScreen(aReprendre: …)`, qui télécharge, résume et demande
+confirmation comme pour un choix dans la liste ; *Garder cet appareil* n'existe que dans le cas « à choisir ») et `CarteRepriseDrive` (en tête
+de l'écran Google Drive tant que la proposition n'est pas réglée). `SynchroDriveObservateur` entoure `MainShell`, montre la fenêtre **une fois**
+par proposition (un `ensureVisualUpdate` garantit qu'un écran au repos la dessine) et porte les deux écoutes du cycle de vie.
+
+**Tests** : `test/domain/drive_synchro_test.dart` (règles), `test/data/synchro_drive_test.dart` (deux appareils simulés sur un même faux Drive :
+envoi, reprise, deux changements, « garder cet appareil », migration, empreinte), `test/presentation/synchro_drive_ecrans_test.dart`
+(proposition, carte, garde, arrière-plan Android, fermeture Windows et « Fermer sans attendre »).
 
 ## Dossier `android/`
 

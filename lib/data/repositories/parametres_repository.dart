@@ -3,6 +3,7 @@ import 'package:flutter/material.dart' show ThemeMode;
 
 import '../../core/theme/theme_mode_provider.dart';
 import '../../core/utils/texte.dart';
+import '../../domain/agenda.dart';
 import '../../domain/enums.dart';
 import '../../domain/erreurs.dart';
 import '../../domain/regles_client.dart';
@@ -121,6 +122,24 @@ class ParametresRepository implements ModeThemeStore {
       changements.copyWith(modifieLe: Value(DateTime.now())),
     );
   }
+
+  /// Ce que montre le calendrier (tout, tant que rien n'a été masqué).
+  static FiltresAgenda filtresAgendaDe(Entreprise e) => FiltresAgenda(
+    cours: e.agendaCours,
+    devis: e.agendaDevis,
+    declaration: e.agendaDeclaration,
+    evenements: e.agendaEvenements,
+  );
+
+  /// Mémorise les types d'entrées que montre le calendrier.
+  Future<void> enregistrerFiltresAgenda(FiltresAgenda filtres) => modifier(
+    ParametresEntrepriseCompanion(
+      agendaCours: Value(filtres.cours),
+      agendaDevis: Value(filtres.devis),
+      agendaDeclaration: Value(filtres.declaration),
+      agendaEvenements: Value(filtres.evenements),
+    ),
+  );
 
   /// Mode d'affichage mémorisé (automatique tant que rien n'a été choisi).
   Future<ThemeMode> lireModeTheme() async => _versThemeMode((await lire()).modeTheme);

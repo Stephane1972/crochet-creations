@@ -1,4 +1,4 @@
-/// Schéma de la base de données (SQLite, via Drift) : 20 tables.
+/// Schéma de la base de données (SQLite, via Drift) : 21 tables.
 ///
 /// Conventions (détail dans ARCHITECTURE.md) :
 /// - **Montants** : nombres entiers de centimes (`1250` = 12,50 €). Jamais de décimaux.
@@ -74,6 +74,12 @@ class ParametresEntreprise extends Table with Tracabilite {
 
   /// Mode jour / nuit / automatique choisi dans les réglages.
   TextColumn get modeTheme => textEnum<ModeTheme>().withDefault(const Constant('systeme'))();
+
+  /// Ce que montre le calendrier (schéma 7) : chaque type d'entrée peut être masqué. Tout est affiché au départ.
+  BoolColumn get agendaCours => boolean().withDefault(const Constant(true))();
+  BoolColumn get agendaDevis => boolean().withDefault(const Constant(true))();
+  BoolColumn get agendaDeclaration => boolean().withDefault(const Constant(true))();
+  BoolColumn get agendaEvenements => boolean().withDefault(const Constant(true))();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -698,5 +704,38 @@ class PiecesJointesNote extends Table {
     'CHECK (length(trim(nom_affiche)) > 0)',
     "CHECK (type_fichier IN ('photo', 'video', 'document'))",
     'CHECK (octets >= 0)',
+  ];
+}
+
+// -----------------------------------------------------------------------------
+// Calendrier
+// -----------------------------------------------------------------------------
+
+/// Un événement ajouté par l'utilisatrice dans le calendrier (un marché, un rendez-vous, une échéance à elle).
+///
+/// Les cours, les devis et les jours de déclaration du calendrier ne sont **pas** ici : ils viennent de leurs propres
+/// tables. Un événement « toute la journée » est enregistré à minuit, sans heure de fin.
+@DataClassName('EvenementAgenda')
+@TableIndex(name: 'idx_evenements_agenda_debut_le', columns: {#debutLe})
+class EvenementsAgenda extends Table with Tracabilite {
+  IntColumn get id => integer().autoIncrement()();
+
+  TextColumn get titre => text().withLength(min: 1, max: 120)();
+
+  /// Précisions facultatives (lieu, matériel à prévoir...).
+  TextColumn get notes => text().withDefault(const Constant(''))();
+
+  /// Début : minuit du jour pour un événement « toute la journée ».
+  DateTimeColumn get debutLe => dateTime()();
+
+  /// Heure de fin, le même jour ; vide = pas d'heure de fin.
+  DateTimeColumn get finLe => dateTime().nullable()();
+
+  BoolColumn get journeeEntiere => boolean().withDefault(const Constant(true))();
+
+  @override
+  List<String> get customConstraints => [
+    'CHECK (length(trim(titre)) > 0)',
+    'CHECK (fin_le IS NULL OR fin_le >= debut_le)',
   ];
 }

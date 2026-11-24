@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../core/router/app_routes.dart';
 import '../../domain/drive_sauvegardes.dart';
+import '../agenda/agenda_screen.dart';
+import '../agenda/evenement_form_screen.dart';
 import '../clients/client_fiche_screen.dart';
 import '../clients/client_form_screen.dart';
 import '../common/placeholder_screen.dart';
@@ -84,6 +86,16 @@ abstract final class AppRouter {
         return _page(
           settings,
           idNote == null ? const _PageIntrouvable() : NoteFormScreen(noteId: idNote),
+        );
+      case AppRoutes.agenda:
+        return _page(settings, const AgendaScreen());
+      case AppRoutes.agendaEvenement:
+        final Object? argumentsEvenement = settings.arguments;
+        return _page(
+          settings,
+          argumentsEvenement is ArgumentsEvenement
+              ? EvenementFormScreen(evenementId: argumentsEvenement.evenementId, jour: argumentsEvenement.jour)
+              : const _PageIntrouvable(),
         );
       case AppRoutes.factures:
         return _page(settings, const FacturesScreen());

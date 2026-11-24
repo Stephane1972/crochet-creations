@@ -1,7 +1,7 @@
 name: crochet_creations
 description: "Un p’tit crochet dans les stocks : stock, ventes, factures, devis et cours pour une créatrice auto-entrepreneuse."
 publish_to: "none"
-version: 0.25.0+30
+version: 0.26.0+31
 
 environment:
   # Drift 2.35 demande Dart 3.10 (Flutter 3.38 ou plus récent, canal « stable »).
@@ -46,6 +46,9 @@ dependencies:
   google_sign_in: ^7.2.0
   googleapis: ^19.0.0
   http: ^1.6.0
+
+  # Calendrier : ouvrir Google Agenda dans le navigateur (Android ; sous Windows, l'application utilise celui du système).
+  url_launcher: ^6.3.2
 
   # Les dépendances des étapes suivantes seront ajoutées au fur et à mesure,
   # pour ne pas alourdir l'application avant d'en avoir besoin.

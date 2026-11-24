@@ -280,6 +280,38 @@ Deux choses : **donner le catalogue** à quelqu'un, et **partager un fichier de 
   `drive.file` (seuls les fichiers créés par l'application ; le reste de votre Drive reste invisible pour elle).
 - Aucun changement de la base (schéma 6) ni de la sauvegarde ; aucune nouvelle dépendance.
 
+### Accueil et calendrier (demande de novembre 2026, étape 1 sur 3 — version 0.26.0)
+
+Première des trois étapes demandées par Stéphane (accueil + calendrier, puis rappel de déclaration, puis synchronisation avec Google Agenda), sur
+**Android et Windows** (mêmes écrans).
+
+- **Accueil** : une troisième rangée de tuiles, **Bloc-notes** et **Calendrier**. Le bloc-notes reste aussi dans *Plus*, qui contient maintenant
+  *Calendrier*.
+- **Calendrier** : la grille du mois (lundi à dimanche), un point de couleur par type d'entrée, les boutons *Mois précédent*, *Mois suivant* et
+  *Aujourd'hui*. Toucher un jour affiche, sous la grille, ce qui est prévu ce jour-là.
+- **Ce qu'il montre** (chaque type s'affiche ou se masque avec les filtres **Cours**, **Devis**, **Déclaration**, **Mes événements** ; le choix est
+  gardé dans les réglages, donc aussi dans la sauvegarde et la reprise entre appareils) :
+  - les **cours** : jour, heure, durée et lieu (pas les cours annulés ni archivés) ;
+  - la **fin de validité des devis** encore ouverts (brouillon ou envoyé, pas encore expirés), avec le nom du client ;
+  - la **déclaration des recettes**, le **dernier jour de chaque mois** ;
+  - **vos événements**.
+- **Vos événements** : bouton **Nouvel événement** (titre, jour, *Toute la journée* ou heure de début et de fin, précisions). Toucher un événement
+  le modifie ; il se supprime après confirmation. Toucher un cours ou un devis ouvre sa fiche (ils se modifient là) ; la déclaration n'a pas de fiche.
+- **Google Agenda** : **Ouvrir Google Agenda** ouvre le mois dans le navigateur ; l'icône **Ajouter à Google Agenda** d'une entrée ouvre Google
+  Agenda avec l'événement **déjà rempli** — il reste à cliquer sur *Enregistrer* dans Google Agenda ; la déclaration est proposée **chaque mois,
+  le dernier jour**. Rien n'est créé sans votre clic. Si plusieurs comptes Google sont connectés au navigateur (Google Workspace et personnel),
+  Google utilise le compte actif.
+- Le schéma de la base passe en **version 7** (table `evenements_agenda` et quatre réglages d'affichage, migration automatique). La
+  **sauvegarde** emporte les événements (21 tables) ; une ancienne sauvegarde se restaure normalement (calendrier vide, tout affiché).
+
+**Limites** (à connaître) :
+
+- Le calendrier **n'est pas encore synchronisé** avec Google Agenda (étape 3) et il n'y a **pas encore de notification** (étape 2).
+- Les événements sont ponctuels : un seul jour, pas de répétition.
+- Sous Windows, la fenêtre garde la largeur « téléphone » (la mise en page pour grand écran viendra seulement sur demande).
+- Cette étape a été écrite sans pouvoir lancer Flutter sur place : l'analyse et les tests automatiques tournent sur GitHub ; le vrai essai
+  (téléphone et PC) reste à faire.
+
 ### Ce que contient l'étape 11 : sauvegarde et export
 
 - **Écran « Sauvegarde et export »** (écran 23, *Plus → Réglages → Sauvegarde et export*) : sauvegarder, partager, restaurer

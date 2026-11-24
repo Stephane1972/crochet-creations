@@ -1292,6 +1292,80 @@ void main() {
       avant.remove('pieces_jointes_note');
       expect(apres, avant);
     });
+
+    test('les événements du calendrier et les réglages d’affichage font l’aller-retour d’un téléphone à l’autre', () async {
+      await remplirBase(banc.db);
+      await banc.ecrireFichiers();
+      await banc.db
+          .into(banc.db.evenementsAgenda)
+          .insert(
+            EvenementsAgendaCompanion.insert(
+              titre: 'Marché de Noël',
+              debutLe: DateTime(2026, 12, 12, 9),
+              finLe: Value(DateTime(2026, 12, 12, 18)),
+              journeeEntiere: const Value(false),
+              notes: const Value('Prévoir la table et la nappe'),
+            ),
+          );
+      await (banc.db.update(banc.db.parametresEntreprise)..where((t) => t.id.equals(1))).write(
+        const ParametresEntrepriseCompanion(agendaDevis: Value(false), agendaDeclaration: Value(false)),
+      );
+
+      final Uint8List octets = await banc.octetsArchive();
+      final Map<String, List<Map<String, Object?>>> avant = await instantane(banc.db);
+      expect(avant['evenements_agenda'], hasLength(1));
+
+      final _Banc autre = await _Banc.creer();
+      addTearDown(autre.fermer);
+      await autre.restaurer(octets);
+
+      expect(await instantane(autre.db), avant);
+      final EvenementAgenda evenement = (await autre.db.select(autre.db.evenementsAgenda).get()).single;
+      expect(evenement.titre, 'Marché de Noël');
+      expect(evenement.journeeEntiere, isFalse);
+      expect(evenement.finLe, DateTime(2026, 12, 12, 18));
+      final Entreprise reglages = await autre.db.select(autre.db.parametresEntreprise).getSingle();
+      expect(reglages.agendaCours, isTrue);
+      expect(reglages.agendaDevis, isFalse);
+      expect(reglages.agendaDeclaration, isFalse);
+      expect(reglages.agendaEvenements, isTrue);
+    });
+
+    test('une sauvegarde faite avant le calendrier (schéma 6) est restaurée : aucun événement, tout est affiché', () async {
+      await remplirBase(banc.db);
+      await banc.ecrireFichiers();
+      final Uint8List actuelle = await banc.octetsArchive();
+      final Map<String, List<Map<String, Object?>>> avant = await instantane(banc.db);
+
+      // L'archive d'avant : ni la table des événements, ni les quatre colonnes d'affichage des réglages.
+      final Uint8List ancienne = _modifierDonnees(actuelle, (Map<String, dynamic> d) {
+        (d['manifeste'] as Map<String, dynamic>)['versionSchema'] = 6;
+        final Map<String, dynamic> tables = d['tables'] as Map<String, dynamic>;
+        tables.remove('evenements_agenda');
+        for (final Object? ligne in tables['parametres_entreprise'] as List<dynamic>) {
+          for (final String colonne in <String>['agenda_cours', 'agenda_devis', 'agenda_declaration', 'agenda_evenements']) {
+            (ligne as Map<String, dynamic>).remove(colonne);
+          }
+        }
+      });
+
+      // L'appareil, lui, a déjà un événement et un affichage modifié : la restauration remplace tout.
+      await banc.db
+          .into(banc.db.evenementsAgenda)
+          .insert(EvenementsAgendaCompanion.insert(titre: 'À remplacer', debutLe: DateTime(2026, 11, 20)));
+      await (banc.db.update(banc.db.parametresEntreprise)..where((t) => t.id.equals(1))).write(
+        const ParametresEntrepriseCompanion(agendaCours: Value(false)),
+      );
+      await banc.restaurer(ancienne);
+
+      expect(await banc.db.select(banc.db.evenementsAgenda).get(), isEmpty);
+      final Entreprise reglages = await banc.db.select(banc.db.parametresEntreprise).getSingle();
+      expect(reglages.agendaCours, isTrue);
+      expect(reglages.agendaDevis, isTrue);
+      expect(reglages.agendaDeclaration, isTrue);
+      expect(reglages.agendaEvenements, isTrue);
+      expect(await instantane(banc.db), avant);
+    });
   });
 
   group('export JSON', () {

@@ -132,6 +132,19 @@ class _ActionsRapides extends ConsumerWidget {
             onTap: () => ouvrir(AppRoutes.clientNouveau),
           ),
         ),
+        const SizedBox(height: 12),
+        _RangeeDeuxCartes(
+          gauche: _ActionTuile(
+            icone: Icons.sticky_note_2_outlined,
+            libelle: 'Bloc-notes',
+            onTap: () => ouvrir(AppRoutes.notes),
+          ),
+          droite: _ActionTuile(
+            icone: Icons.calendar_month_outlined,
+            libelle: 'Calendrier',
+            onTap: () => ouvrir(AppRoutes.agenda),
+          ),
+        ),
       ],
     );
   }

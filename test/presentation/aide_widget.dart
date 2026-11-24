@@ -10,6 +10,7 @@ import 'package:crochet_creations/data/drive/service_drive.dart';
 import 'package:crochet_creations/data/drive/service_partages_drive.dart';
 import 'package:crochet_creations/data/drive/service_sauvegarde_drive.dart';
 import 'package:crochet_creations/data/providers.dart';
+import 'package:crochet_creations/data/repositories/agenda_repository.dart';
 import 'package:crochet_creations/data/repositories/categorie_note_repository.dart';
 import 'package:crochet_creations/data/repositories/categorie_repository.dart';
 import 'package:crochet_creations/data/repositories/client_repository.dart';
@@ -24,6 +25,7 @@ import 'package:crochet_creations/data/repositories/numerotation_repository.dart
 import 'package:crochet_creations/data/repositories/parametres_repository.dart';
 import 'package:crochet_creations/data/repositories/produit_repository.dart';
 import 'package:crochet_creations/data/repositories/vente_repository.dart';
+import 'package:crochet_creations/data/partage/ouvreur_adresse.dart';
 import 'package:crochet_creations/data/partage/service_documents.dart';
 import 'package:crochet_creations/data/partage/service_partage_fichiers.dart';
 import 'package:crochet_creations/data/sauvegarde/selecteur_fichier.dart';
@@ -99,6 +101,18 @@ class FauxOuvreurPieceJointe implements OuvreurPieceJointe {
   Future<ResultatOuverture> ouvrir(File fichier) async {
     ouverts.add(fichier.uri.pathSegments.last);
     return resultat;
+  }
+}
+
+/// Faux navigateur : note les adresses qu'on a demandé d'ouvrir (Google Agenda), et répond [reussit].
+class FauxOuvreurAdresse implements OuvreurAdresse {
+  bool reussit = true;
+  final List<Uri> ouvertes = <Uri>[];
+
+  @override
+  Future<bool> ouvrir(Uri adresse) async {
+    ouvertes.add(adresse);
+    return reussit;
   }
 }
 
@@ -237,6 +251,8 @@ class EnvironnementTest {
   final FauxSelecteurFichier selecteurFichier = FauxSelecteurFichier();
   final FauxSelecteurPieceJointe selecteurPieceJointe = FauxSelecteurPieceJointe();
   final FauxOuvreurPieceJointe ouvreurPieceJointe = FauxOuvreurPieceJointe();
+  final FauxOuvreurAdresse ouvreurAdresse = FauxOuvreurAdresse();
+  late final AgendaRepository agenda = AgendaRepository(db);
   /// Faux compte Google et faux Drive : aucun réseau, aucune fenêtre de connexion.
   FauxCompteGoogle compteGoogle = FauxCompteGoogle();
   final FauxClientDrive clientDrive = FauxClientDrive();
@@ -316,6 +332,7 @@ class EnvironnementTest {
     stockagePiecesJointesProvider.overrideWithValue(stockagePiecesJointes),
     selecteurPieceJointeProvider.overrideWithValue(selecteurPieceJointe),
     ouvreurPieceJointeProvider.overrideWithValue(ouvreurPieceJointe),
+    ouvreurAdresseProvider.overrideWithValue(ouvreurAdresse),
     generateurFacturePdfProvider.overrideWithValue(generateurPdf.call),
     generateurDevisPdfProvider.overrideWithValue(generateurDevisPdf.call),
     serviceDocumentsProvider.overrideWithValue(documents),

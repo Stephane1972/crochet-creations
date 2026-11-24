@@ -36,6 +36,7 @@ part 'app_database.g.dart';
     CategoriesNote,
     Notes,
     PiecesJointesNote,
+    EvenementsAgenda,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -57,7 +58,7 @@ class AppDatabase extends _$AppDatabase {
 
   /// Version du schéma. **À augmenter à chaque modification de `tables.dart`**,
   /// avec l'étape de migration correspondante dans [migration] (voir ARCHITECTURE.md).
-  static const int versionSchema = 6;
+  static const int versionSchema = 7;
 
   @override
   int get schemaVersion => versionSchema;
@@ -147,6 +148,18 @@ class AppDatabase extends _$AppDatabase {
         await customStatement(
           'CREATE INDEX IF NOT EXISTS idx_pieces_jointes_note_note_id ON pieces_jointes_note (note_id)',
         );
+      }
+      // Version 7 : le calendrier. Une nouvelle table (les événements de l'utilisatrice) et quatre réglages d'affichage
+      // (tout est affiché au départ) ; aucune donnée existante n'est touchée.
+      if (from < 7) {
+        await m.createTable(evenementsAgenda);
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_evenements_agenda_debut_le ON evenements_agenda (debut_le)',
+        );
+        await m.addColumn(parametresEntreprise, parametresEntreprise.agendaCours);
+        await m.addColumn(parametresEntreprise, parametresEntreprise.agendaDevis);
+        await m.addColumn(parametresEntreprise, parametresEntreprise.agendaDeclaration);
+        await m.addColumn(parametresEntreprise, parametresEntreprise.agendaEvenements);
       }
     },
 

@@ -54,6 +54,18 @@ Future<void> _toucher(WidgetTester tester, Finder cible) async {
   await tester.pumpAndSettle();
 }
 
+/// Appuie sur une ligne qui ouvre une fiche, puis attend l'écran de la fiche. On n'attend pas qu'il « se calme » : sa barre
+/// de progression tourne tant que la base n'a pas répondu, et `pumpAndSettle` ne s'arrêterait pas.
+Future<void> _toucherPourOuvrir(WidgetTester tester, Finder cible, Type ecran) async {
+  await tester.ensureVisible(cible);
+  await tester.pumpAndSettle();
+  await tester.tap(cible);
+  await tester.pump();
+  await attendreJusqua(tester, () => find.byType(ecran).evaluate().isNotEmpty);
+  await laisserFinir(tester);
+  expect(find.byType(ecran), findsOneWidget);
+}
+
 /// Accueil → tuile « Calendrier ».
 Future<void> _ouvrirCalendrier(WidgetTester tester, EnvironnementTest env) async {
   env.maintenant = _maintenant;
@@ -310,18 +322,14 @@ void main() {
       await _ouvrirCalendrier(tester, env);
 
       await _toucher(tester, _jour(2026, 11, 25));
-      await _toucher(tester, find.text('Initiation au crochet'));
-      await attendreJusqua(tester, () => find.byType(CoursFicheScreen).evaluate().isNotEmpty);
-      expect(find.byType(CoursFicheScreen), findsOneWidget);
+      await _toucherPourOuvrir(tester, find.text('Initiation au crochet'), CoursFicheScreen);
 
       Navigator.of(tester.element(find.byType(CoursFicheScreen))).pop();
       await tester.pumpAndSettle();
       await _attendreCalendrier(tester);
 
       await _toucher(tester, _jour(2026, 11, 27));
-      await _toucher(tester, find.textContaining('Fin de validité du devis'));
-      await attendreJusqua(tester, () => find.byType(DevisDetailScreen).evaluate().isNotEmpty);
-      expect(find.byType(DevisDetailScreen), findsOneWidget);
+      await _toucherPourOuvrir(tester, find.textContaining('Fin de validité du devis'), DevisDetailScreen);
       await env.fermer(tester);
     });
   });

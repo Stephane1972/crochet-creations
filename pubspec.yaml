@@ -47,6 +47,9 @@ dependencies:
   googleapis: ^19.0.0
   http: ^1.6.0
 
+  # Calendrier : ouvrir Google Agenda dans le navigateur (Android ; sous Windows, l'application utilise celui du système).
+  url_launcher: ^6.3.2
+
   # Les dépendances des étapes suivantes seront ajoutées au fur et à mesure,
   # pour ne pas alourdir l'application avant d'en avoir besoin.
 

@@ -44,6 +44,12 @@ class MoreScreen extends StatelessWidget {
       Icons.sticky_note_2_outlined,
       'Futures commandes, documents de l’entreprise, idées : vos notes rangées par catégorie.',
     ),
+    const _Entree(
+      AppRoutes.agenda,
+      'Calendrier',
+      Icons.calendar_month_outlined,
+      'Cours, fin de validité des devis, déclaration des recettes, vos événements ; liens vers Google Agenda.',
+    ),
   ];
 
   @override

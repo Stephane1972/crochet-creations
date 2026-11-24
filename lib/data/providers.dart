@@ -8,11 +8,13 @@ import 'drive/compte_google.dart';
 import 'drive/service_drive.dart';
 import 'drive/service_partages_drive.dart';
 import 'drive/service_sauvegarde_drive.dart';
+import 'partage/ouvreur_adresse.dart';
 import 'partage/service_documents.dart';
 import 'partage/service_partage_fichiers.dart';
 import 'pdf/devis_pdf.dart';
 import 'pdf/facture_pdf.dart';
 import 'pdf/ressources_pdf.dart';
+import 'repositories/agenda_repository.dart';
 import 'repositories/categorie_note_repository.dart';
 import 'repositories/categorie_repository.dart';
 import 'repositories/client_repository.dart';
@@ -184,6 +186,12 @@ final coursRepositoryProvider = Provider<CoursRepository>(
 final depenseRepositoryProvider = Provider<DepenseRepository>(
   (ref) => DepenseRepository(ref.watch(appDatabaseProvider)),
 );
+
+/// Le calendrier : événements de l'utilisatrice et ce qui s'y affiche (cours, devis, jours de déclaration).
+final agendaRepositoryProvider = Provider<AgendaRepository>((ref) => AgendaRepository(ref.watch(appDatabaseProvider)));
+
+/// Ouverture d'une adresse web (Google Agenda) dans le navigateur. Les tests la remplacent par un faux ouvreur.
+final ouvreurAdresseProvider = Provider<OuvreurAdresse>((ref) => const OuvreurAdresseSysteme());
 
 final statistiquesRepositoryProvider = Provider<StatistiquesRepository>(
   (ref) => StatistiquesRepository(ref.watch(appDatabaseProvider)),

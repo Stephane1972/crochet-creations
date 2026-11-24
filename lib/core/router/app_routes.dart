@@ -59,6 +59,10 @@ abstract final class AppRoutes {
   static const String noteNouvelle = '/notes/nouvelle';
   static const String noteModifier = '/notes/modifier';
 
+  // Calendrier. Le formulaire d'un événement reçoit des `ArgumentsEvenement` (sans identifiant : nouvel événement).
+  static const String agenda = '/agenda';
+  static const String agendaEvenement = '/agenda/evenement';
+
   // Réglages
   static const String reglages = '/reglages';
   static const String monEntreprise = '/reglages/entreprise';
@@ -83,4 +87,13 @@ class ArgumentsInscription {
 
   /// Renseigné : on confirme cette personne en attente. Absent : on inscrit quelqu'un de nouveau.
   final int? inscriptionId;
+}
+
+/// Ce que reçoit le formulaire d'un événement du calendrier : l'événement à modifier, ou (pour un nouvel événement) le
+/// jour qui était affiché.
+class ArgumentsEvenement {
+  const ArgumentsEvenement({this.evenementId, this.jour});
+
+  final int? evenementId;
+  final DateTime? jour;
 }

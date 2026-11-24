@@ -34,7 +34,7 @@ void main() {
   );
 
   group('structure', () {
-    test('les 20 tables du schéma existent', () async {
+    test('les 21 tables du schéma existent', () async {
       final List<String> tables = (await noms(
         'table',
       )).where((n) => !n.startsWith('sqlite_')).toList();
@@ -45,6 +45,7 @@ void main() {
         'cours',
         'depenses',
         'devis',
+        'evenements_agenda',
         'factures',
         'inscriptions_cours',
         'lieux_vente',
@@ -85,6 +86,7 @@ void main() {
           'idx_notes_categorie_id',
           'idx_notes_modifie_le',
           'idx_pieces_jointes_note_note_id',
+          'idx_evenements_agenda_debut_le',
         ]),
       );
     });
@@ -92,7 +94,7 @@ void main() {
     test('la version du schéma est enregistrée dans le fichier', () async {
       final row = await db.customSelect('PRAGMA user_version').getSingle();
       expect(row.read<int>('user_version'), AppDatabase.versionSchema);
-      expect(AppDatabase.versionSchema, 6);
+      expect(AppDatabase.versionSchema, 7);
     });
 
     test('les quatre lieux de vente de départ existent dès la création, dans l’ordre', () async {

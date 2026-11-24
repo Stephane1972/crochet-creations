@@ -4,7 +4,7 @@ import 'dart:io';
 ///
 /// Une sauvegarde est un fichier `.zip` qui contient :
 /// - `donnees.json` : un « manifeste » (application, version du format et du schéma, date, sauvegarde complète
-///   ou non) et **toutes les lignes des 20 tables** de la base, telles qu'elles sont enregistrées ;
+///   ou non) et **toutes les lignes des 21 tables** de la base, telles qu'elles sont enregistrées ;
 /// - `fichiers.json` (format 2) : la **liste des fichiers** de l'archive, avec la taille et l'empreinte SHA-256 de
 ///   chacun, pour vérifier à la restauration que rien n'a été abîmé ;
 /// - `fichiers/photos_produits/…`, `fichiers/factures/…`, `fichiers/devis/…`, `fichiers/notes_pieces_jointes/…` : les
@@ -39,7 +39,7 @@ abstract final class FormatSauvegarde {
     dossierPiecesJointes,
   ];
 
-  /// Les 20 tables, **dans l'ordre où on peut les remplir** : une table vient après celles qu'elle référence
+  /// Les 21 tables, **dans l'ordre où on peut les remplir** : une table vient après celles qu'elle référence
   /// (une vente après son client, une ligne après sa vente...). On les vide dans l'ordre inverse.
   /// Un test vérifie que cette liste est exactement celle de la base : une nouvelle table doit y être ajoutée.
   static const List<String> tables = <String>[
@@ -63,6 +63,7 @@ abstract final class FormatSauvegarde {
     'categories_note',
     'notes',
     'pieces_jointes_note',
+    'evenements_agenda',
   ];
 
   /// Les colonnes de la base qui contiennent un **nom de fichier**. Un test vérifie qu'elles existent : une

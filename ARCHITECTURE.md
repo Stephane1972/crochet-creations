@@ -58,6 +58,7 @@ crochet-creations/
 │   │   ├── categories_produit.dart           clés et noms des catégories de départ, règles du nom d'une catégorie
 │   │   ├── lieux_vente.dart                  lieux de départ, « Non renseigné », règles du nom d'un lieu de vente
 │   │   ├── notes.dart                        catégories de notes de départ, « Sans catégorie », règles du nom, du titre et du texte d'une note
+│   │   ├── agenda.dart                       calendrier sans base ni écran : entrées, filtres, grille du mois, tri, échéances de déclaration, adresses Google Agenda
 │   │   ├── erreurs.dart                      erreurs métier à message clair
 │   │   ├── usage_historique.dart             « où apparaît cet élément » (ventes, factures, devis, inscriptions), en phrase
 │   │   ├── regles_client.dart                règles de saisie d'une fiche client (e-mail, téléphone, code postal, SIRET)
@@ -82,7 +83,7 @@ crochet-creations/
 │   │       └── numero_document.dart          FACT-2026-0001, DEVIS-2026-0001, PRD-0001
 │   ├── data/
 │   │   ├── database/
-│   │   │   ├── tables.dart                   les 20 tables (contraintes, index)
+│   │   │   ├── tables.dart                   les 21 tables (contraintes, index)
 │   │   │   ├── app_database.dart             base, version du schéma, migrations
 │   │   │   ├── flux_en_direct.dart           lecture « en direct » de plusieurs tables (observerTables)
 │   │   │   └── app_database.g.dart           (généré par build_runner, non versionné)
@@ -95,6 +96,7 @@ crochet-creations/
 │   │   │   ├── lieu_vente_repository.dart    lieux de vente : lister, créer, renommer, supprimer (en déplaçant les ventes), ventes par lieu
 │   │   │   ├── categorie_note_repository.dart catégories de notes : lister, créer, renommer, supprimer (en déplaçant les notes), notes par catégorie
 │   │   │   ├── note_repository.dart          notes : lister, créer, modifier, supprimer, en direct
+│   │   │   ├── agenda_repository.dart        calendrier : événements (créer, modifier, supprimer) et tout ce qui s'affiche (cours, devis, déclaration), en direct
 │   │   │   ├── client_repository.dart        clients : créer, modifier, archiver, supprimer, fiche et historique en direct
 │   │   │   ├── client_vues.dart              nom affiché, initiales, historique d'un client (ventes, paiements, cours…)
 │   │   │   ├── vente_repository.dart         ventes : valider, annuler, encaisser, changer le lieu, détail en direct
@@ -130,7 +132,8 @@ crochet-creations/
 │   │   │   ├── export_catalogue.dart         export du catalogue : un .zip (CSV, JSON, photos, LISEZMOI), photos rangées une par une
 │   │   │   └── selecteur_fichier.dart        choix du fichier à restaurer : copie de travail en flux (interface + sélecteur Android)
 │   │   ├── partage/
-│   │   │   └── service_partage_fichiers.dart partage d'un fichier quelconque (sauvegarde, export) par la feuille de partage
+│   │   │   ├── service_partage_fichiers.dart partage d'un fichier quelconque (sauvegarde, export) par la feuille de partage
+│   │   │   └── ouvreur_adresse.dart          ouvre une adresse web dans le navigateur (interface + Windows / url_launcher), remplaçable en test
 │   │   ├── stockage/
 │   │   │   ├── stockage_photos.dart          copie les photos dans le dossier privé de l'application
 │   │   │   ├── stockage_pdf.dart             range les PDF (factures, devis) : un fichier par numéro
@@ -198,6 +201,10 @@ crochet-creations/
 │       │   ├── lieux_providers.dart          lieux en direct, nombre de ventes par lieu, recherche d'un lieu par identifiant
 │       │   └── choix_lieu.dart               carte « Lieu de vente » et feuille de choix (panier, détail d'une vente)
 │       ├── more/more_screen.dart             onglet « Plus »
+│       ├── agenda/                           calendrier (voir « Calendrier »)
+│       │   ├── agenda_screen.dart            Accueil ou Plus › Calendrier : grille du mois, filtres, liste du jour, liens Google Agenda
+│       │   ├── evenement_form_screen.dart    un événement : titre, jour, toute la journée ou heures, précisions ; enregistrer, supprimer
+│       │   └── agenda_providers.dart         entrées du mois et filtres, en direct
 │       ├── notes/                            bloc-notes (voir « Bloc-notes »)
 │       │   ├── notes_screen.dart             Plus › Bloc-notes : liste, filtres par catégorie, « Nouvelle note »
 │       │   ├── note_form_screen.dart         une note : titre, catégorie, texte, pièces jointes ; enregistrer, supprimer, abandonner
@@ -289,6 +296,8 @@ les produits : `domain/produits/`, `data/produits/`, `presentation/produits/`.
   `categoriesNoteProvider` (catégories en direct, dans l'ordre), `nombreNotesParCategorieProvider` (écran Catégories de notes),
   `nombrePiecesJointesParNoteProvider` (liste des notes) ; les pièces jointes ont leurs propres providers dans `data/providers.dart`
   (`stockagePiecesJointesProvider`, `selecteurPieceJointeProvider`, `ouvreurPieceJointeProvider`), remplacés en test ;
+- calendrier (`presentation/agenda/agenda_providers.dart`) : `entreesAgendaProvider` (tout ce qui est prévu dans la grille d'un mois, en direct),
+  `filtresAgendaProvider` (types affichés, en direct) ; `agendaRepositoryProvider` et `ouvreurAdresseProvider` sont dans `data/providers.dart` ;
 - `filtresProduitsProvider` : recherche, catégorie (clé), « Archivés », « À réapprovisionner ». Il vit au-dessus des écrans :
   le filtre choisi depuis l'accueil (« Stock faible ») s'applique à l'ouverture de l'onglet Produits ;
 - clients (`presentation/clients/clients_providers.dart`) : `clientsProvider` (tous les clients, archivés compris, en
@@ -315,7 +324,8 @@ Navigation Flutter standard (`Navigator` + routes nommées), sans bibliothèque 
   (`Navigator.pushNamed(context, AppRoutes.produitFiche, arguments: produit.id)`) ; `AppRouter` le lit et
   affiche un message d'erreur si l'identifiant manque. Aujourd'hui : `produitFiche`, `produitModifier`,
   `clientFiche`, `clientModifier`, `factureDetail`, `devisDetail`, `devisModifier`, `devisConversion`,
-  `venteConfirmation`, `coursFiche`, `coursModifier` et `depenseModifier` ; `produitNouveau`, `clientNouveau`,
+  `venteConfirmation`, `coursFiche`, `coursModifier` et `depenseModifier` ; `agendaEvenement` reçoit des `ArgumentsEvenement` (l'événement à modifier,
+  ou le jour affiché pour un nouvel événement) et `agenda` n'en prend pas ; `produitNouveau`, `clientNouveau`,
   `devisNouveau`, `coursNouveau` et `depenseNouvelle` n'en prennent pas ; `coursInscription` reçoit un `ArgumentsInscription` (cours et, pour confirmer une
   personne en attente, son inscription) ;
 - « Vendre » et « Ajouter au panier » depuis une fiche produit ramènent à la racine et ouvrent l'onglet Vente
@@ -348,7 +358,7 @@ Navigation Flutter standard (`Navigator` + routes nommées), sans bibliothèque 
 
 Un fichier `crochet_creations.sqlite` dans le stockage privé de l'application. Aucun serveur.
 
-### Les 20 tables
+### Les 21 tables
 
 | Table | Rôle |
 |-------|------|
@@ -372,6 +382,7 @@ Un fichier `crochet_creations.sqlite` dans le stockage privé de l'application. 
 | `categories_note` | Catégories du bloc-notes (Futures commandes, Documents entreprise, les vôtres) : nom modifiable, ordre d'affichage |
 | `notes` | Une note : titre, texte, catégorie (vide = « Sans catégorie »), dates de création et de modification |
 | `pieces_jointes_note` | Une pièce jointe d'une note : nom du fichier rangé, nom affiché, type (photo, vidéo, document), taille |
+| `evenements_agenda` | Un événement ajouté au calendrier : titre, précisions, début, fin (facultative), « toute la journée ». Les cours, devis et échéances n'y sont pas : ils viennent de leurs tables |
 
 Relations principales :
 
@@ -433,7 +444,7 @@ Les valeurs des listes de choix sont enregistrées sous leur **nom Dart** : ne j
 Après une migration, `PRAGMA foreign_key_check` vérifie qu'aucune liaison n'a été cassée.
 
 Historique des versions du schéma : **1** (étapes 2 à 12), **2** (`ventes.client_nom` et `devis.client_nom`, pour garder le nom
-d'un client supprimé), **3** (table `categories_produit`, remplie avec les cinq catégories de départ), **4** (table `lieux_vente`, remplie avec les quatre lieux de départ, et colonne `ventes.lieu_id` vide pour toutes les ventes existantes), **5** (tables `categories_note`, remplie avec les deux catégories de départ, et `notes`). Une sauvegarde d'un schéma plus ancien se restaure sans changement : la restauration n'écrit que les
+d'un client supprimé), **3** (table `categories_produit`, remplie avec les cinq catégories de départ), **4** (table `lieux_vente`, remplie avec les quatre lieux de départ, et colonne `ventes.lieu_id` vide pour toutes les ventes existantes), **5** (tables `categories_note`, remplie avec les deux catégories de départ, et `notes`), **6** (table `pieces_jointes_note`), **7** (table `evenements_agenda` et quatre colonnes d'affichage du calendrier dans `parametres_entreprise`, toutes à « vrai »). Une sauvegarde d'un schéma plus ancien se restaure sans changement : la restauration n'écrit que les
 colonnes présentes dans l'archive (voir « Restaurer »).
 
 ## Produits et stock (étape 3)
@@ -968,9 +979,9 @@ base. Un lieu ou une catégorie supprimés entre-temps reviennent à « tous ».
 Un `.zip` avec `donnees.json`, `fichiers.json` (format 2) et les fichiers. `donnees.json` contient un **manifeste**
 (`application`, `format` = version de l'organisation du fichier (2), `versionSchema` = `AppDatabase.versionSchema`,
 `versionApplication`, `creeLe`, `nombreFichiers`, `lignes` par table, et depuis le format 2 `complete` et `fichiersAbsents`)
-puis `tables` : pour chacune des 20 tables, ses lignes lues par `SELECT * … ORDER BY id`, **telles que
+puis `tables` : pour chacune des 21 tables, ses lignes lues par `SELECT * … ORDER BY id`, **telles que
 SQLite les stocke** (dates en secondes, booléens 0/1, énumérations en texte). Rien n'est recalculé : une sauvegarde restaurée
-redonne exactement les mêmes lignes (un test le vérifie table par table). Les 20 lectures se font dans **une transaction** :
+redonne exactement les mêmes lignes (un test le vérifie table par table). Les 21 lectures se font dans **une transaction** :
 l'instantané est cohérent même si l'application écrit en même temps. Les fichiers sont rangés sous
 `fichiers/<dossier>/<nom>` (`photos_produits`, `factures`, `devis`, `notes_pieces_jointes`) ; la base ne garde que des noms relatifs, ils retrouvent
 donc leur place.
@@ -1008,7 +1019,7 @@ copies de sécurité ; les manuelles ne sont supprimées que par la personne.
 Une seule sauvegarde ou restauration à la fois (`_enSerie` : file d'attente interne) : sinon l'une effacerait les fichiers
 provisoires de l'autre (la sauvegarde automatique du démarrage peut tomber pendant un appui sur « Sauvegarder maintenant »).
 
-1. **Lire la base** : les 20 tables dans une transaction.
+1. **Lire la base** : les 21 tables dans une transaction.
 2. **Lister les fichiers** présents (`photos_produits`, `factures`, `devis`, `notes_pieces_jointes`) et calculer pour chacun sa **taille et son SHA-256 en
    flux** (`sha256.bind(fichier.openRead())`, jamais le fichier entier en mémoire). Un fichier illisible n'est pas archivé. Les
    photos citées par les données mais absentes de cette liste donnent `fichiersAbsents` : la sauvegarde est **incomplète**.
@@ -1275,6 +1286,55 @@ par proposition (un `ensureVisualUpdate` garantit qu'un écran au repos la dessi
 envoi, reprise, deux changements, « garder cet appareil », migration, empreinte), `test/presentation/synchro_drive_ecrans_test.dart`
 (proposition, carte, garde, arrière-plan Android, fermeture Windows et « Fermer sans attendre »).
 
+## Calendrier (demande de novembre 2026, étape 1 sur 3 — 0.26.0)
+
+Le calendrier montre ce qui est prévu, sans rien dupliquer : les cours, les devis et les jours de déclaration restent dans leurs propres tables,
+seuls les **événements de l'utilisatrice** ont une table (`evenements_agenda`, schéma 7).
+
+### Règles (`domain/agenda.dart`, sans base ni écran)
+
+- `EntreeAgenda` : une ligne du calendrier (type, titre, début, fin, « toute la journée », précision, lieu, identifiant) ; `TypeEntreeAgenda` :
+  `cours`, `devis`, `declaration`, `evenement`. `FiltresAgenda` : quels types sont affichés.
+- `joursAffiches(annee, mois)` : la grille, des semaines entières du lundi au dimanche (4 à 6 semaines), composée jour par jour avec
+  `DateTime(année, mois, jour)` et non en ajoutant 24 h, pour qu'un changement d'heure ne décale rien. `dernierJourDuMois`, `debutMoisSuivant`, `jourDe`.
+- `comparerEntrees` : par jour, puis « toute la journée » d'abord, puis par heure, par type et par titre ; `regrouperParJour`.
+- `echeancesDeclaration(debut, fin)` : le **dernier jour de chaque mois** de l'intervalle (« Déclaration des recettes »).
+- `lienOuvrirGoogleAgenda` (`https://calendar.google.com/calendar/r[/month/A/M/J]`) et `lienAjouterAGoogleAgenda` (`…/calendar/render?action=TEMPLATE&text=…&dates=…`) :
+  journée entière = `AAAAMMJJ/AAAAMMJJ+1`, heure fixe = UTC `AAAAMMJJTHHMMSSZ` (+ 1 h sans heure de fin), `recur=RRULE:FREQ=MONTHLY;BYMONTHDAY=-1`
+  pour la déclaration ; paramètre `authuser` si un compte est donné (l'écran ne le donne pas encore).
+
+### Le dépôt (`AgendaRepository`)
+
+- Événements : `obtenir`, `lister`, `creer`, `modifier`, `supprimer`. `DonneesEvenement.valider()` refuse un titre vide ou de plus de 120 caractères,
+  des précisions de plus de 1 000 caractères et une heure de fin qui n'est pas après le début (`DonneeInvalide`) ; `modifier` lance
+  `ElementIntrouvable` si l'événement a été supprimé entre-temps. Un événement « toute la journée » est enregistré à minuit, sans fin.
+- `entrees(debut, fin, filtres, maintenant)` : lit les cours (ni annulés ni archivés, avec durée et lieu), les devis `brouillon` ou `envoye` à leur
+  `dateValidite` (sauf si `validiteDepassee`, c'est-à-dire déjà « Expiré » ; client par `nomClientOuCopie`), les échéances et les événements.
+  `observerEntrees` suit `cours`, `devis`, `clients` et `evenements_agenda` (`observerTables`) et prend l'heure de `horlogeProvider`.
+- Les filtres sont **quatre colonnes de `parametres_entreprise`** (`agenda_cours`, `agenda_devis`, `agenda_declaration`, `agenda_evenements`), lues
+  par `ParametresRepository.filtresAgendaDe` et écrites par `enregistrerFiltresAgenda` : ils suivent donc la sauvegarde et l'empreinte de
+  synchronisation entre appareils.
+
+### Écrans
+
+- `AgendaScreen` (routes `agenda`, tuile de l'accueil et entrée de *Plus*) : grille du mois, filtres, liste du jour choisi, *Nouvel événement*,
+  *Ouvrir Google Agenda*, et sur chaque ligne l'icône *Ajouter à Google Agenda*. Toucher un cours ou un devis ouvre sa fiche, un événement son formulaire.
+  Elle lit **tous** les types du mois et masque ceux que les filtres écartent.
+- `EvenementFormScreen` (route `agendaEvenement`) : titre, jour, « Toute la journée » ou heures, précisions, *Supprimer l'événement* avec confirmation.
+- `OuvreurAdresse` (`data/partage/ouvreur_adresse.dart`) : sous Windows, `ouvrirDansLeNavigateur` (déjà utilisé pour la connexion à Google) ; sous
+  Android, `url_launcher` (`launchUrl`, sans `<queries>` à ajouter). Seules les adresses `https` sont ouvertes. Les tests le remplacent par un faux.
+- La page d'accueil (`home_screen.dart`) a une troisième rangée de tuiles : Bloc-notes et Calendrier.
+
+### Limites
+
+Pas encore de notification (étape 2) ni de synchronisation avec Google Agenda (étape 3) ; événements sur un seul jour et sans répétition ; le lien
+« Ajouter à Google Agenda » crée seulement un événement prérempli (rien n'est enregistré sans le clic de l'utilisatrice).
+
+**Tests** : `test/domain/agenda_test.dart` (grille, tri, échéances, adresses), `test/data/agenda_repository_test.dart` (événements, validation,
+cours / devis / déclaration et filtres, flux en direct), `test/presentation/agenda_ecrans_test.dart` (accueil, grille, filtres, nouvel événement,
+modification, suppression, liens), `schema_test` et `migration_schema_test` (version 7, migration 6 → 7), `service_sauvegarde_test`
+(aller-retour, ancienne archive).
+
 ## Dossier `android/`
 
 Le dossier `android/` n'est pas versionné. `tool/setup_android.sh` le crée avec `flutter create`,
@@ -1432,6 +1492,8 @@ Le cahier des charges ne tranchait pas ces points ; voici ce qui a été retenu 
   fichiers, flux en direct du décompte), `schema_test` et `migration_schema_test` (table, contraintes, cascade, version 6, migration 5 → 6),
   `service_sauvegarde_test` (4e dossier, empreintes, restauration sur un autre téléphone, pièce absente = incomplète, `.tmp` ignoré,
   archive du schéma 5) et `notes_ecrans_test` (limites affichées, ajout, refus, retrait, abandon, ouverture, nombre dans la liste).
+- Calendrier (0.26.0) : `domain/agenda_test`, `agenda_repository_test`, `agenda_ecrans_test` (détail dans « Calendrier »), `schema_test`,
+  `migration_schema_test` (version 7, migration 6 → 7) et `service_sauvegarde_test` (événements dans l'archive, archive d'avant le calendrier).
 - Suppression d'un client ou d'un produit : `suppression_repository_test` (historique conservé, noms copiés, lignes détachées,
   inscriptions refusées), `migration_schema_test` (base du schéma 1 mise à jour sans perte), `service_sauvegarde_test`
   (archive du schéma 1), `export_csv_test` et `devis_repository_test` (client supprimé), `domain/usage_historique_test`.

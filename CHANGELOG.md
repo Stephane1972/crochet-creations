@@ -6,6 +6,54 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
 
 ## [Non publié]
 
+## [0.26.0] — Accueil et calendrier (en attente de validation)
+
+Première partie de la demande de Stéphane : « un bouton bloc-notes sur l'écran d'accueil, un calendrier + lien Google Agenda (Workspace) et une
+notification pour la fin de mois (déclaration des recettes), sur Windows et Android ». Elle est livrée en **trois étapes**, chacune validée avant la
+suivante : **1. accueil + calendrier** (cette version), 2. rappel de déclaration (notifications), 3. synchronisation avec Google Agenda. Choix de
+Stéphane : **calendrier personnalisable** (on choisit ce qu'il montre, on ajoute ses propres événements), **liens vers Google Agenda et
+synchronisation automatique** (la synchronisation vient à l'étape 3), déclaration **mensuelle**. **Android est inchangé** : mêmes écrans, mêmes
+données ; la base passe au schéma 7 par une migration automatique qui ne touche à aucune donnée existante.
+
+### Ajouté
+- **Accueil** : une troisième rangée de tuiles avec **Bloc-notes** (ouvre directement le bloc-notes) et **Calendrier**. Le bloc-notes reste aussi
+  dans *Plus*, le calendrier s'y ajoute.
+- **Calendrier** : la grille du mois (du lundi au dimanche, aujourd'hui repéré, un point par type d'entrée), *Mois précédent / suivant*,
+  *Aujourd'hui*, et sous la grille la **liste du jour choisi**. Il montre :
+  - les **cours** (jour, heure, durée, lieu) — pas ceux qui sont annulés ou archivés ;
+  - la **fin de validité des devis** encore ouverts (brouillon ou envoyé, pas encore expirés), avec le nom du client ;
+  - la **déclaration des recettes**, le **dernier jour de chaque mois** ;
+  - **vos événements**.
+- **Filtres** : Cours, Devis, Déclaration, Mes événements. Le choix est gardé dans les réglages (donc dans la sauvegarde et la reprise
+  d'un appareil à l'autre).
+- **Vos événements** : *Nouvel événement* (titre, jour, « Toute la journée » ou heures de début et de fin, précisions), modifier, supprimer
+  (après confirmation).
+- **Google Agenda** : le bouton **Ouvrir Google Agenda** ouvre le mois dans le navigateur ; l'icône **Ajouter à Google Agenda** d'une entrée ouvre
+  Google Agenda avec l'événement **déjà rempli** (il reste à l'enregistrer ; la déclaration est proposée **chaque mois, le dernier jour**).
+  Android utilise le navigateur du téléphone, Windows celui du PC.
+- Base : table `evenements_agenda` et quatre réglages d'affichage (schéma 7) ; la sauvegarde contient 21 tables ; une ancienne sauvegarde se
+  restaure (calendrier vide, tout affiché).
+- Code : `domain/agenda.dart` (règles pures : grille du mois, tri, échéances, adresses Google Agenda), `AgendaRepository`, `OuvreurAdresse`
+  (+ dépendance `url_launcher`), écrans `presentation/agenda/`.
+- Tests : règles du calendrier (`agenda_test`), lecture / création / modification des événements et filtres (`agenda_repository_test`), écrans
+  (`agenda_ecrans_test` : accueil, grille, filtres, nouvel événement, modification, suppression, liens Google Agenda), `schema_test`,
+  `migration_schema_test` (schéma 7, migration 6 → 7), `service_sauvegarde_test` (aller-retour, ancienne archive).
+
+### Modifié
+- Version 0.26.0 (schéma de la base : 7).
+
+### Limites connues
+- Le calendrier **n'est pas encore synchronisé** avec Google Agenda (étape 3) : pour l'instant, les liens créent un événement prérempli que l'on
+  enregistre soi-même dans Google Agenda.
+- Le lien « Ajouter à Google Agenda » ne choisit pas le compte : Google utilise le compte actif du navigateur (celui de Google Workspace si c'est
+  lui qui est connecté).
+- Pas de notification : le rappel de déclaration (3 jours avant et le dernier jour) arrive à l'étape 2. Le calendrier ne montre que le jour de
+  l'échéance.
+- Les événements sont ponctuels (pas de répétition) et sur un seul jour. Le calendrier ne montre que des échéances et des événements : il ne
+  remplace pas Google Agenda.
+- Sous Windows, la fenêtre garde la largeur « téléphone » (mise en page pour grand écran : plus tard, sur demande).
+- Écrit sans pouvoir lancer Flutter ici : l'analyse et les tests tournent sur GitHub ; pas encore essayé sur un vrai téléphone ni sur un PC.
+
 ## [0.25.0] — Synchroniser téléphone et PC (en attente de validation)
 
 Seconde partie de la demande de Stéphane : retrouver les **mêmes données sur Android et sur Windows**. Choix : **reprise d'un appareil à

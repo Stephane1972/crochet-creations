@@ -6,7 +6,57 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
 
 ## [Non publié]
 
-## [0.26.0] — Accueil et calendrier (en attente de validation)
+## [0.27.0] — Rappel de déclaration des recettes (en attente de validation)
+
+Deuxième des trois étapes de la demande de Stéphane (accueil + calendrier, **rappel de déclaration**, synchronisation avec Google Agenda), sur
+**Android et Windows**. Choix de Stéphane : déclaration **mensuelle**, rappel **3 jours avant la fin du mois et le dernier jour**. **Android est
+inchangé** tant que le rappel n'est pas activé (il est désactivé au départ) ; la base passe au schéma 8 par une migration automatique qui ne touche
+à aucune donnée existante.
+
+### Ajouté
+- **Plus › Déclaration des recettes** (aussi atteinte en touchant la déclaration dans le calendrier) :
+  - l'interrupteur **Me rappeler la déclaration** : une **notification 3 jours avant le dernier jour du mois, puis le dernier jour, à 9 h**. Elle
+    apparaît **même si l'application est fermée** (alarmes d'Android ; notifications programmées de Windows). Les 12 prochains mois sont programmés,
+    et la programmation est **refaite à chaque ouverture de l'application** : elle ne s'arrête que si l'application reste fermée plus d'un an ;
+  - le **prochain rappel** (jour et heure) quand le rappel est activé ;
+  - **Tester la notification** : en affiche une tout de suite, pour vérifier que les notifications fonctionnent sur l'appareil ;
+  - une phrase d'avertissement si les notifications ont été **bloquées** dans les réglages de l'appareil, et un message clair si elles sont **refusées**
+    quand on active le rappel (le rappel reste alors désactivé) ;
+  - les **recettes encaissées ce mois-ci et le mois dernier** (ventes d'objets, prestations et cours, total), à reporter sur le site de l'organisme.
+    C'est l'argent réellement encaissé, remboursements déduits : le chiffre d'affaires des Statistiques. Les montants se mettent à jour tout seuls.
+    L'application **n'envoie rien** à l'organisme.
+- **Calendrier** : toucher la déclaration d'un jour ouvre cet écran (elle n'avait pas de fiche).
+- Base : un réglage `rappel_declaration` (schéma 8) ; il est dans la sauvegarde. Une ancienne sauvegarde se restaure (rappel désactivé) ; le rappel
+  est reprogrammé à l'ouverture suivante si le réglage est activé (cas d'une reprise d'un autre appareil).
+- Code : `domain/declaration.dart` (règles pures : dates des rappels, textes, identifiants), `data/notifications/` (`PlanificateurRappels`,
+  `ServiceRappelsDeclaration`), `StatistiquesRepository.recettesDeclaration`, écran `presentation/declaration/`, dépendances
+  `flutter_local_notifications` et `timezone`.
+- Android : `tool/patch_notifications_android.py` (appelé par `tool/setup_android.sh`) ajoute au projet généré ce que le module de notifications exige
+  (récepteurs de notifications et de redémarrage, permission de reprogrammation après un redémarrage du téléphone, compatibilité Java).
+- Tests : règles des dates et des textes (`declaration_test`), service (`service_rappels_declaration_test`), recettes du mois
+  (`statistiques_repository_test`), réglage (`parametres_repository_test`), écran (`declaration_ecran_test`, Android et Windows),
+  calendrier › déclaration (`agenda_ecrans_test`), `schema_test`, `migration_schema_test` (migration 7 → 8), `service_sauvegarde_test`.
+
+### Modifié
+- Version 0.27.0 (build 32) ; schéma de la base : 8.
+- Flutter 3.44 / Dart 3.12 au minimum (exigés par le module de notifications ; la CI utilise déjà Flutter 3.50).
+- Les mentions « en attente de validation » des versions 0.25.0 et 0.26.0 sont retirées (étape 1 validée et fusionnée, PR #30).
+
+### Limites connues
+- **Pas encore essayé sur un vrai téléphone ni sur un vrai PC** : écrit sans pouvoir lancer Flutter ici ; l'analyse et les tests tournent sur GitHub.
+  Le bouton **Tester la notification** sert justement à vérifier que tout fonctionne sur l'appareil.
+- **Heure approximative sous Android** : le système peut avancer ou retarder un peu la notification (alarmes « inexactes », pour ne pas demander
+  l'autorisation des alarmes exactes). Les économiseurs de batterie de certaines marques peuvent aussi retarder ou bloquer les notifications.
+- **Sous Windows**, la notification programmée dépend du système (Windows 10/11, notifications et « Ne pas déranger » réglés dans les paramètres) ;
+  le comportement avec le dossier `.zip` portable (programme non installé) n'est pas encore vérifié sur un vrai PC.
+- Le texte de la notification est **fixe** : le montant des recettes se lit dans l'application, pas dans la notification.
+- Toucher la notification **ouvre l'application** (pas directement l'écran de la déclaration).
+- L'heure (9 h) et les jours (3 jours avant + le dernier jour) ne se règlent pas dans l'application.
+- La programmation se refait quand on **ouvre l'application** : si elle reste fermée plus d'un an, les rappels s'arrêtent jusqu'à la prochaine ouverture.
+- L'organisme (URSSAF ou autre) n'est pas nommé et aucun lien vers son site n'est proposé : l'application ne le connaît pas.
+- Le calendrier montre toujours la déclaration le dernier jour du mois seulement (pas le rappel de 3 jours avant).
+
+## [0.26.0] — Accueil et calendrier
 
 Première partie de la demande de Stéphane : « un bouton bloc-notes sur l'écran d'accueil, un calendrier + lien Google Agenda (Workspace) et une
 notification pour la fin de mois (déclaration des recettes), sur Windows et Android ». Elle est livrée en **trois étapes**, chacune validée avant la
@@ -54,7 +104,7 @@ données ; la base passe au schéma 7 par une migration automatique qui ne touch
 - Sous Windows, la fenêtre garde la largeur « téléphone » (mise en page pour grand écran : plus tard, sur demande).
 - Écrit sans pouvoir lancer Flutter ici : l'analyse et les tests tournent sur GitHub ; pas encore essayé sur un vrai téléphone ni sur un PC.
 
-## [0.25.0] — Synchroniser téléphone et PC (en attente de validation)
+## [0.25.0] — Synchroniser téléphone et PC
 
 Seconde partie de la demande de Stéphane : retrouver les **mêmes données sur Android et sur Windows**. Choix : **reprise d'un appareil à
 l'autre + envoi automatique à la fermeture**, un seul appareil actif à la fois, **pas de fusion** de modifications simultanées, **jamais

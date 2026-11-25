@@ -296,7 +296,7 @@ Première des trois étapes demandées par Stéphane (accueil + calendrier, puis
   - la **déclaration des recettes**, le **dernier jour de chaque mois** ;
   - **vos événements**.
 - **Vos événements** : bouton **Nouvel événement** (titre, jour, *Toute la journée* ou heure de début et de fin, précisions). Toucher un événement
-  le modifie ; il se supprime après confirmation. Toucher un cours ou un devis ouvre sa fiche (ils se modifient là) ; la déclaration n'a pas de fiche.
+  le modifie ; il se supprime après confirmation. Toucher un cours ou un devis ouvre sa fiche (ils se modifient là) ; toucher la déclaration ouvre l'écran *Déclaration des recettes* (étape 2).
 - **Google Agenda** : **Ouvrir Google Agenda** ouvre le mois dans le navigateur ; l'icône **Ajouter à Google Agenda** d'une entrée ouvre Google
   Agenda avec l'événement **déjà rempli** — il reste à cliquer sur *Enregistrer* dans Google Agenda ; la déclaration est proposée **chaque mois,
   le dernier jour**. Rien n'est créé sans votre clic. Si plusieurs comptes Google sont connectés au navigateur (Google Workspace et personnel),
@@ -306,11 +306,41 @@ Première des trois étapes demandées par Stéphane (accueil + calendrier, puis
 
 **Limites** (à connaître) :
 
-- Le calendrier **n'est pas encore synchronisé** avec Google Agenda (étape 3) et il n'y a **pas encore de notification** (étape 2).
+- Le calendrier **n'est pas encore synchronisé** avec Google Agenda (étape 3).
 - Les événements sont ponctuels : un seul jour, pas de répétition.
 - Sous Windows, la fenêtre garde la largeur « téléphone » (la mise en page pour grand écran viendra seulement sur demande).
 - Cette étape a été écrite sans pouvoir lancer Flutter sur place : l'analyse et les tests automatiques tournent sur GitHub ; le vrai essai
   (téléphone et PC) reste à faire.
+
+### Rappel de déclaration des recettes (demande de novembre 2026, étape 2 sur 3 — version 0.27.0)
+
+Deuxième étape : une **notification** pour penser à déclarer ses recettes à l'organisme, sur **Android et Windows**. Choix de Stéphane :
+déclaration **mensuelle**, rappel **3 jours avant la fin du mois et le dernier jour**.
+
+- **Où** : *Plus › Déclaration des recettes* (ou en touchant la déclaration dans le calendrier).
+- **Le rappel** : l'interrupteur *Me rappeler la déclaration* est **désactivé au départ**. Activé, il programme une notification **3 jours avant le
+  dernier jour du mois, puis le dernier jour, à 9 h**, pour les **12 prochains mois**. Elle apparaît **même si l'application est fermée**. La
+  programmation est refaite **à chaque ouverture de l'application** (l'horizon avance tout seul). L'écran indique le **prochain rappel**.
+- **Autorisation** : sous Android 13 ou plus récent, une fenêtre du système demande d'autoriser les notifications ; si on refuse, le rappel reste
+  désactivé et l'écran explique où les autoriser. Si elles sont bloquées plus tard dans les réglages de l'appareil, l'écran le signale.
+- **Tester la notification** : en affiche une tout de suite pour vérifier que tout fonctionne sur l'appareil (à faire une fois après l'activation).
+- **Les montants** : l'écran affiche l'argent **encaissé ce mois-ci et le mois dernier** (ventes d'objets, prestations et cours, total), à reporter sur
+  le site de l'organisme. C'est l'argent réellement encaissé, remboursements déduits : le chiffre d'affaires des *Statistiques*. **L'application
+  n'envoie rien** à l'organisme.
+- Le schéma de la base passe en **version 8** (un réglage `rappel_declaration`, migration automatique, inclus dans la sauvegarde ; une ancienne
+  sauvegarde se restaure avec le rappel désactivé).
+- Flutter 3.44 / Dart 3.12 au minimum (module de notifications) ; sous Android, `tool/setup_android.sh` ajoute au projet généré ce que ce module exige
+  (`tool/patch_notifications_android.py`).
+
+**Limites** (à connaître) :
+
+- **Pas encore essayé sur un vrai téléphone ni un vrai PC** : écrit sans pouvoir lancer Flutter sur place ; l'analyse et les tests tournent sur GitHub.
+  Utiliser *Tester la notification* après avoir installé la version.
+- Sous Android, l'**heure est approximative** (le système peut avancer ou retarder un peu la notification) et certains économiseurs de batterie
+  peuvent retarder ou bloquer les notifications. Sous Windows, le comportement avec le dossier `.zip` portable (programme non installé) reste à vérifier.
+- Le texte de la notification est **fixe** (le montant se lit dans l'application) et la toucher **ouvre l'application** (pas directement l'écran).
+- L'heure (9 h) et les jours ne se règlent pas ; l'organisme n'est pas nommé et aucun lien vers son site n'est proposé.
+- Si l'application reste **fermée plus d'un an**, les rappels s'arrêtent jusqu'à la prochaine ouverture.
 
 ### Ce que contient l'étape 11 : sauvegarde et export
 
@@ -588,7 +618,7 @@ flutter test                 # lance les tests
 flutter analyze              # vérifie la qualité du code
 ```
 
-Flutter doit être récent (canal *stable*, Flutter 3.38 / Dart 3.10 au minimum). Les fichiers `*.g.dart` générés par
+Flutter doit être récent (canal *stable*, Flutter 3.44 / Dart 3.12 au minimum : exigé par le module de notifications). Les fichiers `*.g.dart` générés par
 `build_runner` ne sont pas versionnés : relancer la commande de génération après chaque `git pull` qui modifie
 `lib/data/database/tables.dart`.
 
@@ -715,7 +745,7 @@ lib/            code de l'application : presentation, domain, data (voir ARCHITE
 assets/         logo, icônes, police Poppins
 test/           tests automatiques
 integration_test/  test de démarrage de la vraie application sous Windows (lancé par la CI Windows)
-tool/           scripts : génération des icônes et des dossiers android/ et windows/, signature de l'APK, annotations de la CI
+tool/           scripts : génération des icônes et des dossiers android/ et windows/, notifications Android, signature de l'APK, annotations de la CI
 .github/        constructions automatiques : APK Android (android.yml) et dossier .zip Windows (windows.yml)
 ```
 

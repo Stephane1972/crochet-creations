@@ -28,6 +28,12 @@ Retrouver les mêmes données sur le téléphone et sur ce PC (par Drive)
   appareil, il vous propose de reprendre la version de Drive, après confirmation et copie de sécurité. Si les deux appareils ont
   changé chacun de leur côté, vous choisissez : rien n'est écrasé sans votre accord et rien n'est supprimé sur Drive.
 
+Rappel de la déclaration des recettes
+  Plus > Déclaration des recettes : activez « Me rappeler la déclaration » pour recevoir une notification Windows 3 jours avant la
+  fin du mois, puis le dernier jour, à 9 h. Utilisez « Tester la notification » pour vérifier qu'elle s'affiche (si rien n'apparaît,
+  vérifiez dans les paramètres de Windows que les notifications sont autorisées et que « Ne pas déranger » est désactivé). La
+  programmation est refaite à chaque ouverture de l'application. L'application n'envoie rien à l'organisme.
+
 Passer vos données du téléphone Android à Windows (ou l'inverse), sans Drive :
   1. Sur l'appareil qui contient les données : Réglages > Sauvegarde et export > « Sauvegarder maintenant »,
      puis « Partager » (sous Windows : « Enregistrer sous... »).

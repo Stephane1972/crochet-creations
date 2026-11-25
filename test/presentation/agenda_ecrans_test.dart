@@ -9,6 +9,7 @@ import 'package:crochet_creations/domain/enums.dart';
 import 'package:crochet_creations/presentation/agenda/agenda_screen.dart';
 import 'package:crochet_creations/presentation/agenda/evenement_form_screen.dart';
 import 'package:crochet_creations/presentation/cours/cours_fiche_screen.dart';
+import 'package:crochet_creations/presentation/declaration/declaration_screen.dart';
 import 'package:crochet_creations/presentation/devis/devis_detail_screen.dart';
 import 'package:crochet_creations/presentation/more/more_screen.dart';
 import 'package:crochet_creations/presentation/notes/notes_screen.dart';
@@ -330,6 +331,17 @@ void main() {
 
       await _toucher(tester, _jour(2026, 11, 27));
       await _toucherPourOuvrir(tester, find.textContaining('Fin de validité du devis'), DevisDetailScreen);
+      await env.fermer(tester);
+    });
+
+    testWidgets('un appui sur la déclaration des recettes ouvre l’écran du rappel et des recettes', (WidgetTester tester) async {
+      final EnvironnementTest env = await EnvironnementTest.creer(tester);
+      await _ouvrirCalendrier(tester, env);
+      await _toucher(tester, _jour(2026, 11, 30));
+
+      await _toucherPourOuvrir(tester, find.text('Déclaration des recettes'), DeclarationScreen);
+
+      expect(find.text('Rappel de fin de mois'), findsOneWidget);
       await env.fermer(tester);
     });
   });

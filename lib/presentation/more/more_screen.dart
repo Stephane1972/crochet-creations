@@ -50,6 +50,12 @@ class MoreScreen extends StatelessWidget {
       Icons.calendar_month_outlined,
       'Cours, fin de validité des devis, déclaration des recettes, vos événements ; liens vers Google Agenda.',
     ),
+    const _Entree(
+      AppRoutes.declaration,
+      'Déclaration des recettes',
+      Icons.notifications_active_outlined,
+      'Rappel de fin de mois et recettes encaissées ce mois-ci et le mois dernier.',
+    ),
   ];
 
   @override

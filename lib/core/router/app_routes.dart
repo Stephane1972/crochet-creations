@@ -62,6 +62,7 @@ abstract final class AppRoutes {
   // Calendrier. Le formulaire d'un événement reçoit des `ArgumentsEvenement` (sans identifiant : nouvel événement).
   static const String agenda = '/agenda';
   static const String agendaEvenement = '/agenda/evenement';
+  static const String declaration = '/declaration';
 
   // Réglages
   static const String reglages = '/reglages';

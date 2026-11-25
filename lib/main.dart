@@ -155,6 +155,10 @@ Future<void> main() async {
     // premier écran : elle ne retarde pas le démarrage, et un échec ne gêne jamais l'utilisation. Ensuite, l'envoi
     // automatique vers Drive (désactivé au départ) : au plus une fois par jour, seulement si Google est connecté.
     unawaited(_sauvegardesAutomatiques(sauvegarde, conteneur));
+
+    // Rappel de la déclaration des recettes : s'il est activé, on reprogramme les mois à venir (l'horizon avance à
+    // chaque ouverture). Aussi en arrière-plan ; rien ne se passe tant que le rappel est désactivé.
+    unawaited(conteneur.read(serviceRappelsDeclarationProvider).synchroniser());
   } catch (erreur, pile) {
     debugPrint('Ouverture de la base impossible : $erreur\n$pile');
     runApp(ErreurDemarrageApp(erreur: erreur));

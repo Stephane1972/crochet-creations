@@ -2,8 +2,9 @@
 # Prépare la plateforme Android de l'application :
 #   1. crée le dossier android/ s'il n'existe pas (via `flutter create`) ;
 #   2. règle le nom affiché sous l'icône : « Un p’tit crochet dans les stocks » ;
-#   3. prépare la signature de l'APK : clé stable si la CI la fournit, sinon clé de débogage (tool/patch_signature_android.py) ;
-#   4. génère les icônes de l'application à partir de assets/icon/ (logo fourni, voir tool/generate_icons.py).
+#   3. prépare les notifications programmées du rappel de déclaration (tool/patch_notifications_android.py) ;
+#   4. prépare la signature de l'APK : clé stable si la CI la fournit, sinon clé de débogage (tool/patch_signature_android.py) ;
+#   5. génère les icônes de l'application à partir de assets/icon/ (logo fourni, voir tool/generate_icons.py).
 #
 # Utilisation (à la racine du dépôt, après `flutter pub get`) :
 #   bash tool/setup_android.sh
@@ -57,6 +58,9 @@ if ! grep -q 'android.permission.INTERNET' "$MANIFEST"; then
   sed -i '0,/<manifest[^>]*>/s||&\n    <uses-permission android:name="android.permission.INTERNET"/>|' "$MANIFEST"
 fi
 grep -q 'android.permission.INTERNET' "$MANIFEST" || { echo "✗ Permission Internet non ajoutée au manifeste" >&2; exit 1; }
+
+echo "→ Notifications programmées (rappel de la déclaration des recettes)"
+python3 tool/patch_notifications_android.py
 
 echo "→ Signature de l'APK"
 python3 tool/patch_signature_android.py

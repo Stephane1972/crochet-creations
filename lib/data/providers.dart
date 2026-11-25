@@ -8,6 +8,8 @@ import 'drive/compte_google.dart';
 import 'drive/service_drive.dart';
 import 'drive/service_partages_drive.dart';
 import 'drive/service_sauvegarde_drive.dart';
+import 'notifications/planificateur_rappels.dart';
+import 'notifications/service_rappels_declaration.dart';
 import 'partage/ouvreur_adresse.dart';
 import 'partage/service_documents.dart';
 import 'partage/service_partage_fichiers.dart';
@@ -192,6 +194,18 @@ final agendaRepositoryProvider = Provider<AgendaRepository>((ref) => AgendaRepos
 
 /// Ouverture d'une adresse web (Google Agenda) dans le navigateur. Les tests la remplacent par un faux ouvreur.
 final ouvreurAdresseProvider = Provider<OuvreurAdresse>((ref) => const OuvreurAdresseSysteme());
+
+/// Notifications de l'appareil (Android et Windows). Les tests le remplacent par un faux planificateur.
+final planificateurRappelsProvider = Provider<PlanificateurRappels>((ref) => PlanificateurRappelsSysteme());
+
+/// Le rappel de la déclaration des recettes (réglage + notifications programmées).
+final serviceRappelsDeclarationProvider = Provider<ServiceRappelsDeclaration>(
+  (ref) => ServiceRappelsDeclaration(
+    parametres: ref.watch(parametresRepositoryProvider),
+    planificateur: ref.watch(planificateurRappelsProvider),
+    horloge: ref.watch(horlogeProvider),
+  ),
+);
 
 final statistiquesRepositoryProvider = Provider<StatistiquesRepository>(
   (ref) => StatistiquesRepository(ref.watch(appDatabaseProvider)),

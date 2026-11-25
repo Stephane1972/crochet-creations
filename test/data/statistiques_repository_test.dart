@@ -480,6 +480,117 @@ void main() {
     });
   });
 
+  group('recettes pour la déclaration', () {
+    test('le mois en cours et le mois précédent, objets et prestations séparés', () async {
+      // Octobre : un objet (3 000) et une prestation (4 500).
+      await vente(
+        date: DateTime(2026, 10, 5, 9),
+        lignes: <_L>[const _L('Bonnet', prix: 3000)],
+        paiements: <_P>[_P(DateTime(2026, 10, 5, 9), 3000)],
+      );
+      await vente(
+        date: DateTime(2026, 10, 20, 14),
+        lignes: <_L>[const _L('Couverture sur mesure', nature: NatureLigne.service, prix: 4500)],
+        paiements: <_P>[_P(DateTime(2026, 10, 20, 14), 4500)],
+      );
+      // Septembre : un objet payé le dernier jour du mois, tard le soir (2 000), et une prestation (1 500).
+      await vente(
+        date: DateTime(2026, 9, 30, 22),
+        lignes: <_L>[const _L('Écharpe', prix: 2000)],
+        paiements: <_P>[_P(DateTime(2026, 9, 30, 23), 2000)],
+      );
+      await vente(
+        date: DateTime(2026, 9, 2, 10),
+        lignes: <_L>[const _L('Retouche', nature: NatureLigne.service, prix: 1500)],
+        paiements: <_P>[_P(DateTime(2026, 9, 2, 10), 1500)],
+      );
+      // Ni août ni novembre ne comptent.
+      await vente(
+        date: DateTime(2026, 8, 31, 12),
+        lignes: <_L>[const _L('Pochon', prix: 900)],
+        paiements: <_P>[_P(DateTime(2026, 8, 31, 12), 900)],
+      );
+
+      final RecettesDeclaration r = await stats.recettesDeclaration(maintenant: maintenant);
+
+      expect(r.courant.debut, DateTime(2026, 10));
+      expect(r.courant.encaisseObjetsCentimes, 3000);
+      expect(r.courant.encaissePrestationsCentimes, 4500);
+      expect(r.courant.encaisseTotalCentimes, 7500);
+      expect(r.precedent.debut, DateTime(2026, 9));
+      expect(r.precedent.encaisseObjetsCentimes, 2000);
+      expect(r.precedent.encaissePrestationsCentimes, 1500);
+      expect(r.precedent.encaisseTotalCentimes, 3500);
+    });
+
+    test('un remboursement est déduit du mois où il est fait', () async {
+      await vente(
+        date: DateTime(2026, 9, 10, 10),
+        lignes: <_L>[const _L('Bonnet', prix: 5000)],
+        paiements: <_P>[_P(DateTime(2026, 9, 10, 10), 5000), _P(DateTime(2026, 10, 12, 9), -1200)],
+      );
+
+      final RecettesDeclaration r = await stats.recettesDeclaration(maintenant: maintenant);
+
+      expect(r.precedent.encaisseTotalCentimes, 5000);
+      expect(r.courant.encaisseTotalCentimes, -1200);
+    });
+
+    test('en janvier, le mois précédent est décembre de l’année d’avant', () async {
+      await vente(
+        date: DateTime(2026, 12, 18, 10),
+        lignes: <_L>[const _L('Pull', prix: 8000)],
+        paiements: <_P>[_P(DateTime(2026, 12, 18, 10), 8000)],
+      );
+
+      final RecettesDeclaration r = await stats.recettesDeclaration(maintenant: DateTime(2027, 1, 12, 9));
+
+      expect(r.courant.debut, DateTime(2027));
+      expect(r.courant.encaisseTotalCentimes, 0);
+      expect(r.precedent.debut, DateTime(2026, 12));
+      expect(r.precedent.encaisseTotalCentimes, 8000);
+    });
+
+    test('base vide : tout est à zéro', () async {
+      final RecettesDeclaration r = await stats.recettesDeclaration(maintenant: maintenant);
+
+      expect(r.courant.encaisseTotalCentimes, 0);
+      expect(r.precedent.encaisseTotalCentimes, 0);
+    });
+
+    test('le flux se met à jour quand un paiement est enregistré', () async {
+      final int id = await vente(date: DateTime(2026, 10, 29, 10), lignes: <_L>[const _L('Bonnet', prix: 2000)]);
+
+      final List<int> encaisses = <int>[];
+      Completer<void> prochain = Completer<void>();
+      final StreamSubscription<RecettesDeclaration> abonnement = stats
+          .observerRecettesDeclaration(horloge: () => maintenant)
+          .listen((RecettesDeclaration r) {
+            encaisses.add(r.courant.encaisseTotalCentimes);
+            if (!prochain.isCompleted) prochain.complete();
+          });
+
+      await prochain.future.timeout(const Duration(seconds: 5));
+      expect(encaisses, <int>[0]);
+
+      prochain = Completer<void>();
+      await db
+          .into(db.paiements)
+          .insert(
+            PaiementsCompanion.insert(
+              venteId: id,
+              montantCentimes: 2000,
+              modePaiement: ModePaiement.carte,
+              datePaiement: Value(DateTime(2026, 10, 29, 10)),
+            ),
+          );
+      await prochain.future.timeout(const Duration(seconds: 5));
+      expect(encaisses.last, 2000);
+
+      await abonnement.cancel();
+    });
+  });
+
   group('en direct', () {
     test('le flux se met à jour quand une vente est payée', () async {
       final DateTime date = DateTime(2026, 10, 29, 10);

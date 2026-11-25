@@ -81,6 +81,10 @@ class ParametresEntreprise extends Table with Tracabilite {
   BoolColumn get agendaDeclaration => boolean().withDefault(const Constant(true))();
   BoolColumn get agendaEvenements => boolean().withDefault(const Constant(true))();
 
+  /// Rappel de la déclaration des recettes (schéma 8) : notification 3 jours avant la fin du mois et le dernier jour.
+  /// Désactivé au départ : il s'active dans l'écran « Déclaration des recettes » (qui demande l'autorisation).
+  BoolColumn get rappelDeclaration => boolean().withDefault(const Constant(false))();
+
   @override
   Set<Column> get primaryKey => {id};
 }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:crochet_creations/data/database/app_database.dart';
 import 'package:crochet_creations/data/repositories/parametres_repository.dart';
 import 'package:crochet_creations/domain/enums.dart';
@@ -48,6 +50,32 @@ void main() {
     final Entreprise e = await repo.lire();
     expect(e.nomCommercial, 'Crochet & Créations');
     expect(e.modeTheme, ModeTheme.nuit);
+  });
+
+  test('le rappel de la déclaration est désactivé au départ, puis mémorisé sans toucher aux autres réglages', () async {
+    expect(await repo.lireRappelDeclaration(), isFalse);
+    expect(ParametresRepository.rappelDeclarationDe(await repo.lire()), isFalse);
+
+    await repo.modifier(const ParametresEntrepriseCompanion(ville: Value('Toulouse')));
+    await repo.enregistrerRappelDeclaration(true);
+    expect(await repo.lireRappelDeclaration(), isTrue);
+    expect((await repo.lire()).ville, 'Toulouse');
+
+    await repo.enregistrerRappelDeclaration(false);
+    expect(await repo.lireRappelDeclaration(), isFalse);
+    expect((await repo.lire()).ville, 'Toulouse');
+  });
+
+  test('le rappel de la déclaration est annoncé en direct aux écrans ouverts', () async {
+    final List<bool> vus = <bool>[];
+    final StreamSubscription<bool> subscription = repo.observer().map(ParametresRepository.rappelDeclarationDe).listen(vus.add);
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    await repo.enregistrerRappelDeclaration(true);
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    await subscription.cancel();
+
+    expect(vus.first, isFalse);
+    expect(vus.last, isTrue);
   });
 
   test('toujours une seule ligne de réglages', () async {

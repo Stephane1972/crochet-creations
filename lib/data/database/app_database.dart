@@ -58,7 +58,7 @@ class AppDatabase extends _$AppDatabase {
 
   /// Version du schéma. **À augmenter à chaque modification de `tables.dart`**,
   /// avec l'étape de migration correspondante dans [migration] (voir ARCHITECTURE.md).
-  static const int versionSchema = 7;
+  static const int versionSchema = 8;
 
   @override
   int get schemaVersion => versionSchema;
@@ -160,6 +160,11 @@ class AppDatabase extends _$AppDatabase {
         await m.addColumn(parametresEntreprise, parametresEntreprise.agendaDevis);
         await m.addColumn(parametresEntreprise, parametresEntreprise.agendaDeclaration);
         await m.addColumn(parametresEntreprise, parametresEntreprise.agendaEvenements);
+      }
+      // Version 8 : le rappel de la déclaration des recettes (un réglage, désactivé au départ) ; aucune donnée existante
+      // n'est touchée.
+      if (from < 8) {
+        await m.addColumn(parametresEntreprise, parametresEntreprise.rappelDeclaration);
       }
     },
 

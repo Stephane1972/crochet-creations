@@ -52,6 +52,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../data/aide_drive.dart';
+import '../data/aide_rappels.dart';
 
 /// Faux appareil photo : choisit toujours le fichier [chemin] (ou annule si `null`).
 class FauxSelecteurPhoto implements SelecteurPhoto {
@@ -252,6 +253,8 @@ class EnvironnementTest {
   final FauxSelecteurPieceJointe selecteurPieceJointe = FauxSelecteurPieceJointe();
   final FauxOuvreurPieceJointe ouvreurPieceJointe = FauxOuvreurPieceJointe();
   final FauxOuvreurAdresse ouvreurAdresse = FauxOuvreurAdresse();
+  /// Faux système de notifications (Android et Windows) : rien ne s'affiche, il note ce qu'on lui demande.
+  final FauxPlanificateurRappels planificateur = FauxPlanificateurRappels();
   late final AgendaRepository agenda = AgendaRepository(db);
   /// Faux compte Google et faux Drive : aucun réseau, aucune fenêtre de connexion.
   FauxCompteGoogle compteGoogle = FauxCompteGoogle();
@@ -333,6 +336,7 @@ class EnvironnementTest {
     selecteurPieceJointeProvider.overrideWithValue(selecteurPieceJointe),
     ouvreurPieceJointeProvider.overrideWithValue(ouvreurPieceJointe),
     ouvreurAdresseProvider.overrideWithValue(ouvreurAdresse),
+    planificateurRappelsProvider.overrideWithValue(planificateur),
     generateurFacturePdfProvider.overrideWithValue(generateurPdf.call),
     generateurDevisPdfProvider.overrideWithValue(generateurDevisPdf.call),
     serviceDocumentsProvider.overrideWithValue(documents),

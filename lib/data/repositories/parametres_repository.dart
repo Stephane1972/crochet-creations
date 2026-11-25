@@ -141,6 +141,15 @@ class ParametresRepository implements ModeThemeStore {
     ),
   );
 
+  /// Le rappel de la déclaration des recettes est-il demandé ? (Désactivé tant que rien n'a été choisi.)
+  static bool rappelDeclarationDe(Entreprise e) => e.rappelDeclaration;
+
+  Future<bool> lireRappelDeclaration() async => (await lire()).rappelDeclaration;
+
+  /// Mémorise le choix d'être rappelé (ou non) de la déclaration des recettes.
+  Future<void> enregistrerRappelDeclaration(bool actif) =>
+      modifier(ParametresEntrepriseCompanion(rappelDeclaration: Value(actif)));
+
   /// Mode d'affichage mémorisé (automatique tant que rien n'a été choisi).
   Future<ThemeMode> lireModeTheme() async => _versThemeMode((await lire()).modeTheme);
 

@@ -74,7 +74,7 @@ fenêtre redimensionnable.
 - [x] Google Drive sous Windows : connexion dans le navigateur, accès « application de bureau » (PR #28 fusionnée, 0.24.0)
 - [x] Synchroniser téléphone et PC (demandé par Stéphane, choix : **reprise d'un appareil à l'autre + envoi automatique à la fermeture**, un seul
   appareil actif à la fois, pas de fusion de modifications simultanées) : proposition de reprise à l'ouverture, envoi à la fermeture
-  (Windows) et en arrière-plan (Android) (0.25.0, en attente de validation)
+  (Windows) et en arrière-plan (Android) (PR #29 fusionnée, 0.25.0)
 
 - [ ] Plus tard, par étapes et seulement sur demande : mise en page pour grand écran, photos réduites à l'ajout, installateur ou signature du programme
 
@@ -86,8 +86,9 @@ synchronisation** avec Google Agenda, déclaration **mensuelle** avec rappel **3
 la suivante :
 
 - [x] 1. Accueil + calendrier : tuiles « Bloc-notes » et « Calendrier », calendrier du mois, filtres (cours, devis, déclaration, vos événements),
-  événements personnels, boutons « Ouvrir Google Agenda » et « Ajouter à Google Agenda » (0.26.0, en attente de validation)
-- [ ] 2. Rappel de déclaration : notification 3 jours avant et le dernier jour du mois (Android et Windows), réglages, montant des recettes du mois
+  événements personnels, boutons « Ouvrir Google Agenda » et « Ajouter à Google Agenda » (PR #30 fusionnée, 0.26.0)
+- [x] 2. Rappel de déclaration : notification 3 jours avant et le dernier jour du mois, à 9 h (Android et Windows), écran Plus › Déclaration des
+  recettes (activer, tester, prochain rappel), recettes encaissées ce mois-ci et le mois dernier (0.27.0, en attente de validation)
 - [ ] 3. Synchronisation avec Google Agenda : un calendrier dédié, jamais de suppression sans demande (nécessite d'activer l'API Google Agenda)
 
 ## Version 2 : confort et échanges (propositions, non engagées)

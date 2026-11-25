@@ -70,9 +70,13 @@ class _AgendaScreenState extends ConsumerState<AgendaScreen> {
   }
 
   void _ouvrirEntree(EntreeAgenda entree) {
+    final NavigatorState navigateur = Navigator.of(context);
+    if (entree.type == TypeEntreeAgenda.declaration) {
+      navigateur.pushNamed(AppRoutes.declaration);
+      return;
+    }
     final int? id = entree.identifiant;
     if (id == null) return;
-    final NavigatorState navigateur = Navigator.of(context);
     switch (entree.type) {
       case TypeEntreeAgenda.cours:
         navigateur.pushNamed(AppRoutes.coursFiche, arguments: id);
@@ -81,6 +85,7 @@ class _AgendaScreenState extends ConsumerState<AgendaScreen> {
       case TypeEntreeAgenda.evenement:
         navigateur.pushNamed(AppRoutes.agendaEvenement, arguments: ArgumentsEvenement(evenementId: id));
       case TypeEntreeAgenda.declaration:
+        // Déjà traité plus haut (la déclaration n'a pas d'identifiant).
         break;
     }
   }
@@ -436,7 +441,7 @@ class _DetailDuJour extends StatelessWidget {
           for (final EntreeAgenda entree in entrees)
             _LigneEntree(
               entree: entree,
-              onTap: entree.identifiant == null ? null : () => onOuvrirEntree(entree),
+              onTap: entree.identifiant == null && entree.type != TypeEntreeAgenda.declaration ? null : () => onOuvrirEntree(entree),
               onAjouterAGoogle: () => onAjouterAGoogle(entree),
             ),
         const SizedBox(height: 16),

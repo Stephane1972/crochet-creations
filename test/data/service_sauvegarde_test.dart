@@ -1308,7 +1308,11 @@ void main() {
             ),
           );
       await (banc.db.update(banc.db.parametresEntreprise)..where((t) => t.id.equals(1))).write(
-        const ParametresEntrepriseCompanion(agendaDevis: Value(false), agendaDeclaration: Value(false)),
+        const ParametresEntrepriseCompanion(
+          agendaDevis: Value(false),
+          agendaDeclaration: Value(false),
+          rappelDeclaration: Value(true),
+        ),
       );
 
       final Uint8List octets = await banc.octetsArchive();
@@ -1329,6 +1333,7 @@ void main() {
       expect(reglages.agendaDevis, isFalse);
       expect(reglages.agendaDeclaration, isFalse);
       expect(reglages.agendaEvenements, isTrue);
+      expect(reglages.rappelDeclaration, isTrue);
     });
 
     test('une sauvegarde faite avant le calendrier (schéma 6) est restaurée : aucun événement, tout est affiché', () async {
@@ -1343,7 +1348,13 @@ void main() {
         final Map<String, dynamic> tables = d['tables'] as Map<String, dynamic>;
         tables.remove('evenements_agenda');
         for (final Object? ligne in tables['parametres_entreprise'] as List<dynamic>) {
-          for (final String colonne in <String>['agenda_cours', 'agenda_devis', 'agenda_declaration', 'agenda_evenements']) {
+          for (final String colonne in <String>[
+            'agenda_cours',
+            'agenda_devis',
+            'agenda_declaration',
+            'agenda_evenements',
+            'rappel_declaration',
+          ]) {
             (ligne as Map<String, dynamic>).remove(colonne);
           }
         }
@@ -1364,6 +1375,34 @@ void main() {
       expect(reglages.agendaDevis, isTrue);
       expect(reglages.agendaDeclaration, isTrue);
       expect(reglages.agendaEvenements, isTrue);
+      expect(await instantane(banc.db), avant);
+    });
+  });
+
+  group('sauvegarde d’avant le rappel de déclaration', () {
+    test('une sauvegarde du schéma 7 est restaurée : le rappel de déclaration est désactivé', () async {
+      await remplirBase(banc.db);
+      await banc.ecrireFichiers();
+      final Uint8List actuelle = await banc.octetsArchive();
+      final Map<String, List<Map<String, Object?>>> avant = await instantane(banc.db);
+
+      // L'archive d'avant : la colonne du rappel n'existe pas encore dans les réglages.
+      final Uint8List ancienne = _modifierDonnees(actuelle, (Map<String, dynamic> d) {
+        (d['manifeste'] as Map<String, dynamic>)['versionSchema'] = 7;
+        final Map<String, dynamic> tables = d['tables'] as Map<String, dynamic>;
+        for (final Object? ligne in tables['parametres_entreprise'] as List<dynamic>) {
+          (ligne as Map<String, dynamic>).remove('rappel_declaration');
+        }
+      });
+
+      // L'appareil, lui, avait activé le rappel : la restauration remplace tout, le réglage revient à « désactivé ».
+      await (banc.db.update(banc.db.parametresEntreprise)..where((t) => t.id.equals(1))).write(
+        const ParametresEntrepriseCompanion(rappelDeclaration: Value(true)),
+      );
+      await banc.restaurer(ancienne);
+
+      final Entreprise reglages = await banc.db.select(banc.db.parametresEntreprise).getSingle();
+      expect(reglages.rappelDeclaration, isFalse);
       expect(await instantane(banc.db), avant);
     });
   });

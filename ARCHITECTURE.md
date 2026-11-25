@@ -59,6 +59,7 @@ crochet-creations/
 │   │   ├── lieux_vente.dart                  lieux de départ, « Non renseigné », règles du nom d'un lieu de vente
 │   │   ├── notes.dart                        catégories de notes de départ, « Sans catégorie », règles du nom, du titre et du texte d'une note
 │   │   ├── agenda.dart                       calendrier sans base ni écran : entrées, filtres, grille du mois, tri, échéances de déclaration, adresses Google Agenda
+│   │   ├── declaration.dart                  rappel de déclaration sans notification ni écran : dates des rappels (3 jours avant + dernier jour, 9 h), textes, identifiants
 │   │   ├── erreurs.dart                      erreurs métier à message clair
 │   │   ├── usage_historique.dart             « où apparaît cet élément » (ventes, factures, devis, inscriptions), en phrase
 │   │   ├── regles_client.dart                règles de saisie d'une fiche client (e-mail, téléphone, code postal, SIRET)
@@ -116,6 +117,9 @@ crochet-creations/
 │   │   │   ├── devis_pdf.dart                mise en page du PDF d'un devis (genererDevisPdf)
 │   │   │   ├── construire_document.dart      facture ou devis + profil → DocumentFacture / DocumentDevis
 │   │   │   └── ressources_pdf.dart           polices Poppins et logo lus dans les ressources
+│   │   ├── notifications/
+│   │   │   ├── planificateur_rappels.dart    notifications programmées (interface PlanificateurRappels + flutter_local_notifications : Android et Windows)
+│   │   │   └── service_rappels_declaration.dart activer / désactiver / synchroniser / tester le rappel de déclaration
 │   │   ├── partage/service_documents.dart    partage (share_plus) et impression (printing), remplaçables en test
 │   │   ├── drive/
 │   │   │   ├── compte_google.dart            connexion au compte Google (interface CompteGoogle + google_sign_in), erreurs lisibles (ErreurDrive)
@@ -205,6 +209,9 @@ crochet-creations/
 │       │   ├── agenda_screen.dart            Accueil ou Plus › Calendrier : grille du mois, filtres, liste du jour, liens Google Agenda
 │       │   ├── evenement_form_screen.dart    un événement : titre, jour, toute la journée ou heures, précisions ; enregistrer, supprimer
 │       │   └── agenda_providers.dart         entrées du mois et filtres, en direct
+│       ├── declaration/                      rappel de déclaration (voir « Rappel de déclaration »)
+│       │   ├── declaration_screen.dart       Plus › Déclaration des recettes : rappel, essai de notification, recettes du mois et du mois dernier
+│       │   └── declaration_providers.dart    rappel activé, notifications autorisées, recettes en direct
 │       ├── notes/                            bloc-notes (voir « Bloc-notes »)
 │       │   ├── notes_screen.dart             Plus › Bloc-notes : liste, filtres par catégorie, « Nouvelle note »
 │       │   ├── note_form_screen.dart         une note : titre, catégorie, texte, pièces jointes ; enregistrer, supprimer, abandonner
@@ -247,10 +254,11 @@ crochet-creations/
 ├── tool/
 │   ├── generate_icons.py             logo fourni → premier plan d'icône adaptative et logo de l'application
 │   ├── setup_android.sh              crée android/, règle le nom, prépare la signature, génère les icônes
+│   ├── patch_notifications_android.py ajoute au projet android/ ce que demandent les notifications programmées (récepteurs, desugaring, compileSdk)
 │   ├── patch_signature_android.py    branche la clé de signature stable dans android/app/build.gradle.kts
 │   ├── empreinte_signature_apk.py    lit la signature d'un APK (SHA-256 / SHA-1) et la compare à l'attendue
 │   ├── signature_attendue.txt        empreinte SHA-256 attendue de la clé stable (publique)
-│   ├── tests/                        tests Python des scripts de signature (modèle Gradle de Flutter en copie)
+│   ├── tests/                        tests Python des scripts de signature et de notifications (modèle Gradle de Flutter en copie)
 │   └── ci_annoter.sh                 publie les erreurs de la CI en annotations lisibles
 ├── pubspec.yaml
 └── analysis_options.yaml
@@ -298,6 +306,8 @@ les produits : `domain/produits/`, `data/produits/`, `presentation/produits/`.
   (`stockagePiecesJointesProvider`, `selecteurPieceJointeProvider`, `ouvreurPieceJointeProvider`), remplacés en test ;
 - calendrier (`presentation/agenda/agenda_providers.dart`) : `entreesAgendaProvider` (tout ce qui est prévu dans la grille d'un mois, en direct),
   `filtresAgendaProvider` (types affichés, en direct) ; `agendaRepositoryProvider` et `ouvreurAdresseProvider` sont dans `data/providers.dart` ;
+- rappel de déclaration (`presentation/declaration/declaration_providers.dart`) : `rappelDeclarationProvider` (réglage en direct), `notificationsAutoriseesProvider`,
+  `recettesDeclarationProvider` (recettes en direct) ; `planificateurRappelsProvider` et `serviceRappelsDeclarationProvider` sont dans `data/providers.dart` ;
 - `filtresProduitsProvider` : recherche, catégorie (clé), « Archivés », « À réapprovisionner ». Il vit au-dessus des écrans :
   le filtre choisi depuis l'accueil (« Stock faible ») s'applique à l'ouverture de l'onglet Produits ;
 - clients (`presentation/clients/clients_providers.dart`) : `clientsProvider` (tous les clients, archivés compris, en
@@ -1318,7 +1328,7 @@ seuls les **événements de l'utilisatrice** ont une table (`evenements_agenda`,
 ### Écrans
 
 - `AgendaScreen` (routes `agenda`, tuile de l'accueil et entrée de *Plus*) : grille du mois, filtres, liste du jour choisi, *Nouvel événement*,
-  *Ouvrir Google Agenda*, et sur chaque ligne l'icône *Ajouter à Google Agenda*. Toucher un cours ou un devis ouvre sa fiche, un événement son formulaire.
+  *Ouvrir Google Agenda*, et sur chaque ligne l'icône *Ajouter à Google Agenda*. Toucher un cours ou un devis ouvre sa fiche, un événement son formulaire, la déclaration l'écran « Déclaration des recettes » (0.27.0).
   Elle lit **tous** les types du mois et masque ceux que les filtres écartent.
 - `EvenementFormScreen` (route `agendaEvenement`) : titre, jour, « Toute la journée » ou heures, précisions, *Supprimer l'événement* avec confirmation.
 - `OuvreurAdresse` (`data/partage/ouvreur_adresse.dart`) : sous Windows, `ouvrirDansLeNavigateur` (déjà utilisé pour la connexion à Google) ; sous
@@ -1327,7 +1337,7 @@ seuls les **événements de l'utilisatrice** ont une table (`evenements_agenda`,
 
 ### Limites
 
-Pas encore de notification (étape 2) ni de synchronisation avec Google Agenda (étape 3) ; événements sur un seul jour et sans répétition ; le lien
+Pas encore de synchronisation avec Google Agenda (étape 3) ; événements sur un seul jour et sans répétition ; le lien
 « Ajouter à Google Agenda » crée seulement un événement prérempli (rien n'est enregistré sans le clic de l'utilisatrice).
 
 **Tests** : `test/domain/agenda_test.dart` (grille, tri, échéances, adresses), `test/data/agenda_repository_test.dart` (événements, validation,
@@ -1335,13 +1345,74 @@ cours / devis / déclaration et filtres, flux en direct), `test/presentation/age
 modification, suppression, liens), `schema_test` et `migration_schema_test` (version 7, migration 6 → 7), `service_sauvegarde_test`
 (aller-retour, ancienne archive).
 
+## Rappel de déclaration (demande de novembre 2026, étape 2 sur 3 — 0.27.0)
+
+Le rappel envoie une notification 3 jours avant le dernier jour de chaque mois, puis le dernier jour, à 9 h. Il est **désactivé au départ** ; son
+état est une colonne de `parametres_entreprise` (`rappel_declaration`, schéma 8) : il suit donc la sauvegarde et la reprise entre appareils.
+
+### Règles (`domain/declaration.dart`, sans notification ni écran)
+
+- `prochainsRappelsDeclaration(maintenant, mois: 12)` : pour chacun des 12 mois à partir de celui de `maintenant`, un rappel `avance` (3 jours avant le
+  dernier jour) et un rappel `dernierJour`, à 9 h locales ; ceux dont l'heure n'est pas **après** `maintenant` sont écartés. Les dates sont composées
+  jour par jour (`DateTime(année, mois, jour - 3, 9)`), et non en retirant 72 h : un changement d'heure ne décale rien. Le mois de février (28 ou
+  29 jours) et le passage à l'année suivante sont gérés par `DateTime` et `dernierJourDuMois`.
+- `identifiantRappel(dernierJour, type)` = année × 1000 + mois × 10 + type (0 : avance, 1 : dernier jour), par exemple 2026110 et 2026111 pour novembre
+  2026. L'identifiant est **stable** : reprogrammer un rappel remplace l'ancien. `estIdentifiantRappel` ne reconnaît que ces identifiants (7 chiffres),
+  pour ne jamais toucher aux autres notifications (l'essai utilise l'identifiant 1).
+- Textes : titre « Déclaration des recettes » ; corps avec le jour de fin de mois. Le montant des recettes n'est **pas** dans la notification
+  (texte fixe, programmé à l'avance) : il se lit dans l'écran.
+
+### Notifications (`data/notifications/`)
+
+- `PlanificateurRappels` (interface, remplacée par un faux en test : `test/data/aide_rappels.dart`) : `disponible`, `autorise`, `demanderAutorisation`,
+  `remplacer(rappels)`, `annuler`, `afficherMaintenant`. `PlanificateurRappelsSysteme` utilise `flutter_local_notifications` 23 (et `timezone`) :
+  initialisation à la demande (icône `@mipmap/ic_launcher` sous Android ; `appName`, `appUserModelId` et `guid` fixes sous Windows), canal Android
+  `declaration_recettes`, `zonedSchedule` avec `AndroidScheduleMode.inexactAllowWhileIdle` (pas d'autorisation d'alarme exacte à demander ; l'heure peut
+  varier un peu). `remplacer` annule d'abord les notifications en attente dont l'identifiant est un rappel, puis programme les nouvelles.
+  Disponible sous Android et Windows (pas sur le web).
+- `ServiceRappelsDeclaration` : `activer` (demande l'autorisation → `remplacer` → mémorise le choix ; si l'autorisation est refusée, rien n'est
+  programmé ni mémorisé), `desactiver` (annule, puis mémorise), `synchroniser` (au démarrage, dans `main.dart` : ne fait rien si le rappel est
+  désactivé, si l'appareil n'a pas de notifications ou si l'autorisation a été retirée ; reprogramme les 12 mois à venir, donc l'horizon avance à
+  chaque ouverture ; une erreur est ignorée et n'empêche jamais l'ouverture), `tester` (affiche une notification tout de suite).
+- Android : `tool/patch_notifications_android.py` (appelé par `tool/setup_android.sh`) ajoute au projet généré la permission
+  `RECEIVE_BOOT_COMPLETED`, les récepteurs `ScheduledNotificationReceiver` et `ScheduledNotificationBootReceiver` (reprogrammation après un
+  redémarrage du téléphone), le *desugaring* Java (`isCoreLibraryDesugaringEnabled`, dépendance `desugar_jdk_libs`), `multiDexEnabled` et
+  `compileSdk` au moins 37. Il s'arrête avec un message clair si un fichier n'a pas la forme attendue, et peut être relancé sans risque ; ses tests sont
+  dans `tool/tests/test_notifications.py` (lancés par la CI). La permission `POST_NOTIFICATIONS` (Android 13+) vient de la bibliothèque.
+- Windows : notifications de bureau programmées par le système (elles s'affichent application fermée) ; nécessite Dart 3.12 / Flutter 3.44 au minimum
+  (exigence de la bibliothèque).
+
+### Recettes (`StatistiquesRepository`)
+
+`recettesDeclaration` rend `({courant, précédent})`, deux `StatsPeriode` du **mois** : le mois de `maintenant` et le mois d'avant (calculé au 15 du mois
+précédent, pour éviter tout piège de fin de mois). Ce sont les mêmes chiffres que l'écran Statistiques : argent **encaissé** (paiements datés dans le
+mois, remboursements déduits), objets d'un côté, prestations et cours de l'autre. `observerRecettesDeclaration` les suit en direct (`observerTables`) avec
+l'heure de `horlogeProvider`.
+
+### Écran (`DeclarationScreen`)
+
+Route `declaration`, entrée de *Plus* et ligne « Déclaration » du calendrier. Carte du rappel : interrupteur, prochain rappel, avertissement si les
+notifications sont bloquées (`rappel-bloque`), bouton *Tester la notification* ; si l'appareil n'a pas de notifications, une phrase le dit à la place.
+Carte des recettes : *Ce mois-ci* et *Le mois dernier*. Rien n'est envoyé à l'organisme.
+
+### Limites
+
+Pas encore essayé sur un vrai appareil ; heure approximative sous Android ; comportement sous Windows avec le dossier `.zip` portable à vérifier ; texte
+fixe ; toucher la notification ouvre l'application ; 9 h et les jours fixes ; programmation refaite à l'ouverture (12 mois d'avance).
+
+**Tests** : `test/domain/declaration_test.dart` (dates, février, années, heures passées, identifiants), `test/data/service_rappels_declaration_test.dart`
+(activer, refus, désactiver, synchroniser, tester), `statistiques_repository_test` (recettes du mois et du mois précédent, flux), `parametres_repository_test`
+(réglage), `test/presentation/declaration_ecran_test.dart` (écran, Android et Windows), `agenda_ecrans_test` (ligne « Déclaration »), `schema_test` et
+`migration_schema_test` (version 8, migration 7 → 8), `service_sauvegarde_test` (réglage dans l'archive, archive d'avant le rappel),
+`tool/tests/test_notifications.py` (script Android).
+
 ## Dossier `android/`
 
 Le dossier `android/` n'est pas versionné. `tool/setup_android.sh` le crée avec `flutter create`,
 règle le nom affiché (« Un p’tit crochet dans les stocks ») et génère les icônes. La CI exécute ce script à chaque fois.
 
 Conséquence à garder en tête pour les étapes suivantes : toute modification de configuration Android
-devra être ajoutée à ce script. `image_picker` (étape 3) n'en demande aucune : la galerie passe par le sélecteur
+devra être ajoutée à ce script (c'est ce que fait `tool/patch_notifications_android.py` pour les notifications, depuis la version 0.27.0). `image_picker` (étape 3) n'en demande aucune : la galerie passe par le sélecteur
 de photos du système, sans permission. L'appareil photo, lui, ouvre l'application photo du téléphone ; si
 Android ferme l'application pendant la prise de vue, la photo est retrouvée au démarrage suivant (voir *Photos*).
 Si cette contrainte gêne, on pourra versionner `android/` à la place (il suffit de retirer `/android/` du `.gitignore`).
@@ -1429,7 +1500,7 @@ Pas d'appareil photo ; photos non réduites
 |-------|----------|------|
 | Base de données | **Drift** (SQLite) : requêtes typées et vérifiées à la compilation, migrations versionnées, flux de données réactifs, base en mémoire pour les tests. Meilleur choix de maintenabilité parmi les deux options du cahier des charges | mis en œuvre à l'étape 2, à confirmer |
 | Dépendances | `drift`, `drift_flutter` (ouverture du fichier), `path_provider` ; en développement `drift_dev` et `build_runner`. SQLite est embarqué automatiquement par le paquet `sqlite3` | étape 2 |
-| Version minimale | Dart 3.10 / Flutter 3.38 (exigé par Drift 2.35) : utiliser le canal *stable* | étape 2 |
+| Version minimale | Dart 3.12 / Flutter 3.44 (exigé par `flutter_local_notifications` 23 depuis la version 0.27.0 ; Drift 2.35 demandait déjà Dart 3.10 / Flutter 3.38) : utiliser le canal *stable* | étape 2, relevée en 0.27.0 |
 | Modèles | Classes de lignes générées par Drift, pas de seconde série d'entités | étape 2 |
 | Mémorisation du mode jour/nuit | Dans la base (`parametres_entreprise`), sans bibliothèque supplémentaire | fait |
 | Photos des produits | `image_picker` (galerie et appareil photo, aucune permission à déclarer), copie dans le dossier privé de l'application ; chemin relatif en base | étape 3 |
@@ -1438,6 +1509,7 @@ Pas d'appareil photo ; photos non réduites
 | Sauvegarde et export | `archive` (fabriquer et lire les `.zip` ; depuis l'étape 3 du plan d'évolution, **en flux** : `ZipFileEncoder`, `InputFileStream`, `OutputFileStream`) et `file_picker` (choisir un fichier à restaurer, sélecteur du système sans permission) ; partage par `share_plus` | étape 11 |
 | Sauvegarde fiable | `crypto` (SHA-256 des fichiers, en flux) ; `disk_space_plus` (place libre du téléphone, derrière l'interface `ControleEspaceLibre` : une mesure impossible est traitée comme « inconnue » et ne bloque jamais une sauvegarde) | étape 3 du plan d'évolution |
 | Google Drive | `google_sign_in` (connexion, Android : Google Play Services), `googleapis` (API Drive v3) et `http` ; droit `drive.file` seulement ; ID client Web non secret ; gratuit (voir « Google Drive ») | étape 6 du plan d'évolution |
+| Notifications | `flutter_local_notifications` (notifications programmées, Android et Windows) et `timezone` ; programmation inexacte sous Android (pas d'alarme exacte à autoriser) ; texte fixe ; gratuit, sans serveur (voir « Rappel de déclaration ») | 0.27.0 |
 | Dépendances des étapes suivantes | arriveront avec les étapes qui s'en servent | à venir |
 
 ### Hypothèses du schéma, à confirmer
@@ -1494,6 +1566,9 @@ Le cahier des charges ne tranchait pas ces points ; voici ce qui a été retenu 
   archive du schéma 5) et `notes_ecrans_test` (limites affichées, ajout, refus, retrait, abandon, ouverture, nombre dans la liste).
 - Calendrier (0.26.0) : `domain/agenda_test`, `agenda_repository_test`, `agenda_ecrans_test` (détail dans « Calendrier »), `schema_test`,
   `migration_schema_test` (version 7, migration 6 → 7) et `service_sauvegarde_test` (événements dans l'archive, archive d'avant le calendrier).
+- Rappel de déclaration (0.27.0) : `domain/declaration_test`, `service_rappels_declaration_test`, `declaration_ecran_test`, `statistiques_repository_test`,
+  `parametres_repository_test`, `schema_test` et `migration_schema_test` (version 8, migration 7 → 8), `service_sauvegarde_test`, `tool/tests/test_notifications.py`
+  (détail dans « Rappel de déclaration »).
 - Suppression d'un client ou d'un produit : `suppression_repository_test` (historique conservé, noms copiés, lignes détachées,
   inscriptions refusées), `migration_schema_test` (base du schéma 1 mise à jour sans perte), `service_sauvegarde_test`
   (archive du schéma 1), `export_csv_test` et `devis_repository_test` (client supprimé), `domain/usage_historique_test`.

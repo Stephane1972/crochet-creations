@@ -4,6 +4,7 @@ import '../../core/router/app_routes.dart';
 import '../../domain/drive_sauvegardes.dart';
 import '../agenda/agenda_screen.dart';
 import '../agenda/evenement_form_screen.dart';
+import '../declaration/declaration_screen.dart';
 import '../clients/client_fiche_screen.dart';
 import '../clients/client_form_screen.dart';
 import '../common/placeholder_screen.dart';
@@ -89,6 +90,8 @@ abstract final class AppRouter {
         );
       case AppRoutes.agenda:
         return _page(settings, const AgendaScreen());
+      case AppRoutes.declaration:
+        return _page(settings, const DeclarationScreen());
       case AppRoutes.agendaEvenement:
         final Object? argumentsEvenement = settings.arguments;
         return _page(

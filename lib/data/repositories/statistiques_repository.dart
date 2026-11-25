@@ -8,6 +8,10 @@ import 'statistiques_vues.dart';
 
 typedef _Bornes = ({DateTime debut, DateTime fin});
 
+/// L'argent encaissé pendant le mois en cours et pendant le mois précédent : ce qu'on reporte lors de la déclaration des
+/// recettes. [courant] et [precedent] sont des périodes « mois » complètes ([StatsPeriode.debut] donne le mois).
+typedef RecettesDeclaration = ({StatsPeriode courant, StatsPeriode precedent});
+
 /// Statistiques : lit les ventes, paiements, dépenses et factures, puis laisse `domain/calculs/statistiques.dart`
 /// faire les calculs. Ce dépôt ne modifie jamais rien.
 class StatistiquesRepository {
@@ -70,6 +74,23 @@ class StatistiquesRepository {
       _db.categoriesProduit,
     },
     () => calculer(maintenant: horloge?.call()),
+  );
+
+  /// Les recettes encaissées pendant le mois de [maintenant] et pendant le mois d'avant (sans rien déduire d'autre que
+  /// les remboursements : c'est le « chiffre d'affaires » des statistiques).
+  Future<RecettesDeclaration> recettesDeclaration({DateTime? maintenant}) async {
+    final DateTime instant = maintenant ?? DateTime.now();
+    final Statistiques courant = await calculer(maintenant: instant);
+    // Le 15 du mois précédent : un jour qui n'existe jamais « en double » quel que soit le mois.
+    final Statistiques precedent = await calculer(maintenant: DateTime(instant.year, instant.month - 1, 15));
+    return (courant: courant.periode(PeriodeStats.mois), precedent: precedent.periode(PeriodeStats.mois));
+  }
+
+  /// [recettesDeclaration], relues automatiquement à chaque vente, paiement ou remboursement.
+  Stream<RecettesDeclaration> observerRecettesDeclaration({DateTime Function()? horloge}) => observerTables(
+    _db,
+    <ResultSetImplementation>{_db.ventes, _db.lignesVente, _db.paiements, _db.produits, _db.categoriesProduit},
+    () => recettesDeclaration(maintenant: horloge?.call()),
   );
 
   /// Toutes les ventes avec leurs lignes et leurs paiements, de tout temps : la matière de l'analyse détaillée, qui

@@ -137,7 +137,14 @@ class ClientOAuthBureau {
   /// Ouvre le navigateur sur la page de Google, attend le retour, puis échange le code contre les jetons.
   ///
   /// Lève une [ErreurDrive] : `annulee` si la personne refuse ou ferme (ou relance la connexion), un message lisible sinon.
-  Future<JetonsGoogle> autoriser({required String clientId, required String codeSecret}) async {
+  ///
+  /// [portees] : les droits demandés (par défaut [porteesConnexionBureau] : Drive seul). Google laisse la personne décocher
+  /// chaque droit : à l'appelant de lire [JetonsGoogle.portees] pour savoir ce qui a été accordé (Drive est vérifié ici).
+  Future<JetonsGoogle> autoriser({
+    required String clientId,
+    required String codeSecret,
+    List<String> portees = porteesConnexionBureau,
+  }) async {
     annulerConnexionEnCours();
     final Completer<void> annulation = Completer<void>();
     _annulation = annulation;
@@ -159,7 +166,9 @@ class ClientOAuthBureau {
       // Si le navigateur ne s'ouvre pas, ce retour n'est jamais attendu : son échec ne doit alors pas remonter tout seul.
       retour.ignore();
       try {
-        await _ouvreur(adresseDeConnexion(clientId: clientId, redirection: redirection, defi: defiPkce(preuve), etat: etat));
+        await _ouvreur(
+          adresseDeConnexion(clientId: clientId, redirection: redirection, defi: defiPkce(preuve), etat: etat, portees: portees),
+        );
       } catch (_) {
         annulation.complete();
         throw const ErreurDrive('Impossible d’ouvrir votre navigateur. Ouvrez-le, puis réessayez.');

@@ -24,6 +24,25 @@ void main() {
     expect(r.jetonActualisation, isNull);
     expect(r.email, isEmpty);
     expect(r.nom, isNull);
+    expect(r.agenda, isFalse);
+  });
+
+  test('le droit « Google Agenda » est gardé ; un ancien fichier qui n’en parle pas le donne comme non accordé', () async {
+    await stockage.ecrire(
+      const ReglagesGoogleBureau(clientId: 'id.apps.googleusercontent.com', jetonActualisation: 'actualisation', agenda: true),
+    );
+    expect((await stockage.lire()).agenda, isTrue);
+
+    await stockage.fichier.writeAsString(
+      jsonEncode(<String, Object?>{'clientId': 'id.apps.googleusercontent.com', 'jetonActualisation': 'actualisation'}),
+    );
+    expect((await stockage.lire()).agenda, isFalse);
+
+    // Oublier l'autorisation (déconnexion) oublie aussi le droit « agenda ».
+    const ReglagesGoogleBureau connecte = ReglagesGoogleBureau(jetonActualisation: 'actualisation', agenda: true);
+    expect(connecte.copier(oublierJeton: true).agenda, isFalse);
+    expect(connecte.copier(email: 'stef@exemple.fr').agenda, isTrue);
+    expect(connecte.copier(agenda: false).agenda, isFalse);
   });
 
   test('ce qui est écrit est relu à l’identique, accents compris, sans fichier provisoire oublié', () async {

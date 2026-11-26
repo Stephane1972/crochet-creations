@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import '../../domain/agenda_google.dart';
 import '../../domain/id_client_google.dart';
 import 'compte_google.dart';
 import 'oauth_bureau.dart';
@@ -13,7 +14,7 @@ import 'stockage_google_bureau.dart';
 /// l'autorisation durable dans un petit fichier du dossier de données de l'utilisateur ([StockageGoogleBureau]) pour ne pas
 /// redemander la connexion à chaque lancement. Le seul droit Drive demandé est `drive.file` : l'application ne voit que les
 /// fichiers qu'elle a elle-même mis sur Drive.
-class CompteGoogleBureau implements CompteGoogle, CompteAvecCodeSecret {
+class CompteGoogleBureau implements CompteGoogle, CompteAvecCodeSecret, CompteAvecAgenda {
   CompteGoogleBureau({
     required StockageGoogleBureau stockage,
     ReglagesGoogleBureau reglages = const ReglagesGoogleBureau(),
@@ -101,13 +102,70 @@ class CompteGoogleBureau implements CompteGoogle, CompteAvecCodeSecret {
     if (!configure) {
       throw const ErreurDrive('Renseignez d’abord l’ID client et le code secret de l’accès « application de bureau ».');
     }
-    final JetonsGoogle jetons = await _oauth.autoriser(clientId: _reglages.clientId, codeSecret: _reglages.codeSecret);
+    // Un droit « agenda » déjà accordé est redemandé avec celui de Drive : se reconnecter ne le fait pas perdre.
+    final bool avecAgenda = _reglages.agenda;
+    final JetonsGoogle jetons = await _oauth.autoriser(
+      clientId: _reglages.clientId,
+      codeSecret: _reglages.codeSecret,
+      portees: avecAgenda ? _porteesAvecAgenda : porteesConnexionBureau,
+    );
     final ({String email, String? nom}) identite = identiteDuJeton(jetons.jetonIdentite);
     await _ecrire(
-      _reglages.copier(jetonActualisation: jetons.jetonActualisation, email: identite.email, nom: identite.nom),
+      _reglages.copier(
+        jetonActualisation: jetons.jetonActualisation,
+        email: identite.email,
+        nom: identite.nom,
+        agenda: avecAgenda && _accorde(jetons, porteeAgenda),
+      ),
     );
     _memoriser(jetons);
     return _profil();
+  }
+
+  static const List<String> _porteesAvecAgenda = <String>[...porteesConnexionBureau, porteeAgenda];
+
+  /// Vrai si Google dit avoir accordé [portee] (la personne peut décocher chaque droit à la connexion).
+  static bool _accorde(JetonsGoogle jetons, String portee) => (jetons.portees ?? '').split(' ').contains(portee);
+
+  @override
+  Future<bool> agendaAutorise() async => _reglages.agenda && _reglages.jetonActualisation != null;
+
+  @override
+  Future<void> autoriserAgenda() async {
+    if (!configure) {
+      throw const ErreurDrive('Renseignez d’abord l’ID client et le code secret de l’accès « application de bureau ».');
+    }
+    final JetonsGoogle jetons = await _oauth.autoriser(
+      clientId: _reglages.clientId,
+      codeSecret: _reglages.codeSecret,
+      portees: _porteesAvecAgenda,
+    );
+    if (!_accorde(jetons, porteeAgenda)) {
+      throw const ErreurDrive(
+        'Le droit « Google Agenda » n’a pas été accordé. Recommencez et laissez la case Agenda cochée.',
+      );
+    }
+    final ({String email, String? nom}) identite = identiteDuJeton(jetons.jetonIdentite);
+    await _ecrire(
+      _reglages.copier(
+        jetonActualisation: jetons.jetonActualisation,
+        email: identite.email,
+        nom: identite.nom,
+        agenda: true,
+      ),
+    );
+    _memoriser(jetons);
+  }
+
+  @override
+  Future<String> jetonAgenda() async {
+    if (!_reglages.agenda) {
+      throw const ErreurDrive(
+        'Le droit « Google Agenda » n’est pas (ou plus) accordé. Autorisez-le de nouveau.',
+        autorisationAExpire: true,
+      );
+    }
+    return jetonAcces();
   }
 
   @override

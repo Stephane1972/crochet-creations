@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../core/constants/google_config.dart';
+import '../../domain/agenda_google.dart';
 import '../../domain/drive_envoi.dart';
 import '../../domain/id_client_google.dart';
 import 'stockage_client_web.dart';
@@ -80,8 +81,24 @@ abstract class CompteAvecCodeSecret {
   Future<void> enregistrerCodeSecret(String saisie);
 }
 
+/// Un compte Google qui sait aussi demander le droit « Google Agenda » (`calendar.app.created`), à part du droit Drive : la
+/// personne ne l'accorde que si elle active la synchronisation du calendrier vers Google Agenda. Ce droit ne donne accès qu'à
+/// l'agenda créé par l'application, jamais aux autres agendas de la personne.
+abstract class CompteAvecAgenda {
+  /// Vrai si le droit « agenda » est déjà accordé (sans rien afficher).
+  Future<bool> agendaAutorise();
+
+  /// Demande le droit « agenda » (fenêtre de Google sur Android, page dans le navigateur sous Windows). Lève une [ErreurDrive] :
+  /// `annulee` si la personne ferme, un message lisible si Google refuse ou si le droit n'a pas été accordé.
+  Future<void> autoriserAgenda();
+
+  /// Le jeton qui autorise les appels à Google Agenda. Lève une [ErreurDrive] (`autorisationAExpire`) si le droit n'est pas
+  /// (ou plus) accordé ou si la connexion est perdue.
+  Future<String> jetonAgenda();
+}
+
 /// [CompteGoogle] réel : `google_sign_in` (Android : Google Play Services).
-class CompteGoogleReel implements CompteGoogle {
+class CompteGoogleReel implements CompteGoogle, CompteAvecAgenda {
   /// [clientWeb] : l'ID fourni avec l'application ; [clientWebEnregistre] : celui que la personne a saisi (il passe avant) et
   /// que [stockage] garde d'un lancement à l'autre.
   CompteGoogleReel({String? clientWeb, String? clientWebEnregistre, StockageClientWeb? stockage})
@@ -99,6 +116,8 @@ class CompteGoogleReel implements CompteGoogle {
   String? _clientWebInitialise;
   String? _jeton;
   DateTime? _jetonValideJusqua;
+  String? _jetonAgenda;
+  DateTime? _jetonAgendaValideJusqua;
 
   /// Durée pendant laquelle un jeton est réutilisé (il est valable environ une heure).
   static const Duration _dureeJeton = Duration(minutes: 30);
@@ -165,6 +184,11 @@ class CompteGoogleReel implements CompteGoogle {
     _jetonValideJusqua = DateTime.now().add(_dureeJeton);
   }
 
+  void _memoriserAgenda(String jeton) {
+    _jetonAgenda = jeton;
+    _jetonAgendaValideJusqua = DateTime.now().add(_dureeJeton);
+  }
+
   ProfilGoogle _profil(GoogleSignInAccount compte) => ProfilGoogle(email: compte.email, nom: compte.displayName);
 
   @override
@@ -210,8 +234,7 @@ class CompteGoogleReel implements CompteGoogle {
   @override
   Future<void> seDeconnecter() async {
     _compte = null;
-    _jeton = null;
-    _jetonValideJusqua = null;
+    invaliderJeton();
     if (!configure) return;
     try {
       await _initialiser();
@@ -249,6 +272,67 @@ class CompteGoogleReel implements CompteGoogle {
   void invaliderJeton() {
     _jeton = null;
     _jetonValideJusqua = null;
+    _jetonAgenda = null;
+    _jetonAgendaValideJusqua = null;
+  }
+
+  @override
+  Future<bool> agendaAutorise() async {
+    final GoogleSignInAccount? compte = _compte;
+    if (compte == null) return false;
+    try {
+      final GoogleSignInClientAuthorization? droit = await compte.authorizationClient.authorizationForScopes(
+        const <String>[porteeAgenda],
+      );
+      if (droit == null) return false;
+      _memoriserAgenda(droit.accessToken);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<void> autoriserAgenda() async {
+    final GoogleSignInAccount? compte = _compte;
+    if (compte == null) {
+      throw const ErreurDrive('Connectez-vous d’abord à Google (Réglages › Google Drive).', autorisationAExpire: true);
+    }
+    try {
+      final GoogleSignInClientAuthorization droit = await compte.authorizationClient.authorizeScopes(
+        const <String>[porteeAgenda],
+      );
+      _memoriserAgenda(droit.accessToken);
+    } on GoogleSignInException catch (erreur) {
+      throw _traduire(erreur);
+    }
+  }
+
+  @override
+  Future<String> jetonAgenda() async {
+    final String? jeton = _jetonAgenda;
+    final DateTime? valable = _jetonAgendaValideJusqua;
+    if (jeton != null && valable != null && valable.isAfter(DateTime.now())) return jeton;
+
+    final GoogleSignInAccount? compte = _compte;
+    if (compte == null) {
+      throw const ErreurDrive('La connexion à Google est perdue. Reconnectez-vous.', autorisationAExpire: true);
+    }
+    try {
+      final GoogleSignInClientAuthorization? droit = await compte.authorizationClient.authorizationForScopes(
+        const <String>[porteeAgenda],
+      );
+      if (droit == null) {
+        throw const ErreurDrive(
+          'Le droit « Google Agenda » n’est pas (ou plus) accordé. Autorisez-le de nouveau.',
+          autorisationAExpire: true,
+        );
+      }
+      _memoriserAgenda(droit.accessToken);
+      return droit.accessToken;
+    } on GoogleSignInException catch (erreur) {
+      throw _traduire(erreur);
+    }
   }
 
   ErreurDrive _traduire(GoogleSignInException erreur) {

@@ -7,7 +7,7 @@ import 'package:crochet_creations/domain/drive_partage.dart';
 import 'package:crochet_creations/domain/id_client_google.dart';
 
 /// Fausse connexion à Google, pour les tests : aucun réseau, aucune fenêtre.
-class FauxCompteGoogle implements CompteGoogle {
+class FauxCompteGoogle implements CompteGoogle, CompteAvecAgenda {
   FauxCompteGoogle({this.configure = true});
 
   @override
@@ -96,6 +96,42 @@ class FauxCompteGoogle implements CompteGoogle {
 
   @override
   void invaliderJeton() => jetonsInvalides++;
+
+  /// Le droit « Google Agenda » : déjà accordé ou non (il ne vaut que pour un compte connecté).
+  bool agendaAccorde = false;
+
+  /// Ce que répond la personne quand l'application lui demande le droit « agenda » (`false` : elle ferme la fenêtre).
+  bool reponseDemandeAgenda = true;
+
+  /// Si défini, `autoriserAgenda` échoue avec cette erreur.
+  ErreurDrive? erreurDAutorisationAgenda;
+
+  /// Si défini, `jetonAgenda` échoue avec cette erreur.
+  ErreurDrive? erreurDeJetonAgenda;
+
+  int demandesAgenda = 0;
+
+  @override
+  Future<bool> agendaAutorise() async => courant != null && agendaAccorde;
+
+  @override
+  Future<void> autoriserAgenda() async {
+    demandesAgenda++;
+    final ErreurDrive? erreur = erreurDAutorisationAgenda;
+    if (erreur != null) throw erreur;
+    if (!reponseDemandeAgenda) throw const ErreurDrive('Connexion annulée.', annulee: true);
+    agendaAccorde = true;
+  }
+
+  @override
+  Future<String> jetonAgenda() async {
+    final ErreurDrive? erreur = erreurDeJetonAgenda;
+    if (erreur != null) throw erreur;
+    if (!agendaAccorde) {
+      throw const ErreurDrive('Le droit « Google Agenda » n’est pas accordé.', autorisationAExpire: true);
+    }
+    return 'jeton-agenda-de-test';
+  }
 }
 
 /// Faux compte Google « application de bureau » (Windows) : en plus de l'ID, un code secret est demandé.

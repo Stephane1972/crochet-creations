@@ -94,7 +94,7 @@ void main() {
     test('la version du schéma est enregistrée dans le fichier', () async {
       final row = await db.customSelect('PRAGMA user_version').getSingle();
       expect(row.read<int>('user_version'), AppDatabase.versionSchema);
-      expect(AppDatabase.versionSchema, 8);
+      expect(AppDatabase.versionSchema, 9);
     });
 
     test('les quatre lieux de vente de départ existent dès la création, dans l’ordre', () async {

@@ -99,8 +99,15 @@ void main() {
     expect(categories.map((CategorieNote c) => c.nom), <String>['Futures commandes', 'Documents entreprise']);
   }
 
-  /// Ramène une base du schéma actuel à l'état d'une base du schéma 7 : sans le réglage du rappel de déclaration.
+  /// Ramène une base du schéma actuel à l'état d'une base du schéma 8 : sans les deux réglages de Google Agenda.
+  void retirerLAgendaGoogle(dynamic raw) {
+    raw.execute('ALTER TABLE parametres_entreprise DROP COLUMN agenda_google_actif');
+    raw.execute('ALTER TABLE parametres_entreprise DROP COLUMN agenda_google_calendrier');
+  }
+
+  /// Ramène une base du schéma actuel à l'état d'une base du schéma 7 : sans le réglage du rappel de déclaration (ni Google Agenda).
   void retirerLeRappel(dynamic raw) {
+    retirerLAgendaGoogle(raw);
     raw.execute('ALTER TABLE parametres_entreprise DROP COLUMN rappel_declaration');
   }
 
@@ -138,7 +145,7 @@ void main() {
     raw.execute('DROP TABLE lieux_vente');
   }
 
-  test('du schéma 1 au schéma 8 : les données restent, « client_nom », les catégories, les lieux et le bloc-notes apparaissent', () async {
+  test('du schéma 1 au schéma 9 : les données restent, « client_nom », les catégories, les lieux et le bloc-notes apparaissent', () async {
     // 1. Une base créée avec le schéma actuel, remplie de quelques lignes.
     final int clientId = await remplirBase();
 
@@ -157,7 +164,7 @@ void main() {
     );
     // La première requête déclenche la mise à jour, puis le test relit le résultat.
     final int version = (await rouverte.customSelect('PRAGMA user_version').getSingle()).read<int>('user_version');
-    expect(version, 8);
+    expect(version, 9);
     for (final String table in <String>['ventes', 'devis']) {
       expect(await colonnes(rouverte, table), contains('client_nom'), reason: table);
     }
@@ -186,7 +193,7 @@ void main() {
     await rouverte.close();
   });
 
-  test('du schéma 2 au schéma 8 : catégories, lieux et bloc-notes apparaissent avec ceux de départ, rien d’autre ne bouge', () async {
+  test('du schéma 2 au schéma 9 : catégories, lieux et bloc-notes apparaissent avec ceux de départ, rien d’autre ne bouge', () async {
     await remplirBase();
 
     final AppDatabase rouverte = AppDatabase(
@@ -200,7 +207,7 @@ void main() {
       ),
     );
     final int version = (await rouverte.customSelect('PRAGMA user_version').getSingle()).read<int>('user_version');
-    expect(version, 8);
+    expect(version, 9);
     await verifierLieuxDeDepart(rouverte);
     await verifierCategoriesNoteDeDepart(rouverte);
 
@@ -213,7 +220,7 @@ void main() {
     await rouverte.close();
   });
 
-  test('du schéma 3 au schéma 8 : les lieux de vente apparaissent, toutes les ventes restent « Non renseigné »', () async {
+  test('du schéma 3 au schéma 9 : les lieux de vente apparaissent, toutes les ventes restent « Non renseigné »', () async {
     final int clientId = await remplirBase();
     // Une deuxième vente, pour vérifier qu'aucune n'est touchée.
     final AppDatabase preparee = AppDatabase(NativeDatabase(fichier));
@@ -232,7 +239,7 @@ void main() {
       ),
     );
     final int version = (await rouverte.customSelect('PRAGMA user_version').getSingle()).read<int>('user_version');
-    expect(version, 8);
+    expect(version, 9);
     await verifierCategoriesNoteDeDepart(rouverte);
 
     // Les quatre lieux de départ sont là, la colonne et son index aussi.
@@ -260,7 +267,7 @@ void main() {
     await rouverte.close();
   });
 
-  test('rouvrir une base déjà au schéma 8 ne recrée pas les lieux supprimés ou renommés', () async {
+  test('rouvrir une base déjà au schéma 9 ne recrée pas les lieux supprimés ou renommés', () async {
     final AppDatabase premiere = AppDatabase(NativeDatabase(fichier));
     await (premiere.update(premiere.lieuxVente)..where((t) => t.nom.equals('Marché'))).write(
       const LieuxVenteCompanion(nom: Value('Marché de Noël')),
@@ -274,7 +281,7 @@ void main() {
     await deuxieme.close();
   });
 
-  test('rouvrir une base déjà au schéma 8 ne recrée pas les catégories de départ supprimées ou renommées', () async {
+  test('rouvrir une base déjà au schéma 9 ne recrée pas les catégories de départ supprimées ou renommées', () async {
     final AppDatabase premiere = AppDatabase(NativeDatabase(fichier));
     await (premiere.update(premiere.categoriesProduit)..where((t) => t.cle.equals(CleCategorie.crochet))).write(
       const CategoriesProduitCompanion(nom: Value('Mes créations')),
@@ -290,7 +297,7 @@ void main() {
     await deuxieme.close();
   });
 
-  test('du schéma 4 au schéma 8 : le bloc-notes apparaît avec ses deux catégories de départ, rien d’autre ne bouge', () async {
+  test('du schéma 4 au schéma 9 : le bloc-notes apparaît avec ses deux catégories de départ, rien d’autre ne bouge', () async {
     final int clientId = await remplirBase();
 
     final AppDatabase rouverte = AppDatabase(
@@ -303,7 +310,7 @@ void main() {
       ),
     );
     final int version = (await rouverte.customSelect('PRAGMA user_version').getSingle()).read<int>('user_version');
-    expect(version, 8);
+    expect(version, 9);
 
     // Deux catégories de départ, aucune note, et les index.
     await verifierCategoriesNoteDeDepart(rouverte);
@@ -333,7 +340,7 @@ void main() {
     await rouverte.close();
   });
 
-  test('rouvrir une base déjà au schéma 8 ne recrée pas les catégories de notes supprimées ou renommées, et garde les notes', () async {
+  test('rouvrir une base déjà au schéma 9 ne recrée pas les catégories de notes supprimées ou renommées, et garde les notes', () async {
     final AppDatabase premiere = AppDatabase(NativeDatabase(fichier));
     final CategorieNote futures = (await premiere.select(premiere.categoriesNote).get()).firstWhere(
       (CategorieNote c) => c.nom == 'Futures commandes',
@@ -354,7 +361,7 @@ void main() {
     await deuxieme.close();
   });
 
-  test('du schéma 5 au schéma 8 : les pièces jointes apparaissent (table et index), les notes et le reste ne bougent pas', () async {
+  test('du schéma 5 au schéma 9 : les pièces jointes apparaissent (table et index), les notes et le reste ne bougent pas', () async {
     final int clientId = await remplirBase();
     final AppDatabase premiere = AppDatabase(NativeDatabase(fichier));
     await premiere.into(premiere.notes).insert(NotesCompanion.insert(titre: 'Poncho', contenu: const Value('Laine bleue')));
@@ -370,7 +377,7 @@ void main() {
       ),
     );
     final int version = (await rouverte.customSelect('PRAGMA user_version').getSingle()).read<int>('user_version');
-    expect(version, 8);
+    expect(version, 9);
 
     // La table existe, vide, avec son index.
     expect(await rouverte.select(rouverte.piecesJointesNote).get(), isEmpty);
@@ -407,7 +414,7 @@ void main() {
     await rouverte.close();
   });
 
-  test('rouvrir une base déjà au schéma 8 garde ses pièces jointes', () async {
+  test('rouvrir une base déjà au schéma 9 garde ses pièces jointes', () async {
     final AppDatabase premiere = AppDatabase(NativeDatabase(fichier));
     final int noteId = await premiere.into(premiere.notes).insert(NotesCompanion.insert(titre: 'Bonnet'));
     await premiere
@@ -431,7 +438,7 @@ void main() {
     await deuxieme.close();
   });
 
-  test('du schéma 6 au schéma 8 : le calendrier apparaît (table, index, quatre réglages affichés), rien d’autre ne bouge', () async {
+  test('du schéma 6 au schéma 9 : le calendrier apparaît (table, index, quatre réglages affichés), rien d’autre ne bouge', () async {
     final int clientId = await remplirBase();
     final AppDatabase premiere = AppDatabase(NativeDatabase(fichier));
     await premiere.into(premiere.notes).insert(NotesCompanion.insert(titre: 'Poncho'));
@@ -447,7 +454,7 @@ void main() {
       ),
     );
     final int version = (await rouverte.customSelect('PRAGMA user_version').getSingle()).read<int>('user_version');
-    expect(version, 8);
+    expect(version, 9);
 
     // La table existe, vide, avec son index ; les quatre réglages sont là, et tout est affiché.
     expect(await rouverte.select(rouverte.evenementsAgenda).get(), isEmpty);
@@ -488,7 +495,7 @@ void main() {
     await rouverte.close();
   });
 
-  test('du schéma 7 au schéma 8 : le réglage du rappel de déclaration apparaît (désactivé), rien d’autre ne bouge', () async {
+  test('du schéma 7 au schéma 9 : le réglage du rappel de déclaration apparaît (désactivé), rien d’autre ne bouge', () async {
     final int clientId = await remplirBase();
     final AppDatabase premiere = AppDatabase(NativeDatabase(fichier));
     await premiere
@@ -509,7 +516,7 @@ void main() {
       ),
     );
     final int version = (await rouverte.customSelect('PRAGMA user_version').getSingle()).read<int>('user_version');
-    expect(version, 8);
+    expect(version, 9);
 
     expect(await colonnes(rouverte, 'parametres_entreprise'), contains('rappel_declaration'));
     final Entreprise reglages = await (rouverte.select(rouverte.parametresEntreprise)..where((t) => t.id.equals(1))).getSingle();
@@ -532,7 +539,7 @@ void main() {
     await rouverte.close();
   });
 
-  test('rouvrir une base déjà au schéma 8 garde le rappel de déclaration activé', () async {
+  test('rouvrir une base déjà au schéma 9 garde le rappel de déclaration activé', () async {
     final AppDatabase premiere = AppDatabase(NativeDatabase(fichier));
     await (premiere.update(premiere.parametresEntreprise)..where((t) => t.id.equals(1))).write(
       const ParametresEntrepriseCompanion(rappelDeclaration: Value(true)),
@@ -545,7 +552,7 @@ void main() {
     await deuxieme.close();
   });
 
-  test('rouvrir une base déjà au schéma 8 garde ses événements et ses réglages d’affichage', () async {
+  test('rouvrir une base déjà au schéma 9 garde ses événements et ses réglages d’affichage', () async {
     final AppDatabase premiere = AppDatabase(NativeDatabase(fichier));
     await premiere
         .into(premiere.evenementsAgenda)
@@ -562,6 +569,68 @@ void main() {
     final Entreprise reglages = await (deuxieme.select(deuxieme.parametresEntreprise)..where((t) => t.id.equals(1))).getSingle();
     expect(reglages.agendaCours, isFalse);
     expect(reglages.agendaDevis, isTrue);
+    await deuxieme.close();
+  });
+
+  test('du schéma 8 au schéma 9 : les réglages de Google Agenda apparaissent (désactivé, aucun agenda), rien d’autre ne bouge', () async {
+    final int clientId = await remplirBase();
+    final AppDatabase premiere = AppDatabase(NativeDatabase(fichier));
+    await premiere
+        .into(premiere.evenementsAgenda)
+        .insert(EvenementsAgendaCompanion.insert(titre: 'Marché de Noël', debutLe: DateTime(2026, 12, 12)));
+    await (premiere.update(premiere.parametresEntreprise)..where((t) => t.id.equals(1))).write(
+      const ParametresEntrepriseCompanion(agendaDevis: Value(false), rappelDeclaration: Value(true)),
+    );
+    await premiere.close();
+
+    final AppDatabase rouverte = AppDatabase(
+      NativeDatabase(
+        fichier,
+        setup: (raw) {
+          retirerLAgendaGoogle(raw);
+          raw.execute('PRAGMA user_version = 8');
+        },
+      ),
+    );
+    final int version = (await rouverte.customSelect('PRAGMA user_version').getSingle()).read<int>('user_version');
+    expect(version, 9);
+
+    expect(
+      await colonnes(rouverte, 'parametres_entreprise'),
+      containsAll(<String>['agenda_google_actif', 'agenda_google_calendrier']),
+    );
+    final Entreprise reglages = await (rouverte.select(rouverte.parametresEntreprise)..where((t) => t.id.equals(1))).getSingle();
+    expect(reglages.agendaGoogleActif, isFalse);
+    expect(reglages.agendaGoogleCalendrier, isNull);
+
+    // Rien d'autre ne bouge : le rappel, l'affichage du calendrier, l'événement, le client et la vente.
+    expect(reglages.rappelDeclaration, isTrue);
+    expect(reglages.agendaDevis, isFalse);
+    expect(reglages.agendaCours, isTrue);
+    expect((await rouverte.select(rouverte.evenementsAgenda).get()).single.titre, 'Marché de Noël');
+    expect((await rouverte.select(rouverte.ventes).get()).single.clientId, clientId);
+
+    // Et l'application sait s'en servir.
+    await (rouverte.update(rouverte.parametresEntreprise)..where((t) => t.id.equals(1))).write(
+      const ParametresEntrepriseCompanion(agendaGoogleActif: Value(true), agendaGoogleCalendrier: Value('abc@group.calendar.google.com')),
+    );
+    final Entreprise apres = await (rouverte.select(rouverte.parametresEntreprise)..where((t) => t.id.equals(1))).getSingle();
+    expect(apres.agendaGoogleActif, isTrue);
+    expect(apres.agendaGoogleCalendrier, 'abc@group.calendar.google.com');
+    await rouverte.close();
+  });
+
+  test('rouvrir une base déjà au schéma 9 garde l’agenda Google activé et son agenda', () async {
+    final AppDatabase premiere = AppDatabase(NativeDatabase(fichier));
+    await (premiere.update(premiere.parametresEntreprise)..where((t) => t.id.equals(1))).write(
+      const ParametresEntrepriseCompanion(agendaGoogleActif: Value(true), agendaGoogleCalendrier: Value('abc@group.calendar.google.com')),
+    );
+    await premiere.close();
+
+    final AppDatabase deuxieme = AppDatabase(NativeDatabase(fichier));
+    final Entreprise reglages = await (deuxieme.select(deuxieme.parametresEntreprise)..where((t) => t.id.equals(1))).getSingle();
+    expect(reglages.agendaGoogleActif, isTrue);
+    expect(reglages.agendaGoogleCalendrier, 'abc@group.calendar.google.com');
     await deuxieme.close();
   });
 }

@@ -150,6 +150,28 @@ class ParametresRepository implements ModeThemeStore {
   Future<void> enregistrerRappelDeclaration(bool actif) =>
       modifier(ParametresEntrepriseCompanion(rappelDeclaration: Value(actif)));
 
+  /// La synchronisation vers Google Agenda est-elle demandée ? (Désactivée tant que rien n'a été choisi.)
+  static bool agendaGoogleActifDe(Entreprise e) => e.agendaGoogleActif;
+
+  /// L'identifiant de l'agenda créé dans Google Agenda (`null` : aucun pour l'instant).
+  static String? agendaGoogleCalendrierDe(Entreprise e) => e.agendaGoogleCalendrier;
+
+  Future<({bool actif, String? calendrier})> lireAgendaGoogle() async {
+    final Entreprise e = await lire();
+    return (actif: e.agendaGoogleActif, calendrier: e.agendaGoogleCalendrier);
+  }
+
+  /// Mémorise la synchronisation vers Google Agenda : [actif] (inchangé si absent) et l'agenda créé [calendrier]
+  /// (inchangé si absent ; [oublierCalendrier] l'efface).
+  Future<void> enregistrerAgendaGoogle({bool? actif, String? calendrier, bool oublierCalendrier = false}) => modifier(
+    ParametresEntrepriseCompanion(
+      agendaGoogleActif: actif == null ? const Value.absent() : Value(actif),
+      agendaGoogleCalendrier: oublierCalendrier
+          ? const Value<String?>(null)
+          : (calendrier == null ? const Value<String?>.absent() : Value<String?>(calendrier)),
+    ),
+  );
+
   /// Mode d'affichage mémorisé (automatique tant que rien n'a été choisi).
   Future<ThemeMode> lireModeTheme() async => _versThemeMode((await lire()).modeTheme);
 

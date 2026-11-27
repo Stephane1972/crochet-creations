@@ -58,7 +58,7 @@ class AppDatabase extends _$AppDatabase {
 
   /// Version du schéma. **À augmenter à chaque modification de `tables.dart`**,
   /// avec l'étape de migration correspondante dans [migration] (voir ARCHITECTURE.md).
-  static const int versionSchema = 8;
+  static const int versionSchema = 9;
 
   @override
   int get schemaVersion => versionSchema;
@@ -165,6 +165,12 @@ class AppDatabase extends _$AppDatabase {
       // n'est touchée.
       if (from < 8) {
         await m.addColumn(parametresEntreprise, parametresEntreprise.rappelDeclaration);
+      }
+      // Version 9 : la synchronisation vers Google Agenda (deux réglages : désactivée au départ, aucun agenda mémorisé) ;
+      // aucune donnée existante n'est touchée.
+      if (from < 9) {
+        await m.addColumn(parametresEntreprise, parametresEntreprise.agendaGoogleActif);
+        await m.addColumn(parametresEntreprise, parametresEntreprise.agendaGoogleCalendrier);
       }
     },
 

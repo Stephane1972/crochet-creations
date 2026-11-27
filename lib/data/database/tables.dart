@@ -85,6 +85,13 @@ class ParametresEntreprise extends Table with Tracabilite {
   /// Désactivé au départ : il s'active dans l'écran « Déclaration des recettes » (qui demande l'autorisation).
   BoolColumn get rappelDeclaration => boolean().withDefault(const Constant(false))();
 
+  /// Synchronisation du calendrier vers Google Agenda (schéma 9). Désactivée au départ : elle s'active dans l'écran « Google
+  /// Agenda » (qui demande le droit à Google). [agendaGoogleCalendrier] est l'identifiant de l'agenda créé dans le compte
+  /// Google (vide tant qu'il n'a pas été créé) : il ne peut pas être retrouvé autrement, l'application ne voyant pas les
+  /// autres agendas.
+  BoolColumn get agendaGoogleActif => boolean().withDefault(const Constant(false))();
+  TextColumn get agendaGoogleCalendrier => text().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }

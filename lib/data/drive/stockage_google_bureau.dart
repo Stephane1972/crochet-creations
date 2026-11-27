@@ -10,6 +10,7 @@ class ReglagesGoogleBureau {
     this.jetonActualisation,
     this.email = '',
     this.nom,
+    this.agenda = false,
   });
 
   /// L'ID client de l'accès « application de bureau » (vide : aucun).
@@ -26,6 +27,9 @@ class ReglagesGoogleBureau {
   final String email;
   final String? nom;
 
+  /// Vrai si la personne a accordé le droit « Google Agenda » (`calendar.app.created`) avec cette autorisation.
+  final bool agenda;
+
   ReglagesGoogleBureau copier({
     String? clientId,
     String? codeSecret,
@@ -33,6 +37,7 @@ class ReglagesGoogleBureau {
     bool oublierJeton = false,
     String? email,
     String? nom,
+    bool? agenda,
   }) {
     return ReglagesGoogleBureau(
       clientId: clientId ?? this.clientId,
@@ -40,6 +45,7 @@ class ReglagesGoogleBureau {
       jetonActualisation: oublierJeton ? null : (jetonActualisation ?? this.jetonActualisation),
       email: oublierJeton ? '' : (email ?? this.email),
       nom: oublierJeton ? null : (nom ?? this.nom),
+      agenda: oublierJeton ? false : (agenda ?? this.agenda),
     );
   }
 
@@ -49,6 +55,7 @@ class ReglagesGoogleBureau {
     'jetonActualisation': jetonActualisation,
     'email': email,
     'nom': nom,
+    'agenda': agenda,
   };
 
   static ReglagesGoogleBureau depuisJson(Object? json) {
@@ -62,6 +69,7 @@ class ReglagesGoogleBureau {
       jetonActualisation: jeton.isEmpty ? null : jeton,
       email: texte('email'),
       nom: nom.isEmpty ? null : nom,
+      agenda: json['agenda'] == true,
     );
   }
 }

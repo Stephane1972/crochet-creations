@@ -425,6 +425,37 @@ void main() {
 
       await abonnement.cancel();
     });
+
+    test('le flux des changements signale tout ce qui alimente le calendrier (pour la synchro Google Agenda)', () async {
+      int signaux = 0;
+      final StreamSubscription<int> abonnement = repo.observerChangements().listen((int _) => signaux++);
+      Future<void> attendreSignaux(int nombre) async {
+        for (int i = 0; i < 500 && signaux < nombre; i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 10));
+        }
+        expect(signaux, greaterThanOrEqualTo(nombre));
+      }
+
+      // Le premier signal est la lecture de départ.
+      await attendreSignaux(1);
+
+      final EvenementAgenda e = await repo.creer(donnees(jour: DateTime(2026, 11, 12)));
+      await attendreSignaux(2);
+
+      await cours('Atelier', DateTime(2026, 11, 14, 10));
+      await attendreSignaux(3);
+
+      await devis('DEVIS-2026-0001', DateTime(2026, 11, 20));
+      await attendreSignaux(4);
+
+      await db.insererClient();
+      await attendreSignaux(5);
+
+      await repo.supprimer(e.id);
+      await attendreSignaux(6);
+
+      await abonnement.cancel();
+    });
   });
 
   group('réglages d’affichage', () {

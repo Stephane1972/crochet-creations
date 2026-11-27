@@ -6,6 +6,7 @@ import 'package:crochet_creations/data/drive/compte_google.dart';
 import 'package:crochet_creations/data/drive/compte_google_bureau.dart';
 import 'package:crochet_creations/data/drive/oauth_bureau.dart';
 import 'package:crochet_creations/data/drive/stockage_google_bureau.dart';
+import 'package:crochet_creations/domain/agenda_google.dart';
 import 'package:crochet_creations/domain/drive_envoi.dart';
 import 'package:crochet_creations/domain/id_client_google.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -42,6 +43,12 @@ class _Banc {
   /// Ce que Google répond à un renouvellement (par défaut : un nouveau jeton d'accès).
   http.Response Function(http.Request)? reponseRenouvellement;
 
+  /// Les droits demandés à la dernière connexion (ce que le navigateur a reçu), séparés par des espaces.
+  String? droitsDemandes;
+
+  /// Les droits que Google dit avoir accordés (par défaut : tous ceux qui ont été demandés).
+  String? droitsAccordes;
+
   http.Response _repondre(http.Request r) {
     requetes.add(r);
     if (r.url.toString() == adresseRevocationGoogle) return http.Response('', 200);
@@ -52,7 +59,7 @@ class _Banc {
         'expires_in': 3600,
         'refresh_token': 'actualisation-1',
         'id_token': _jwt(<String, Object?>{'email': 'stef@exemple.fr', 'name': 'Stéphane'}),
-        'scope': 'openid email profile $porteeDrive',
+        'scope': droitsAccordes ?? droitsDemandes ?? 'openid email profile $porteeDrive',
       });
     }
     renouvellements++;
@@ -63,6 +70,7 @@ class _Banc {
   }
 
   Future<void> _navigateur(Uri adresse) async {
+    droitsDemandes = adresse.queryParameters['scope'];
     final Uri redirection = Uri.parse(adresse.queryParameters['redirect_uri']!);
     final HttpClient client = HttpClient();
     try {
@@ -291,6 +299,97 @@ void main() {
       expect(compte.codeSecretEnregistre, isFalse);
       expect(await compte.restaurer(), isNull);
       expect(banc.stockage.fichier.existsSync(), isFalse);
+    });
+  });
+
+  group('droit « Google Agenda »', () {
+    test('au départ il n’est pas accordé : pas de jeton « agenda », et la connexion ne le demande pas', () async {
+      final CompteGoogleBureau compte = await banc.compteConnecte();
+
+      expect(await compte.agendaAutorise(), isFalse);
+      expect(banc.droitsDemandes, isNot(contains(porteeAgenda)));
+      await expectLater(
+        compte.jetonAgenda(),
+        throwsA(isA<ErreurDrive>().having((ErreurDrive e) => e.autorisationAExpire, 'expire', isTrue)),
+      );
+    });
+
+    test('l’autoriser demande Drive ET Agenda (Drive n’est pas perdu), puis le jeton sert aux deux', () async {
+      final CompteGoogleBureau compte = await banc.compteConnecte();
+
+      await compte.autoriserAgenda();
+
+      expect(banc.droitsDemandes, contains(porteeAgenda));
+      expect(banc.droitsDemandes, contains(porteeDrive));
+      expect(await compte.agendaAutorise(), isTrue);
+      expect(await compte.jetonAgenda(), 'acces-0');
+      expect((await compte.restaurer())?.email, 'stef@exemple.fr');
+    });
+
+    test('le droit est gardé d’un lancement à l’autre', () async {
+      final CompteGoogleBureau compte = await banc.compteConnecte();
+      await compte.autoriserAgenda();
+
+      final CompteGoogleBureau relance = await banc.compte();
+
+      expect(await relance.agendaAutorise(), isTrue);
+      expect((await relance.restaurer())?.email, 'stef@exemple.fr');
+    });
+
+    test('si la personne décoche Agenda chez Google : une erreur claire, et la connexion d’avant est intacte', () async {
+      final CompteGoogleBureau compte = await banc.compteConnecte();
+      banc.droitsAccordes = 'openid email profile $porteeDrive';
+
+      await expectLater(
+        compte.autoriserAgenda(),
+        throwsA(isA<ErreurDrive>().having((ErreurDrive e) => e.message, 'message', contains('Google Agenda'))),
+      );
+
+      expect(await compte.agendaAutorise(), isFalse);
+      expect((await compte.restaurer())?.email, 'stef@exemple.fr');
+      expect(await (await banc.compte()).agendaAutorise(), isFalse);
+    });
+
+    test('se reconnecter redemande aussi le droit « agenda » déjà accordé, et le garde', () async {
+      final CompteGoogleBureau compte = await banc.compteConnecte();
+      await compte.autoriserAgenda();
+
+      await compte.seConnecter();
+
+      expect(banc.droitsDemandes, contains(porteeAgenda));
+      expect(await compte.agendaAutorise(), isTrue);
+    });
+
+    test('se reconnecter en décochant Agenda : Drive reste connecté, le droit « agenda » est retiré', () async {
+      final CompteGoogleBureau compte = await banc.compteConnecte();
+      await compte.autoriserAgenda();
+      banc.droitsAccordes = 'openid email profile $porteeDrive';
+
+      await compte.seConnecter();
+
+      expect(await compte.agendaAutorise(), isFalse);
+      expect((await compte.restaurer())?.email, 'stef@exemple.fr');
+    });
+
+    test('se déconnecter, ou changer d’ID client, oublie le droit « agenda »', () async {
+      final CompteGoogleBureau compte = await banc.compteConnecte();
+      await compte.autoriserAgenda();
+      await compte.seDeconnecter();
+      expect(await compte.agendaAutorise(), isFalse);
+
+      final CompteGoogleBureau autre = await banc.compteConnecte();
+      await autre.autoriserAgenda();
+      await autre.enregistrerClientWeb('987654321098-zyxwvutsrqponmlkjihgfedcba012345$suffixeIdClientGoogle');
+      expect(await autre.agendaAutorise(), isFalse);
+    });
+
+    test('sans ID client ni code secret : il faut d’abord configurer l’accès', () async {
+      final CompteGoogleBureau compte = await banc.compte();
+
+      await expectLater(
+        compte.autoriserAgenda(),
+        throwsA(isA<ErreurDrive>().having((ErreurDrive e) => e.message, 'message', contains('Renseignez d’abord'))),
+      );
     });
   });
 }

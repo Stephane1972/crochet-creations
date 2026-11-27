@@ -136,6 +136,12 @@ class _AgendaScreenState extends ConsumerState<AgendaScreen> {
         title: const Text('Calendrier'),
         actions: <Widget>[
           IconButton(
+            key: const ValueKey<String>('agenda-synchro-google'),
+            tooltip: 'Synchroniser avec Google Agenda',
+            icon: const Icon(Icons.sync),
+            onPressed: () => Navigator.of(context).pushNamed(AppRoutes.agendaGoogle),
+          ),
+          IconButton(
             tooltip: 'Aujourd’hui',
             icon: const Icon(Icons.today_outlined),
             onPressed: _allerAujourdhui,

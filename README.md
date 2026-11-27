@@ -306,7 +306,7 @@ Première des trois étapes demandées par Stéphane (accueil + calendrier, puis
 
 **Limites** (à connaître) :
 
-- Le calendrier **n'est pas encore synchronisé** avec Google Agenda (étape 3).
+- Dans cette version, le calendrier **n'était pas encore synchronisé** avec Google Agenda : c'est l'étape 3 (version 0.28.0, juste ci-dessous).
 - Les événements sont ponctuels : un seul jour, pas de répétition.
 - Sous Windows, la fenêtre garde la largeur « téléphone » (la mise en page pour grand écran viendra seulement sur demande).
 - Cette étape a été écrite sans pouvoir lancer Flutter sur place : l'analyse et les tests automatiques tournent sur GitHub ; le vrai essai
@@ -341,6 +341,78 @@ déclaration **mensuelle**, rappel **3 jours avant la fin du mois et le dernier 
 - Le texte de la notification est **fixe** (le montant se lit dans l'application) et la toucher **ouvre l'application** (pas directement l'écran).
 - L'heure (9 h) et les jours ne se règlent pas ; l'organisme n'est pas nommé et aucun lien vers son site n'est proposé.
 - Si l'application reste **fermée plus d'un an**, les rappels s'arrêtent jusqu'à la prochaine ouverture.
+
+### Synchronisation avec Google Agenda (demande de novembre 2026, étape 3 sur 3 — version 0.28.0)
+
+Troisième et dernière étape : le calendrier de l'application peut être **envoyé vers Google Agenda**, sur **Android et Windows**. Choix de Stéphane :
+**les deux** (les liens de l'étape 1 *et* la synchronisation automatique), le contenu se personnalisant avec les **filtres du calendrier**, et
+**« [Annulé] », jamais supprimer** : ce qui disparaît de l'application reste dans Google Agenda, marqué « [Annulé] ».
+
+- **Où** : *Calendrier* → l'icône **⟳ Synchroniser avec Google Agenda** (barre du haut) → écran *Google Agenda*.
+- **Activer** : l'interrupteur *Synchroniser avec Google Agenda* est **désactivé au départ**. Il faut être connecté à Google (*Réglages → Google
+  Drive*, le même compte). En l'activant, Google demande **un droit de plus, à part de Drive** : « Google Agenda ». L'application crée alors **son
+  propre agenda**, « Un p’tit crochet dans les stocks », dans votre compte Google et y envoie le calendrier. Ce droit (`calendar.app.created`) ne
+  donne accès **qu'à cet agenda** : l'application ne voit **aucun autre** de vos agendas.
+- **Ce qui est envoyé** : ce que le calendrier affiche — les **cours** (jour, heures, lieu), la **fin de validité des devis**, la **déclaration des
+  recettes** (le dernier jour de chaque mois) et **vos événements** — du **1er du mois dernier** jusqu'à **12 mois après le mois en cours**. Un type
+  masqué par les filtres du calendrier n'est **pas envoyé** (et ce qui est déjà dans Google Agenda n'est alors pas touché). Chaque élément devient **un**
+  événement Google à identifiant stable : modifier un élément dans l'application **modifie** son événement, il n'en crée pas un second.
+- **Quand** : à **l'ouverture** de l'application, **une trentaine de secondes après une modification** (une seule synchronisation même si l'on
+  modifie plusieurs choses de suite) et quand on touche **Synchroniser maintenant**. Il faut Internet ; sans connexion, l'écran l'explique et la
+  synchronisation reprend à la fois suivante. L'écran montre le bilan de la dernière : « 3 ajoutés, 12 déjà à jour. », ou ce qui a posé problème.
+- **« [Annulé] », jamais supprimé** : un événement supprimé de l'application, un cours annulé ou archivé, un devis accepté, refusé ou expiré ne sont
+  **jamais supprimés** de Google Agenda : leur événement passe en « **[Annulé] Titre** » (et en « disponible », pour ne pas bloquer l'agenda). Si
+  l'élément revient (un cours rétabli), l'événement redevient normal.
+- **Nettoyer l'agenda Google** : le bouton supprime de Google Agenda **les seuls événements marqués « [Annulé] »**, **après une confirmation** qui
+  en donne le nombre. Rien n'est supprimé dans l'application, ni aucun autre événement. C'est la **seule** suppression que l'application fasse
+  dans Google Agenda, et seulement quand vous la demandez.
+- **Désactiver** : l'interrupteur arrête la synchronisation ; ce qui est dans Google Agenda y reste, et la réactiver reprend le même agenda.
+- **Si l'agenda a disparu** (supprimé dans Google Agenda, ou inaccessible depuis cet appareil) : l'écran le dit et propose **Créer un nouvel agenda**.
+  L'application n'en recrée **jamais** un toute seule (vous l'avez peut-être supprimé exprès), pour ne pas multiplier les agendas.
+- **Ouvrir Google Agenda** ouvre Google Agenda dans le navigateur, sur le compte connecté.
+- Le schéma de la base passe en **version 9** (deux réglages : `agenda_google_actif` et `agenda_google_calendrier`, l'identifiant de l'agenda créé ;
+  migration automatique, inclus dans la sauvegarde). Une ancienne sauvegarde se restaure avec la synchronisation désactivée.
+
+**À faire une seule fois, gratuit (≈ 5 minutes)** — dans le **même projet Google Cloud** que pour Drive (voir « Configurer Google Cloud ») :
+
+1. **Activer l'API Google Calendar** : console Google Cloud → menu ☰ → **API et services** → **Bibliothèque** → chercher « **Google Calendar API** » →
+   **Activer**. (Sans cela, l'écran dit que l'API n'est pas activée dans le projet et renvoie à ce guide.)
+2. **Déclarer le droit « Google Agenda »** : *Google Auth Platform* (écran de consentement) → **Accès aux données** (*Data Access*) → **Ajouter ou
+   supprimer des niveaux d'accès** → ajouter (« Ajouter manuellement ») `https://www.googleapis.com/auth/calendar.app.created` (« Créer des agendas
+   secondaires Google, et afficher, créer, modifier et supprimer des événements sur ces agendas ») → **Enregistrer**. Gardez le droit Drive déjà là ;
+   ne cochez **aucun autre** droit d'agenda.
+3. **Vérifier que l'application est publiée** (*Audience → Publier l'application*) : en mode « Test », Google **coupe l'autorisation au bout de
+   7 jours** (comme pour Drive).
+4. **Au premier essai**, Google peut afficher **« Google n'a pas validé cette application »** : ce droit peut être classé « sensible », et une
+   application personnelle n'est pas « vérifiée ». Touchez **Paramètres avancés** (*Advanced*) → **Accéder à Un p'tit crochet… (non sécurisé)** →
+   autorisez. C'est normal pour une application qui ne sert qu'à vous ; la vérification par Google n'est pas nécessaire pour cet usage.
+5. **Compte Google Workspace** (professionnel ou scolaire) : l'**administrateur** peut interdire les applications tierces ; Google affiche alors que
+   l'accès est bloqué. Il faut qu'il autorise l'application (son ID client), ou utiliser un compte Google personnel.
+
+**Sous Windows** : même écran, mêmes réglages. L'autorisation « Google Agenda » se demande dans le **navigateur**, avec le même accès « application de
+bureau » que pour Drive : **laissez toutes les cases cochées** dans la fenêtre de Google (Drive et Google Agenda). L'application vérifie que le droit
+« Google Agenda » a bien été accordé, et le dit sinon.
+
+**Limites** (à connaître) :
+
+- **Pas encore essayé avec un vrai compte Google ni sur un vrai téléphone ou PC** : écrit sans pouvoir lancer Flutter sur place ; l'analyse et les
+  tests (avec un faux Google Agenda) tournent sur GitHub. Le vrai essai reste à faire : activer, regarder l'agenda dans Google Agenda, modifier,
+  supprimer, *Nettoyer*.
+- **Un seul sens** : l'application écrit dans Google Agenda, elle n'y lit que ses propres événements. Ce qu'on **modifie à la main** dans Google Agenda est
+  **remplacé** à la prochaine synchronisation, ce qu'on y **supprime** est **recréé**. Il faut tout modifier dans l'application.
+- **L'agenda est mémorisé par son identifiant** (l'application ne peut pas le « retrouver » dans la liste de vos agendas : le droit demandé est
+  volontairement limité). L'identifiant est dans la base, donc dans la sauvegarde et la reprise entre appareils. **Pas encore vérifié** : que le
+  téléphone (accès Android) et le PC (accès « application de bureau ») puissent tous deux écrire dans le **même** agenda. Sinon, l'un des deux voit
+  « agenda introuvable » : *Créer un nouvel agenda* en crée un second (à supprimer à la main dans Google Agenda).
+- **Un seul appareil à synchroniser** est conseillé : un autre appareil dont les données diffèrent marquerait « [Annulé] » ce qui n'est pas dans
+  *son* calendrier.
+- **Période de 14 mois** : au-delà (plus de 12 mois dans le futur, ou avant le mois dernier), rien n'est envoyé ni mis à jour. Un élément **déplacé hors
+  de la période** est marqué « [Annulé] » dans Google Agenda.
+- **La première synchronisation est la plus longue** (une demande à Google par événement : de l'ordre de la demi-minute pour une centaine
+  d'événements, estimation non mesurée) ; l'écran indique « Synchronisation en cours ». Après 3 échecs de suite, elle s'arrête et reprend à la fois suivante.
+- L'agenda est créé en heure de **Paris** (`Europe/Paris`). Les devis et la déclaration sont des événements « toute la journée ». L'application n'ajoute ni
+  rappel ni invité aux événements (les rappels par défaut de l'agenda, s'il y en a, s'appliquent).
+- Un événement « [Annulé] » **n'est supprimé que par « Nettoyer »** : si vous ne nettoyez jamais, ils s'accumulent (ce qui est voulu).
 
 ### Ce que contient l'étape 11 : sauvegarde et export
 

@@ -225,4 +225,12 @@ class AgendaRepository {
     <ResultSetImplementation>{_db.cours, _db.devis, _db.clients, _db.evenementsAgenda},
     () => entrees(debut, fin, filtres: filtres, maintenant: horloge?.call()),
   );
+
+  /// Annonce, sans rien relire, que ce qui alimente le calendrier a changé (un cours, un devis, un client ou un événement
+  /// créé, modifié ou supprimé). Sert à relancer la synchronisation vers Google Agenda ; la valeur émise n'a pas de sens.
+  Stream<int> observerChangements() => observerTables<int>(
+    _db,
+    <ResultSetImplementation>{_db.cours, _db.devis, _db.clients, _db.evenementsAgenda},
+    () async => 0,
+  );
 }

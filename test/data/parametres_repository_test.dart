@@ -78,6 +78,39 @@ void main() {
     expect(vus.last, isTrue);
   });
 
+  test('l’agenda Google est désactivé au départ, puis son réglage et son agenda sont mémorisés séparément', () async {
+    expect(await repo.lireAgendaGoogle(), (actif: false, calendrier: null));
+    expect(ParametresRepository.agendaGoogleActifDe(await repo.lire()), isFalse);
+    expect(ParametresRepository.agendaGoogleCalendrierDe(await repo.lire()), isNull);
+
+    await repo.modifier(const ParametresEntrepriseCompanion(ville: Value('Toulouse')));
+    await repo.enregistrerAgendaGoogle(actif: true);
+    expect(await repo.lireAgendaGoogle(), (actif: true, calendrier: null));
+
+    // Mémoriser l'agenda ne change pas l'activation, et inversement.
+    await repo.enregistrerAgendaGoogle(calendrier: 'abc@group.calendar.google.com');
+    expect(await repo.lireAgendaGoogle(), (actif: true, calendrier: 'abc@group.calendar.google.com'));
+    await repo.enregistrerAgendaGoogle(actif: false);
+    expect(await repo.lireAgendaGoogle(), (actif: false, calendrier: 'abc@group.calendar.google.com'));
+
+    // Un agenda oublié : l'activation reste telle quelle.
+    await repo.enregistrerAgendaGoogle(oublierCalendrier: true);
+    expect(await repo.lireAgendaGoogle(), (actif: false, calendrier: null));
+    expect((await repo.lire()).ville, 'Toulouse');
+  });
+
+  test('l’agenda Google est annoncé en direct aux écrans ouverts', () async {
+    final List<bool> vus = <bool>[];
+    final StreamSubscription<bool> subscription = repo.observer().map(ParametresRepository.agendaGoogleActifDe).listen(vus.add);
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    await repo.enregistrerAgendaGoogle(actif: true);
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    await subscription.cancel();
+
+    expect(vus.first, isFalse);
+    expect(vus.last, isTrue);
+  });
+
   test('toujours une seule ligne de réglages', () async {
     await repo.memoriser(ThemeMode.dark);
     await repo.modifier(const ParametresEntrepriseCompanion(ville: Value('Toulouse')));

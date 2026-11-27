@@ -1407,6 +1407,63 @@ void main() {
     });
   });
 
+  group('agenda Google dans la sauvegarde', () {
+    test('l’activation et l’agenda Google font l’aller-retour d’un appareil à l’autre', () async {
+      await remplirBase(banc.db);
+      await banc.ecrireFichiers();
+      await (banc.db.update(banc.db.parametresEntreprise)..where((t) => t.id.equals(1))).write(
+        const ParametresEntrepriseCompanion(
+          agendaGoogleActif: Value(true),
+          agendaGoogleCalendrier: Value('abc@group.calendar.google.com'),
+        ),
+      );
+
+      final Uint8List octets = await banc.octetsArchive();
+      final Map<String, List<Map<String, Object?>>> avant = await instantane(banc.db);
+
+      final _Banc autre = await _Banc.creer();
+      addTearDown(autre.fermer);
+      await autre.restaurer(octets);
+
+      expect(await instantane(autre.db), avant);
+      final Entreprise reglages = await autre.db.select(autre.db.parametresEntreprise).getSingle();
+      expect(reglages.agendaGoogleActif, isTrue);
+      expect(reglages.agendaGoogleCalendrier, 'abc@group.calendar.google.com');
+    });
+
+    test('une sauvegarde du schéma 8 est restaurée : l’agenda Google est désactivé, sans agenda', () async {
+      await remplirBase(banc.db);
+      await banc.ecrireFichiers();
+      final Uint8List actuelle = await banc.octetsArchive();
+      final Map<String, List<Map<String, Object?>>> avant = await instantane(banc.db);
+
+      // L'archive d'avant : les deux colonnes de Google Agenda n'existent pas encore dans les réglages.
+      final Uint8List ancienne = _modifierDonnees(actuelle, (Map<String, dynamic> d) {
+        (d['manifeste'] as Map<String, dynamic>)['versionSchema'] = 8;
+        final Map<String, dynamic> tables = d['tables'] as Map<String, dynamic>;
+        for (final Object? ligne in tables['parametres_entreprise'] as List<dynamic>) {
+          (ligne as Map<String, dynamic>)
+            ..remove('agenda_google_actif')
+            ..remove('agenda_google_calendrier');
+        }
+      });
+
+      // L'appareil, lui, avait activé l'agenda : la restauration remplace tout, le réglage revient à « désactivé ».
+      await (banc.db.update(banc.db.parametresEntreprise)..where((t) => t.id.equals(1))).write(
+        const ParametresEntrepriseCompanion(
+          agendaGoogleActif: Value(true),
+          agendaGoogleCalendrier: Value('abc@group.calendar.google.com'),
+        ),
+      );
+      await banc.restaurer(ancienne);
+
+      final Entreprise reglages = await banc.db.select(banc.db.parametresEntreprise).getSingle();
+      expect(reglages.agendaGoogleActif, isFalse);
+      expect(reglages.agendaGoogleCalendrier, isNull);
+      expect(await instantane(banc.db), avant);
+    });
+  });
+
   group('export JSON', () {
     test('toutes les données dans un seul fichier, sans les photos ni les PDF', () async {
       await remplirBase(banc.db);

@@ -28,6 +28,7 @@ import 'data/stockage/stockage_pdf.dart';
 import 'data/stockage/stockage_photos.dart';
 import 'data/stockage/stockage_pieces_jointes.dart';
 import 'domain/drive_envoi.dart';
+import 'presentation/agenda/agenda_google_providers.dart';
 import 'presentation/common/photo_retrouvee.dart';
 import 'presentation/drive/drive_providers.dart';
 import 'presentation/startup/erreur_demarrage_app.dart';
@@ -159,6 +160,10 @@ Future<void> main() async {
     // Rappel de la déclaration des recettes : s'il est activé, on reprogramme les mois à venir (l'horizon avance à
     // chaque ouverture). Aussi en arrière-plan ; rien ne se passe tant que le rappel est désactivé.
     unawaited(conteneur.read(serviceRappelsDeclarationProvider).synchroniser());
+
+    // Synchronisation vers Google Agenda : si elle est activée, le calendrier est renvoyé à l'ouverture, puis quelques
+    // secondes après chaque modification (le notifier écoute la base). Rien ne se passe tant qu'elle est désactivée.
+    unawaited(conteneur.read(synchroAgendaGoogleProvider.notifier).synchroniser());
   } catch (erreur, pile) {
     debugPrint('Ouverture de la base impossible : $erreur\n$pile');
     runApp(ErreurDemarrageApp(erreur: erreur));

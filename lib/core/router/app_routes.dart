@@ -64,6 +64,9 @@ abstract final class AppRoutes {
   static const String agendaEvenement = '/agenda/evenement';
   static const String declaration = '/declaration';
 
+  /// Synchronisation du calendrier vers Google Agenda (créée depuis le calendrier).
+  static const String agendaGoogle = '/agenda/google';
+
   // Réglages
   static const String reglages = '/reglages';
   static const String monEntreprise = '/reglages/entreprise';

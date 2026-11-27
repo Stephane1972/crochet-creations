@@ -1,7 +1,7 @@
 name: crochet_creations
 description: "Un p’tit crochet dans les stocks : stock, ventes, factures, devis et cours pour une créatrice auto-entrepreneuse."
 publish_to: "none"
-version: 0.27.0+32
+version: 0.28.0+33
 
 environment:
   # Les notifications (flutter_local_notifications 23) demandent Dart 3.12 (Flutter 3.44 ou plus récent, canal « stable »).

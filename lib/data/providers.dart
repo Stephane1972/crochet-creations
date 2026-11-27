@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/plateforme.dart';
 import '../domain/document_devis.dart';
 import '../domain/document_facture.dart';
+import 'agenda/client_agenda_google.dart';
+import 'agenda/service_agenda_google.dart';
 import 'database/app_database.dart';
 import 'drive/compte_google.dart';
 import 'drive/service_drive.dart';
@@ -203,6 +205,27 @@ final serviceRappelsDeclarationProvider = Provider<ServiceRappelsDeclaration>(
   (ref) => ServiceRappelsDeclaration(
     parametres: ref.watch(parametresRepositoryProvider),
     planificateur: ref.watch(planificateurRappelsProvider),
+    horloge: ref.watch(horlogeProvider),
+  ),
+);
+
+/// Le client de Google Agenda. Il n'existe que si le compte Google sait demander le droit « agenda » (Android et Windows) ;
+/// sinon `null`. Les tests le remplacent par un faux Google Agenda.
+final clientAgendaGoogleProvider = Provider<ClientAgendaGoogle?>((ref) {
+  final CompteGoogle compte = ref.watch(compteGoogleProvider);
+  // `CompteAvecAgenda` est une interface à part : un simple test de type ne « promeut » pas le compte.
+  if (compte is! CompteAvecAgenda) return null;
+  final CompteAvecAgenda avecAgenda = compte as CompteAvecAgenda;
+  return ClientAgendaGoogleReel(jeton: avecAgenda.jetonAgenda, invaliderJeton: compte.invaliderJeton);
+});
+
+/// La synchronisation du calendrier vers Google Agenda (réglage, agenda créé dans le compte Google, envoi).
+final serviceAgendaGoogleProvider = Provider<ServiceAgendaGoogle>(
+  (ref) => ServiceAgendaGoogle(
+    agenda: ref.watch(agendaRepositoryProvider),
+    parametres: ref.watch(parametresRepositoryProvider),
+    compte: ref.watch(compteGoogleProvider),
+    client: ref.watch(clientAgendaGoogleProvider),
     horloge: ref.watch(horlogeProvider),
   ),
 );

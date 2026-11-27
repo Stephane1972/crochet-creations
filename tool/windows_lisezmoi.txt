@@ -34,6 +34,14 @@ Rappel de la déclaration des recettes
   vérifiez dans les paramètres de Windows que les notifications sont autorisées et que « Ne pas déranger » est désactivé). La
   programmation est refaite à chaque ouverture de l'application. L'application n'envoie rien à l'organisme.
 
+Synchroniser le calendrier avec Google Agenda
+  Calendrier > l'icône de synchronisation (barre du haut) > « Synchroniser avec Google Agenda ». Il faut être connecté à Google
+  (Réglages > Google Drive). Votre navigateur s'ouvre pour autoriser « Google Agenda » : laissez toutes les cases cochées. L'application
+  crée alors son propre agenda, « Un p'tit crochet dans les stocks », dans votre compte Google, et y envoie le calendrier ; elle ne voit
+  aucun de vos autres agendas. Avant la première fois, activez « Google Calendar API » dans votre projet Google Cloud (guide dans le
+  fichier README du projet, section « Synchronisation avec Google Agenda »). Un élément supprimé de l'application reste dans Google
+  Agenda, marqué « [Annulé] » : il n'est supprimé que si vous touchez « Nettoyer l'agenda Google » et confirmez.
+
 Passer vos données du téléphone Android à Windows (ou l'inverse), sans Drive :
   1. Sur l'appareil qui contient les données : Réglages > Sauvegarde et export > « Sauvegarder maintenant »,
      puis « Partager » (sous Windows : « Enregistrer sous... »).

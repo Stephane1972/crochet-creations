@@ -60,6 +60,7 @@ crochet-creations/
 │   │   ├── notes.dart                        catégories de notes de départ, « Sans catégorie », règles du nom, du titre et du texte d'une note
 │   │   ├── agenda.dart                       calendrier sans base ni écran : entrées, filtres, grille du mois, tri, échéances de déclaration, adresses Google Agenda
 │   │   ├── declaration.dart                  rappel de déclaration sans notification ni écran : dates des rappels (3 jours avant + dernier jour, 9 h), textes, identifiants
+│   │   ├── agenda_google.dart                synchro Google Agenda sans réseau ni écran : identifiants stables, contenu des événements, plan d'actions (« [Annulé] », jamais de suppression), bilan
 │   │   ├── erreurs.dart                      erreurs métier à message clair
 │   │   ├── usage_historique.dart             « où apparaît cet élément » (ventes, factures, devis, inscriptions), en phrase
 │   │   ├── regles_client.dart                règles de saisie d'une fiche client (e-mail, téléphone, code postal, SIRET)
@@ -117,6 +118,9 @@ crochet-creations/
 │   │   │   ├── devis_pdf.dart                mise en page du PDF d'un devis (genererDevisPdf)
 │   │   │   ├── construire_document.dart      facture ou devis + profil → DocumentFacture / DocumentDevis
 │   │   │   └── ressources_pdf.dart           polices Poppins et logo lus dans les ressources
+│   │   ├── agenda/
+│   │   │   ├── client_agenda_google.dart     API Google Calendar v3 en appels HTTP directs (interface ClientAgendaGoogle + ClientAgendaGoogleReel), erreurs lisibles
+│   │   │   └── service_agenda_google.dart    activer / désactiver / synchroniser / nettoyer / recréer l'agenda ; bilan de chaque synchronisation
 │   │   ├── notifications/
 │   │   │   ├── planificateur_rappels.dart    notifications programmées (interface PlanificateurRappels + flutter_local_notifications : Android et Windows)
 │   │   │   └── service_rappels_declaration.dart activer / désactiver / synchroniser / tester le rappel de déclaration
@@ -208,7 +212,9 @@ crochet-creations/
 │       ├── agenda/                           calendrier (voir « Calendrier »)
 │       │   ├── agenda_screen.dart            Accueil ou Plus › Calendrier : grille du mois, filtres, liste du jour, liens Google Agenda
 │       │   ├── evenement_form_screen.dart    un événement : titre, jour, toute la journée ou heures, précisions ; enregistrer, supprimer
-│       │   └── agenda_providers.dart         entrées du mois et filtres, en direct
+│       │   ├── agenda_providers.dart         entrées du mois et filtres, en direct
+│       │   ├── agenda_google_screen.dart     Calendrier › Google Agenda : interrupteur, bilan, synchroniser, ouvrir, nouvel agenda, nettoyer
+│       │   └── agenda_google_providers.dart  réglage et droit en direct, état de la synchro (en cours, bilan), déclenchement après modification
 │       ├── declaration/                      rappel de déclaration (voir « Rappel de déclaration »)
 │       │   ├── declaration_screen.dart       Plus › Déclaration des recettes : rappel, essai de notification, recettes du mois et du mois dernier
 │       │   └── declaration_providers.dart    rappel activé, notifications autorisées, recettes en direct
@@ -306,6 +312,10 @@ les produits : `domain/produits/`, `data/produits/`, `presentation/produits/`.
   (`stockagePiecesJointesProvider`, `selecteurPieceJointeProvider`, `ouvreurPieceJointeProvider`), remplacés en test ;
 - calendrier (`presentation/agenda/agenda_providers.dart`) : `entreesAgendaProvider` (tout ce qui est prévu dans la grille d'un mois, en direct),
   `filtresAgendaProvider` (types affichés, en direct) ; `agendaRepositoryProvider` et `ouvreurAdresseProvider` sont dans `data/providers.dart` ;
+- synchronisation Google Agenda (`presentation/agenda/agenda_google_providers.dart`) : `reglageAgendaGoogleProvider` (activée ? agenda mémorisé ?, en direct),
+  `droitAgendaGoogleProvider` (le droit « agenda » est-il accordé ?), `synchroAgendaGoogleProvider` (notifier : état « en cours » + dernier bilan, écoute les
+  changements du calendrier), `delaiSynchroAgendaGoogleProvider` (30 s, raccourci en test) ; `clientAgendaGoogleProvider` (nul si le compte ne sait pas demander
+  le droit « agenda ») et `serviceAgendaGoogleProvider` sont dans `data/providers.dart` ;
 - rappel de déclaration (`presentation/declaration/declaration_providers.dart`) : `rappelDeclarationProvider` (réglage en direct), `notificationsAutoriseesProvider`,
   `recettesDeclarationProvider` (recettes en direct) ; `planificateurRappelsProvider` et `serviceRappelsDeclarationProvider` sont dans `data/providers.dart` ;
 - `filtresProduitsProvider` : recherche, catégorie (clé), « Archivés », « À réapprovisionner ». Il vit au-dessus des écrans :
@@ -454,7 +464,7 @@ Les valeurs des listes de choix sont enregistrées sous leur **nom Dart** : ne j
 Après une migration, `PRAGMA foreign_key_check` vérifie qu'aucune liaison n'a été cassée.
 
 Historique des versions du schéma : **1** (étapes 2 à 12), **2** (`ventes.client_nom` et `devis.client_nom`, pour garder le nom
-d'un client supprimé), **3** (table `categories_produit`, remplie avec les cinq catégories de départ), **4** (table `lieux_vente`, remplie avec les quatre lieux de départ, et colonne `ventes.lieu_id` vide pour toutes les ventes existantes), **5** (tables `categories_note`, remplie avec les deux catégories de départ, et `notes`), **6** (table `pieces_jointes_note`), **7** (table `evenements_agenda` et quatre colonnes d'affichage du calendrier dans `parametres_entreprise`, toutes à « vrai »). Une sauvegarde d'un schéma plus ancien se restaure sans changement : la restauration n'écrit que les
+d'un client supprimé), **3** (table `categories_produit`, remplie avec les cinq catégories de départ), **4** (table `lieux_vente`, remplie avec les quatre lieux de départ, et colonne `ventes.lieu_id` vide pour toutes les ventes existantes), **5** (tables `categories_note`, remplie avec les deux catégories de départ, et `notes`), **6** (table `pieces_jointes_note`), **7** (table `evenements_agenda` et quatre colonnes d'affichage du calendrier dans `parametres_entreprise`, toutes à « vrai »), **8** (colonne `rappel_declaration`, à « faux »), **9** (colonnes `agenda_google_actif`, à « faux », et `agenda_google_calendrier`, vide). Une sauvegarde d'un schéma plus ancien se restaure sans changement : la restauration n'écrit que les
 colonnes présentes dans l'archive (voir « Restaurer »).
 
 ## Produits et stock (étape 3)
@@ -1406,6 +1416,99 @@ fixe ; toucher la notification ouvre l'application ; 9 h et les jours fixes ; pr
 `migration_schema_test` (version 8, migration 7 → 8), `service_sauvegarde_test` (réglage dans l'archive, archive d'avant le rappel),
 `tool/tests/test_notifications.py` (script Android).
 
+## Synchronisation Google Agenda (demande de novembre 2026, étape 3 sur 3 — 0.28.0)
+
+Le calendrier de l'application est **envoyé** vers un agenda Google, **dans un seul sens**, sur Android et Windows. Elle est **désactivée au départ** ; deux
+colonnes de `parametres_entreprise` (schéma 9) mémorisent le choix (`agenda_google_actif`) et l'identifiant de l'agenda créé (`agenda_google_calendrier`) :
+elles suivent la sauvegarde et la reprise entre appareils.
+
+Principes : **un agenda à soi** (créé par l'application, droit `calendar.app.created` : aucun autre agenda n'est visible) ; **identifiants stables** (modifier
+un élément modifie son événement) ; **jamais de suppression sans demande** (un élément disparu devient « [Annulé] ») ; **jamais d'exception** vers l'écran
+(tout est dans un bilan).
+
+### Règles (`domain/agenda_google.dart`, sans réseau ni écran)
+
+- `fenetreSynchro(maintenant)` : du 1er du mois dernier (inclus) au 1er du mois situé 13 mois plus tard (exclu), composé avec `DateTime(année, mois + n)`.
+- `identifiantEvenementGoogle(entree)` : `ptitc<n>` (cours), `ptitq<n>` (devis), `ptite<n>` (événement), `ptitd<AAAAMMJJ>` (déclaration). Google n'accepte, dans un
+  identifiant choisi, que les lettres a à v et les chiffres (5 à 1024 caractères), uniques dans l'agenda : c'est ce qui permet de **remplacer** plutôt que
+  dupliquer, d'une synchronisation et d'un appareil à l'autre.
+- `EvenementGoogle` : titre, précisions, lieu, « toute la journée », début et fin (UTC), type. `evenementDepuisEntree` : les événements d'une journée entière
+  sont envoyés en jours (la fin est le lendemain), les autres avec leurs heures ; `memeContenu` compare ce que Google affiche (titre, précisions, lieu, moments).
+  `annule()` préfixe le titre de `[Annulé] ` (`estAnnule`).
+- `planifierSynchro(souhaites, existants, filtres)` rend un `PlanSynchro` : `aCreer` (absents de Google), `aRemplacer` (contenu différent), `aAnnuler`
+  (présents dans Google, plus dans le calendrier), `inchanges`, `dejaAnnules`. **Il ne contient jamais de suppression.** Un événement dont le type est
+  **masqué par les filtres** (ou de type inconnu) n'est pas touché ; un événement déjà marqué n'est plus retouché ; un élément qui revient redevient normal
+  (`aRemplacer`). Appliquer le plan puis le recalculer donne un plan vide (idempotence testée).
+- `ResultatSynchro` (créés, modifiés, marqués, inchangés, échecs) et `resumeSynchro` : la phrase du bilan (« 3 ajoutés, 12 déjà à jour. »).
+
+### Client Google Calendar (`data/agenda/client_agenda_google.dart`)
+
+`ClientAgendaGoogle` (interface, remplacée en test par un faux Google Agenda en mémoire : `test/data/aide_agenda_google.dart`) : `creerCalendrier`, `lister`,
+`creer`, `remplacer`, `supprimer`. `ClientAgendaGoogleReel` appelle `https://www.googleapis.com/calendar/v3` avec `http` : `POST calendars` (nom, fuseau
+`Europe/Paris`), `GET calendars/<id>/events` (filtre `privateExtendedProperty=crochet=1`, pages de 250, bornes `timeMin`/`timeMax`), `POST events` (identifiant choisi),
+`PUT events/<id>`, `DELETE events/<id>`, toujours avec `sendUpdates=none`. Les événements portent deux propriétés privées (`crochet=1` et le type) et un statut
+« disponible » quand ils sont annulés.
+
+- Un identifiant déjà pris (409) devient un remplacement (Google garde l'identifiant d'un événement supprimé : on le rétablit avec `status: confirmed`) ; un
+  remplacement d'un événement absent (404) devient une création ; supprimer un événement déjà absent (404, 410) n'est pas une erreur ; un agenda absent (404) lève
+  `CalendrierIntrouvable`.
+- Un 401 invalide le jeton et **retente une fois** avec un jeton neuf ; limite de débit (429, ou 403 « rate limit ») et erreurs 5xx : nouvelles tentatives après 1, 2 puis
+  4 s (pas pour la création de l'agenda, qui n'est pas répétable sans risque de doublon). Les erreurs deviennent des `ErreurDrive` à message français :
+  API Google Calendar non activée dans le projet, droit « agenda » absent (`autorisationAExpire`), Google demande de ralentir, réseau coupé.
+
+### Droit « agenda » (`CompteAvecAgenda`, `data/drive/`)
+
+Interface **à part** de `CompteGoogle` (un simple test de type ne « promeut » pas le compte : `compte is CompteAvecAgenda ? compte as CompteAvecAgenda : null`) :
+`agendaAutorise()` (sans rien afficher), `autoriserAgenda()` (lève `ErreurDrive` : `annulee` si la personne ferme la fenêtre), `jetonAgenda()`.
+
+- **Android** (`CompteGoogleReel`) : `authorizationForScopes` / `authorizeScopes([calendar.app.created])` de `google_sign_in` 7 : demande **incrémentale**, Drive n'est pas
+  redemandé ; jeton d'agenda mémorisé à part, `invaliderJeton` efface les deux.
+- **Windows** (`CompteGoogleBureau`) : l'autorisation durable ne se complète pas ; `autoriserAgenda` refait la connexion dans le navigateur avec **Drive + Agenda**
+  (`OAuthBureau.autoriser(portees: …)`) et vérifie que « agenda » figure bien parmi les droits accordés (la personne peut décocher la case). Le réglage
+  `agenda` est gardé dans `google_bureau.json` (hors base et sauvegardes) ; `seConnecter` redemande « agenda » si on l'avait déjà et l'efface s'il n'est plus accordé.
+
+### Service (`ServiceAgendaGoogle`)
+
+- `activer()` : connecté ? (sinon `nonConnecte`) → droit « agenda » (demandé si besoin ; `annulee`, `droitAbsent`, `erreur`) → mémorise `actif` → `synchroniser()`.
+- `synchroniser()` : **une seule à la fois** (deux demandes partagent le même `Future`) ; sans effet si désactivée ; crée l'agenda au besoin (identifiant mémorisé
+  **avant** l'envoi) ; lit les entrées du calendrier de la fenêtre (avec les filtres) et les événements de l'application déjà présents dans Google ; calcule le
+  plan ; l'applique **un événement après l'autre** (une écriture refusée est comptée et on continue ; **3 échecs de suite** arrêtent l'envoi, le reste sera retenté ;
+  une autorisation perdue ou un agenda disparu interrompent tout). **Ne lève jamais** : `BilanSynchro(issue, resultat, message)` avec `IssueSynchro` : `reussie`,
+  `partielle`, `desactivee`, `indisponible`, `nonConnecte`, `droitAbsent`, `annulee`, `agendaIntrouvable`, `erreur`.
+- `desactiver()` garde l'agenda mémorisé (réactiver ne crée pas de doublon). `recreerAgenda()` oublie l'agenda mémorisé, en crée un autre et y envoie tout : **jamais
+  appelé automatiquement**.
+- `evenementsAnnules()` et `nettoyer()` : la **seule suppression** de l'application dans Google Agenda ; elle ne concerne que les événements de l'agenda marqués
+  « [Annulé] » (même hors de la fenêtre), n'est appelée qu'après la confirmation de la personne, ne touche pas à la base de l'application, et lève une `ErreurDrive`
+  lisible (pas connecté, droit absent, aucun agenda créé, agenda introuvable).
+
+### Déclenchement (`SynchroAgendaGoogleNotifier`)
+
+`NotifierProvider` qui vit tant que l'application : `EtatSynchroAgendaGoogle` (en cours ou non, dernier bilan, heure). Il s'abonne à
+`AgendaRepository.observerChangements` (les tables `cours`, `devis`, `clients` et `evenements_agenda`, via `observerTables`), **ignore le premier signal** (la lecture de
+départ) et relance `synchroniser()` **30 s après la dernière modification** (minuteur remis à zéro à chaque signal : une seule synchronisation pour plusieurs
+modifications). `main.dart` le lance une première fois à l'ouverture ; la synchronisation n'écrit dans aucune de ces tables, donc ne se relance pas toute seule. Les
+bilans « désactivée » et « indisponible » ne remplacent pas celui qui est affiché.
+
+### Écran (`AgendaGoogleScreen`)
+
+Route `agendaGoogle` (`/agenda/google`), icône **Synchroniser avec Google Agenda** dans la barre du calendrier. Cartes : explication ; interrupteur (avec le compte), ou
+« pas connecté » (bouton vers *Google Drive*), ou « indisponible sur cet appareil » ; si activée : *Autoriser Google Agenda* quand le droit manque, bilan de la dernière
+synchronisation, *Synchroniser maintenant*, *Ouvrir Google Agenda*, *Créer un nouvel agenda* (seulement si l'agenda est introuvable) ; *Nettoyer l'agenda Google* (dès qu'un
+agenda existe : liste le nombre d'événements marqués, **confirmation**, puis supprime) ; « ce qu'il faut savoir ».
+
+### Limites
+
+Pas encore essayé avec un vrai compte Google ; un seul sens (les modifications faites dans Google Agenda sont écrasées) ; l'agenda est retrouvé par l'identifiant mémorisé (le
+droit demandé ne permet pas de lister les agendas), et l'accès croisé Android (client Web) / Windows (client « bureau ») au même agenda n'est **pas vérifié** ; un seul appareil
+à synchroniser conseillé ; fenêtre de 14 mois (un élément déplacé hors de la fenêtre est marqué « [Annulé] ») ; première synchronisation lente (une requête par événement) ;
+API Google Calendar à activer dans le projet, avertissement « application non vérifiée » possible, administrateur Workspace pouvant bloquer l'application.
+
+**Tests** : `test/domain/agenda_google_test.dart` (fenêtre, identifiants, contenu, plan, idempotence, bilan), `test/data/client_agenda_google_test.dart` (appels HTTP avec
+`MockClient`, 401, 409, 404, limite de débit, messages), `test/data/service_agenda_google_test.dart` (activer, synchroniser, « [Annulé] », nettoyage, pannes),
+`test/data/aide_agenda_google.dart` (faux Google Agenda), `test/presentation/synchro_agenda_google_test.dart` (état, déclenchement différé, une seule synchronisation),
+`test/presentation/agenda_google_ecran_test.dart` (écran), `compte_google_bureau_test` et `stockage_google_bureau_test` (droit « agenda » sous Windows),
+`parametres_repository_test`, `schema_test`, `migration_schema_test` (version 9, migration 8 → 9), `service_sauvegarde_test`, `agenda_repository_test` (flux des changements).
+
 ## Dossier `android/`
 
 Le dossier `android/` n'est pas versionné. `tool/setup_android.sh` le crée avec `flutter create`,
@@ -1510,6 +1613,7 @@ Pas d'appareil photo ; photos non réduites
 | Sauvegarde fiable | `crypto` (SHA-256 des fichiers, en flux) ; `disk_space_plus` (place libre du téléphone, derrière l'interface `ControleEspaceLibre` : une mesure impossible est traitée comme « inconnue » et ne bloque jamais une sauvegarde) | étape 3 du plan d'évolution |
 | Google Drive | `google_sign_in` (connexion, Android : Google Play Services), `googleapis` (API Drive v3) et `http` ; droit `drive.file` seulement ; ID client Web non secret ; gratuit (voir « Google Drive ») | étape 6 du plan d'évolution |
 | Notifications | `flutter_local_notifications` (notifications programmées, Android et Windows) et `timezone` ; programmation inexacte sous Android (pas d'alarme exacte à autoriser) ; texte fixe ; gratuit, sans serveur (voir « Rappel de déclaration ») | 0.27.0 |
+| Google Agenda | API Google Calendar v3 en appels HTTP directs avec `http` (aucune classe `googleapis` : les corps JSON sont écrits et lus à la main, testés avec `MockClient`) ; droit `calendar.app.created` seulement, demandé à part de Drive ; gratuit (voir « Synchronisation Google Agenda ») | 0.28.0 |
 | Dépendances des étapes suivantes | arriveront avec les étapes qui s'en servent | à venir |
 
 ### Hypothèses du schéma, à confirmer
@@ -1569,6 +1673,9 @@ Le cahier des charges ne tranchait pas ces points ; voici ce qui a été retenu 
 - Rappel de déclaration (0.27.0) : `domain/declaration_test`, `service_rappels_declaration_test`, `declaration_ecran_test`, `statistiques_repository_test`,
   `parametres_repository_test`, `schema_test` et `migration_schema_test` (version 8, migration 7 → 8), `service_sauvegarde_test`, `tool/tests/test_notifications.py`
   (détail dans « Rappel de déclaration »).
+- Synchronisation Google Agenda (0.28.0) : `domain/agenda_google_test`, `client_agenda_google_test`, `service_agenda_google_test`, `synchro_agenda_google_test`,
+  `agenda_google_ecran_test`, `compte_google_bureau_test`, `stockage_google_bureau_test`, `parametres_repository_test`, `schema_test` et `migration_schema_test`
+  (version 9, migration 8 → 9), `service_sauvegarde_test`, `agenda_repository_test` (détail dans « Synchronisation Google Agenda »).
 - Suppression d'un client ou d'un produit : `suppression_repository_test` (historique conservé, noms copiés, lignes détachées,
   inscriptions refusées), `migration_schema_test` (base du schéma 1 mise à jour sans perte), `service_sauvegarde_test`
   (archive du schéma 1), `export_csv_test` et `devis_repository_test` (client supprimé), `domain/usage_historique_test`.

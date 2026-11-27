@@ -6,7 +6,66 @@ validée augmente le numéro de version mineure (0.1.0, 0.2.0…).
 
 ## [Non publié]
 
-## [0.27.0] — Rappel de déclaration des recettes (en attente de validation)
+## [0.28.0] — Synchronisation avec Google Agenda (en attente de validation)
+
+Troisième et dernière étape de la demande de Stéphane (accueil + calendrier, rappel de déclaration, **synchronisation avec Google Agenda**), sur
+**Android et Windows**. Choix de Stéphane : **les deux** (liens et synchronisation automatique ; le contenu se personnalise avec les filtres du
+calendrier) et **« [Annulé] », jamais supprimer** : ce qui disparaît de l'application reste dans Google Agenda, marqué « [Annulé] ». **Android est
+inchangé** tant que la synchronisation n'est pas activée (elle est désactivée au départ) ; la base passe au schéma 9 par une migration automatique
+qui ne touche à aucune donnée existante.
+
+### Ajouté
+- **Calendrier › Google Agenda** (icône de synchronisation dans la barre du calendrier, route `/agenda/google`) :
+  - l'interrupteur **Synchroniser avec Google Agenda** (avec le compte Google connecté). L'activer demande à Google le droit « Google Agenda »
+    (`calendar.app.created`, **à part de Drive**, accordé seulement à ce moment-là), crée **l'agenda « Un p’tit crochet dans les stocks »** dans le compte
+    et y envoie le calendrier. Ce droit ne donne accès **qu'à cet agenda** : aucun autre agenda de la personne n'est lu ;
+  - **ce qui est envoyé** : les cours, la fin de validité des devis ouverts, la déclaration (dernier jour du mois) et les événements, **du 1er du mois
+    dernier à 12 mois après le mois en cours**, selon les **filtres du calendrier** (un type masqué n'est pas envoyé, et ce qui est déjà dans Google
+    Agenda n'est pas touché) ; un événement Google par élément, à **identifiant stable** : modifier l'élément modifie l'événement, il n'en crée pas un second ;
+  - **déclenchement** : à l'ouverture de l'application, une trentaine de secondes après une modification (une seule fois pour plusieurs modifications
+    de suite) et avec **Synchroniser maintenant** ; le **bilan** de la dernière synchronisation est affiché (« 3 ajoutés, 12 déjà à jour. » ou le motif d'un problème) ;
+  - **« [Annulé] », jamais supprimé** : un événement supprimé de l'application, un cours annulé ou archivé, un devis accepté, refusé ou expiré passent en
+    « [Annulé] Titre » dans Google Agenda (et en « disponible »). Un élément qui revient (cours rétabli) redevient normal ;
+  - **Nettoyer l'agenda Google** : supprime de Google Agenda **les seuls événements « [Annulé] »**, après une confirmation qui en donne le nombre ; rien
+    n'est supprimé dans l'application. C'est la seule suppression faite dans Google Agenda, et seulement sur demande ;
+  - **Autoriser Google Agenda** (si le droit manque ou a été retiré), **Créer un nouvel agenda** (si l'agenda mémorisé n'existe plus : jamais fait
+    automatiquement), **Ouvrir Google Agenda**, et des messages clairs pour les cas « pas connecté à Google », « autorisation fermée », « API Google
+    Calendar non activée », « réseau coupé », « Google demande de ralentir ».
+- Base : deux réglages, `agenda_google_actif` et `agenda_google_calendrier` (l'identifiant de l'agenda créé), schéma 9 ; ils sont dans la sauvegarde.
+  Une ancienne sauvegarde se restaure avec la synchronisation désactivée.
+- Comptes Google : une interface à part, `CompteAvecAgenda` (`agendaAutorise`, `autoriserAgenda`, `jetonAgenda`). **Android** : demande
+  incrémentale du droit « agenda » avec `google_sign_in` (le droit Drive n'est pas redemandé). **Windows** : nouvelle autorisation dans le navigateur avec
+  Drive **et** Agenda (l'accès « application de bureau » est le même), avec vérification que le droit « Google Agenda » a bien été accordé.
+- Code : `domain/agenda_google.dart` (règles pures : identifiants, contenu des événements, plan d'actions, bilan), `data/agenda/client_agenda_google.dart`
+  (API Google Calendar v3 en appels HTTP directs, nouvelle tentative sur limite de débit et erreurs 5xx), `data/agenda/service_agenda_google.dart`,
+  `AgendaRepository.observerChangements`, `presentation/agenda/agenda_google_providers.dart` et `agenda_google_screen.dart`.
+- Documentation : guide pas à pas pour activer l'API Google Calendar et déclarer le droit dans le projet Google Cloud (README), note Windows.
+- Tests (sans réseau, avec un faux Google Agenda) : règles (`agenda_google_test`), client HTTP (`client_agenda_google_test`), service
+  (`service_agenda_google_test`), déclenchement (`synchro_agenda_google_test`), écran (`agenda_google_ecran_test`), comptes
+  (`compte_google_bureau_test`, `stockage_google_bureau_test`), réglages (`parametres_repository_test`), `schema_test`, `migration_schema_test`
+  (migration 8 → 9), `service_sauvegarde_test`, `agenda_repository_test` (flux des changements).
+
+### Modifié
+- Version 0.28.0 (build 33) ; schéma de la base : 9.
+- La mention « en attente de validation » de la version 0.27.0 est retirée (étape 2 validée et fusionnée, PR #31).
+
+### Limites connues
+- **Pas encore essayé avec un vrai compte Google ni sur un vrai téléphone ou PC** : écrit sans pouvoir lancer Flutter ici ; l'analyse et les tests
+  (avec un faux Google Agenda) tournent sur GitHub. Il faut aussi, une fois, **activer « Google Calendar API »** dans le projet Google Cloud et
+  déclarer le droit (guide dans le README) ; Google peut afficher « application non vérifiée » (Paramètres avancés → continuer), et l'administrateur
+  d'un compte Google Workspace peut bloquer les applications tierces.
+- **Un seul sens** : ce qui est modifié à la main dans Google Agenda est remplacé à la prochaine synchronisation, ce qui y est supprimé est recréé.
+- **L'agenda est mémorisé par son identifiant** (le droit demandé ne permet pas de le retrouver dans la liste des agendas). **Non vérifié** : que le
+  téléphone (accès Android) et le PC (accès « application de bureau ») puissent écrire dans le **même** agenda ; sinon l'un voit « agenda introuvable »
+  et peut en créer un second (à supprimer à la main).
+- **Un seul appareil à synchroniser** est conseillé : un autre appareil aux données différentes marquerait « [Annulé] » ce qui n'est pas dans son calendrier.
+- **Période de 14 mois** ; un élément déplacé hors de la période est marqué « [Annulé] ».
+- **Première synchronisation lente** (une demande par événement ; de l'ordre de la demi-minute pour une centaine d'événements, estimation non
+  mesurée) ; arrêt après 3 échecs de suite, reprise à la fois suivante.
+- Agenda en heure de Paris ; devis et déclaration en « toute la journée » ; ni rappel ni invité ajoutés.
+- Les événements « [Annulé] » s'accumulent tant qu'on ne touche pas à « Nettoyer l'agenda Google » (voulu).
+
+## [0.27.0] — Rappel de déclaration des recettes
 
 Deuxième des trois étapes de la demande de Stéphane (accueil + calendrier, **rappel de déclaration**, synchronisation avec Google Agenda), sur
 **Android et Windows**. Choix de Stéphane : déclaration **mensuelle**, rappel **3 jours avant la fin du mois et le dernier jour**. **Android est

@@ -88,8 +88,10 @@ la suivante :
 - [x] 1. Accueil + calendrier : tuiles « Bloc-notes » et « Calendrier », calendrier du mois, filtres (cours, devis, déclaration, vos événements),
   événements personnels, boutons « Ouvrir Google Agenda » et « Ajouter à Google Agenda » (PR #30 fusionnée, 0.26.0)
 - [x] 2. Rappel de déclaration : notification 3 jours avant et le dernier jour du mois, à 9 h (Android et Windows), écran Plus › Déclaration des
-  recettes (activer, tester, prochain rappel), recettes encaissées ce mois-ci et le mois dernier (0.27.0, en attente de validation)
-- [ ] 3. Synchronisation avec Google Agenda : un calendrier dédié, jamais de suppression sans demande (nécessite d'activer l'API Google Agenda)
+  recettes (activer, tester, prochain rappel), recettes encaissées ce mois-ci et le mois dernier (PR #31 fusionnée, 0.27.0)
+- [x] 3. Synchronisation avec Google Agenda : un agenda dédié créé dans le compte Google, envoi dans un seul sens, élément disparu marqué « [Annulé] » et
+  jamais supprimé sans demande (bouton « Nettoyer l'agenda Google »), écran Calendrier › Google Agenda ; nécessite d'activer l'API Google Calendar
+  (0.28.0, en attente de validation)
 
 ## Version 2 : confort et échanges (propositions, non engagées)
 

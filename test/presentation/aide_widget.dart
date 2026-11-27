@@ -42,6 +42,7 @@ import 'package:crochet_creations/domain/document_devis.dart';
 import 'package:crochet_creations/domain/document_facture.dart';
 import 'package:crochet_creations/domain/drive_envoi.dart';
 import 'package:crochet_creations/domain/enums.dart';
+import 'package:crochet_creations/presentation/agenda/agenda_google_providers.dart';
 import 'package:crochet_creations/presentation/common/photo_retrouvee.dart';
 import 'package:crochet_creations/presentation/factures/factures_providers.dart';
 import 'package:crochet_creations/presentation/splash/splash_screen.dart';
@@ -51,6 +52,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../data/aide_agenda_google.dart';
 import '../data/aide_drive.dart';
 import '../data/aide_rappels.dart';
 
@@ -259,6 +261,13 @@ class EnvironnementTest {
   /// Faux compte Google et faux Drive : aucun réseau, aucune fenêtre de connexion.
   FauxCompteGoogle compteGoogle = FauxCompteGoogle();
   final FauxClientDrive clientDrive = FauxClientDrive();
+
+  /// Faux Google Agenda : aucun réseau ; il garde ce que l'application y écrit.
+  final FauxClientAgendaGoogle agendaGoogle = FauxClientAgendaGoogle();
+
+  /// Faux : Google Agenda n'est pas disponible sur cet appareil (comme sous Windows sans connexion Google). À régler
+  /// **avant** d'ouvrir l'application.
+  bool agendaGoogleIndisponible = false;
   late final ServiceDrive serviceDrive = ServiceDrive(
     client: clientDrive,
     dossiers: <DossierDrive, Directory>{
@@ -343,6 +352,10 @@ class EnvironnementTest {
     serviceSauvegardeProvider.overrideWithValue(sauvegarde),
     servicePartageFichiersProvider.overrideWithValue(partageFichiers),
     compteGoogleProvider.overrideWithValue(compteGoogle),
+    clientAgendaGoogleProvider.overrideWithValue(agendaGoogleIndisponible ? null : agendaGoogle),
+    // La synchronisation Google Agenda ne repart pas toute seule pendant un test (elle attend 30 s après une modification) :
+    // les tests la lancent avec le bouton.
+    delaiSynchroAgendaGoogleProvider.overrideWithValue(const Duration(hours: 1)),
     serviceDriveProvider.overrideWithValue(serviceDrive),
     serviceSauvegardeDriveProvider.overrideWithValue(serviceSauvegardeDrive),
     servicePartagesDriveProvider.overrideWithValue(servicePartagesDrive),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/router/app_routes.dart';
 import '../../domain/drive_sauvegardes.dart';
+import '../agenda/agenda_google_screen.dart';
 import '../agenda/agenda_screen.dart';
 import '../agenda/evenement_form_screen.dart';
 import '../declaration/declaration_screen.dart';
@@ -90,6 +91,8 @@ abstract final class AppRouter {
         );
       case AppRoutes.agenda:
         return _page(settings, const AgendaScreen());
+      case AppRoutes.agendaGoogle:
+        return _page(settings, const AgendaGoogleScreen());
       case AppRoutes.declaration:
         return _page(settings, const DeclarationScreen());
       case AppRoutes.agendaEvenement:
